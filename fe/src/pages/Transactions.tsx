@@ -85,7 +85,7 @@ const Transactions: React.FC = () => {
     );
     const [noteInput, setNoteInput] = useState("");
     const debouncedNote = useDebounce(noteInput, 500);
-    
+
     // Hàm helper để lấy token một cách an toàn
     const getToken = async (): Promise<string | null> => {
         const firebaseUser = auth.currentUser;
@@ -123,11 +123,12 @@ const Transactions: React.FC = () => {
             if (!token) {
                 setLoading(false);
                 return;
-            };
+            }
 
             const params: any = {};
             if (searchParams.dateRange?.[0] && searchParams.dateRange?.[1]) {
-                params.startDate = searchParams.dateRange[0].format("YYYY-MM-DD");
+                params.startDate =
+                    searchParams.dateRange[0].format("YYYY-MM-DD");
                 params.endDate = searchParams.dateRange[1].format("YYYY-MM-DD");
             }
             if (searchParams.type) params.type = searchParams.type;
@@ -135,7 +136,10 @@ const Transactions: React.FC = () => {
             if (searchParams.walletId) params.walletId = searchParams.walletId;
             if (searchParams.note) params.note = searchParams.note;
 
-            const response = await transactionApi.getTransactions(params, token);
+            const response = await transactionApi.getTransactions(
+                params,
+                token
+            );
 
             if (response && response.data.transactions) {
                 setTransactions(response.data.transactions);
@@ -183,24 +187,73 @@ const Transactions: React.FC = () => {
 
     const handleReset = () => {
         setSearchParams({
-            dateRange: null, type: undefined, category: undefined,
-            walletId: undefined, note: "",
+            dateRange: null,
+            type: undefined,
+            category: undefined,
+            walletId: undefined,
+            note: "",
         });
         setNoteInput("");
     };
 
     const columns: ColumnsType<Transaction> = [
-        { title: "Ngày", dataIndex: "date", key: "date", render: (date: string) => dayjs(date).format("DD/MM/YYYY"), sorter: (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() },
-        { title: "Loại", dataIndex: "type", key: "type", render: (type: TransactionType) => <span style={{ color: type === "INCOME" ? "#52c41a" : "#f5222d" }}>{type === "INCOME" ? "Thu nhập" : "Chi tiêu"}</span> },
+        {
+            title: "Ngày",
+            dataIndex: "date",
+            key: "date",
+            render: (date: string) => dayjs(date).format("DD/MM/YYYY"),
+            sorter: (a, b) =>
+                new Date(a.date).getTime() - new Date(b.date).getTime(),
+        },
+        {
+            title: "Loại",
+            dataIndex: "type",
+            key: "type",
+            render: (type: TransactionType) => (
+                <span
+                    style={{ color: type === "INCOME" ? "#52c41a" : "#f5222d" }}
+                >
+                    {type === "INCOME" ? "Thu nhập" : "Chi tiêu"}
+                </span>
+            ),
+        },
         { title: "Danh mục", dataIndex: "category", key: "category" },
-        { title: "Số tiền", dataIndex: "amount", key: "amount", render: (amount: number, record: Transaction) => <span style={{ color: record.type === "INCOME" ? "#52c41a" : "#f5222d" }}>{record.type === "EXPENSE" ? "-" : "+"} {formatCurrency(amount)}</span>, sorter: (a, b) => a.amount - b.amount },
+        {
+            title: "Số tiền",
+            dataIndex: "amount",
+            key: "amount",
+            render: (amount: number, record: Transaction) => (
+                <span
+                    style={{
+                        color: record.type === "INCOME" ? "#52c41a" : "#f5222d",
+                    }}
+                >
+                    {record.type === "EXPENSE" ? "-" : "+"}{" "}
+                    {formatCurrency(amount)}
+                </span>
+            ),
+            sorter: (a, b) => a.amount - b.amount,
+        },
         { title: "Ghi chú", dataIndex: "note", key: "note", ellipsis: true },
-        { title: "Hành động", key: "action", render: (_, record) => (
-            <Space size="middle" key={record._id}>
-                <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
-                <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record._id)} />
-            </Space>
-        )},
+        {
+            title: "Hành động",
+            key: "action",
+            render: (_, record) => (
+                <Space size="middle" key={record._id}>
+                    <Button
+                        type="text"
+                        icon={<EditOutlined />}
+                        onClick={() => handleEdit(record)}
+                    />
+                    <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleDelete(record._id)}
+                    />
+                </Space>
+            ),
+        },
     ];
 
     const showModal = () => {
@@ -210,10 +263,17 @@ const Transactions: React.FC = () => {
     };
 
     const handleEdit = (transaction: Transaction) => {
-        const walletIdValue = typeof transaction.walletId === "object" && transaction.walletId !== null
-            ? (transaction.walletId as any)._id : transaction.walletId;
+        const walletIdValue =
+            typeof transaction.walletId === "object" &&
+            transaction.walletId !== null
+                ? (transaction.walletId as any)._id
+                : transaction.walletId;
 
-        form.setFieldsValue({ ...transaction, walletId: walletIdValue, date: dayjs(transaction.date) });
+        form.setFieldsValue({
+            ...transaction,
+            walletId: walletIdValue,
+            date: dayjs(transaction.date),
+        });
         setEditingTransaction(transaction);
         setIsModalVisible(true);
     };
@@ -222,17 +282,74 @@ const Transactions: React.FC = () => {
         try {
             setLoading(true);
             const token = await getToken();
-            if (!token) { setLoading(false); return; }
+            if (!token) {
+                setLoading(false);
+                return;
+            }
 
+            // 1. Lấy thông tin ví được chọn để kiểm tra số dư
+            const selectedWallet = wallets.find(
+                (w) => w._id === values.walletId
+            );
+
+            // 2. Logic kiểm tra cho giao dịch CHI TIÊU
+            if (values.type === "EXPENSE" && selectedWallet) {
+                if (editingTransaction) {
+                    // TRƯỜNG HỢP CHỈNH SỬA
+                    // Chỉ kiểm tra nếu số tiền chi tiêu MỚI > số tiền chi tiêu CŨ
+                    const oldAmount = editingTransaction.amount || 0;
+                    const amountDiff = values.amount - oldAmount;
+
+                    if (amountDiff > 0 && selectedWallet.balance < amountDiff) {
+                        const isConfirmed = window.confirm(
+                            `Số dư của ví "${
+                                selectedWallet.name
+                            }" không đủ để tăng chi tiêu thêm ${formatCurrency(
+                                amountDiff
+                            )}.\n` +
+                                `Số dư hiện tại: ${formatCurrency(
+                                    selectedWallet.balance
+                                )}\n\n`
+                        );
+                        if (!isConfirmed) {
+                            setLoading(false);
+                            return; // Dừng thực thi nếu người dùng không đồng ý
+                        }
+                    }
+                } else {
+                    // TRƯỜNG HỢP TẠO MỚI
+                    if (selectedWallet.balance < values.amount) {
+                        const isConfirmed = window.confirm(
+                            `Số dư của ví "${selectedWallet.name}" không đủ để thực hiện giao dịch này.\n` +
+                                `Số dư hiện tại: ${formatCurrency(
+                                    selectedWallet.balance
+                                )}\n` +
+                                `Số tiền cần chi: ${formatCurrency(
+                                    values.amount
+                                )}\n\n`
+                        );
+                        if (!isConfirmed) {
+                            setLoading(false);
+                            return; // Dừng thực thi nếu người dùng không đồng ý
+                        }
+                    }
+                }
+            }
+
+            // 3. Nếu kiểm tra vượt qua, tiếp tục gửi API
             const transactionData = {
                 ...values,
                 date: values.date.format("YYYY-MM-DD"),
                 amount: Number(values.amount),
-                category: values.category || customCategory
+                category: values.category || customCategory,
             };
 
             if (editingTransaction) {
-                await transactionApi.updateTransaction(editingTransaction._id, transactionData, token);
+                await transactionApi.updateTransaction(
+                    editingTransaction._id,
+                    transactionData,
+                    token
+                );
                 message.success("Cập nhật giao dịch thành công");
             } else {
                 await transactionApi.createTransaction(transactionData, token);
@@ -247,7 +364,9 @@ const Transactions: React.FC = () => {
             await Promise.all([fetchTransactions(), fetchWallets()]);
         } catch (error: any) {
             console.error("Lỗi khi lưu giao dịch:", error);
-            message.error(error.message || "Đã xảy ra lỗi. Vui lòng thử lại sau.");
+            message.error(
+                error.message || "Đã xảy ra lỗi. Vui lòng thử lại sau."
+            );
         } finally {
             setLoading(false);
         }
@@ -261,11 +380,14 @@ const Transactions: React.FC = () => {
         try {
             setLoading(true);
             const token = await getToken();
-            if (!token) { setLoading(false); return; }
+            if (!token) {
+                setLoading(false);
+                return;
+            }
 
             await transactionApi.deleteTransaction(id, token);
             message.success("Xóa giao dịch thành công");
-            
+
             await Promise.all([fetchTransactions(), fetchWallets()]);
         } catch (error: any) {
             console.error("Lỗi khi xóa giao dịch:", error);
@@ -277,83 +399,300 @@ const Transactions: React.FC = () => {
 
     return (
         <div>
-            <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: 'center' }}>
+            <div
+                style={{
+                    marginBottom: 16,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                }}
+            >
                 <h2>Quản lý giao dịch</h2>
-                <Button type="primary" icon={<PlusOutlined />} onClick={showModal}>
+                <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={showModal}
+                >
                     Thêm giao dịch
                 </Button>
             </div>
 
             <div style={{ marginBottom: 16 }}>
-                <Space direction="vertical" style={{ width: "100%", marginBottom: 16 }}>
+                <Space
+                    direction="vertical"
+                    style={{ width: "100%", marginBottom: 16 }}
+                >
                     <Space wrap>
-                        <RangePicker value={searchParams.dateRange} onChange={(dates) => setSearchParams({ ...searchParams, dateRange: dates as [Dayjs, Dayjs] | null })} format="DD/MM/YYYY" />
-                        <Select placeholder="Chọn loại giao dịch" style={{ width: 150 }} value={searchParams.type} onChange={(value) => setSearchParams({ ...searchParams, type: value, category: undefined })} allowClear>
+                        <RangePicker
+                            value={searchParams.dateRange}
+                            onChange={(dates) =>
+                                setSearchParams({
+                                    ...searchParams,
+                                    dateRange: dates as [Dayjs, Dayjs] | null,
+                                })
+                            }
+                            format="DD/MM/YYYY"
+                        />
+                        <Select
+                            placeholder="Chọn loại giao dịch"
+                            style={{ width: 150 }}
+                            value={searchParams.type}
+                            onChange={(value) =>
+                                setSearchParams({
+                                    ...searchParams,
+                                    type: value,
+                                    category: undefined,
+                                })
+                            }
+                            allowClear
+                        >
                             <Option value="INCOME">Thu nhập</Option>
                             <Option value="EXPENSE">Chi tiêu</Option>
                         </Select>
-                        <Select placeholder="Chọn danh mục" style={{ width: 150 }} value={searchParams.category} onChange={(value) => setSearchParams({ ...searchParams, category: value })} allowClear showSearch optionFilterProp="children">
-                            {filterableCategories.map((cat) => (<Option key={cat} value={cat}>{cat}</Option>))}
+                        <Select
+                            placeholder="Chọn danh mục"
+                            style={{ width: 150 }}
+                            value={searchParams.category}
+                            onChange={(value) =>
+                                setSearchParams({
+                                    ...searchParams,
+                                    category: value,
+                                })
+                            }
+                            allowClear
+                            showSearch
+                            optionFilterProp="children"
+                        >
+                            {filterableCategories.map((cat) => (
+                                <Option key={cat} value={cat}>
+                                    {cat}
+                                </Option>
+                            ))}
                         </Select>
-                        <Select placeholder="Chọn ví" style={{ width: 150 }} value={searchParams.walletId} onChange={(value) => setSearchParams({ ...searchParams, walletId: value })} allowClear>
-                            {wallets.map((wallet) => (<Option key={wallet._id} value={wallet._id}>{wallet.name}</Option>))}
+                        <Select
+                            placeholder="Chọn ví"
+                            style={{ width: 150 }}
+                            value={searchParams.walletId}
+                            onChange={(value) =>
+                                setSearchParams({
+                                    ...searchParams,
+                                    walletId: value,
+                                })
+                            }
+                            allowClear
+                        >
+                            {wallets.map((wallet) => (
+                                <Option key={wallet._id} value={wallet._id}>
+                                    {wallet.name}
+                                </Option>
+                            ))}
                         </Select>
-                        <Input placeholder="Tìm kiếm ghi chú" value={noteInput} onChange={(e) => setNoteInput(e.target.value)} onPressEnter={handleSearch} style={{ width: 200 }} />
+                        <Input
+                            placeholder="Tìm kiếm ghi chú"
+                            value={noteInput}
+                            onChange={(e) => setNoteInput(e.target.value)}
+                            onPressEnter={handleSearch}
+                            style={{ width: 200 }}
+                        />
                         {/* <Button type="primary" onClick={handleSearch} icon={<SearchOutlined />}>Tìm kiếm</Button> */}
                         <Button onClick={handleReset}>Đặt lại</Button>
                     </Space>
                 </Space>
             </div>
 
-            <Table columns={columns} dataSource={transactions} rowKey="_id" loading={loading} pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `Tổng ${total} giao dịch` }} scroll={{ x: 'max-content' }} />
+            <Table
+                columns={columns}
+                dataSource={transactions}
+                rowKey="_id"
+                loading={loading}
+                pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    showTotal: (total) => `Tổng ${total} giao dịch`,
+                }}
+                scroll={{ x: "max-content" }}
+            />
 
-            <Modal title={editingTransaction ? "Chỉnh sửa giao dịch" : "Thêm giao dịch mới"} open={isModalVisible} onCancel={() => setIsModalVisible(false)} footer={null} width={600}>
-                <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ type: "EXPENSE", walletId: wallets[0]?._id, date: dayjs() }}>
-                    <Form.Item name="type" label="Loại giao dịch" rules={[{ required: true, message: "Vui lòng chọn loại giao dịch" }]}>
-                        <Select onChange={() => form.setFieldsValue({ category: undefined })}>
+            <Modal
+                title={
+                    editingTransaction
+                        ? "Chỉnh sửa giao dịch"
+                        : "Thêm giao dịch mới"
+                }
+                open={isModalVisible}
+                onCancel={() => setIsModalVisible(false)}
+                footer={null}
+                width={600}
+            >
+                <Form
+                    form={form}
+                    layout="vertical"
+                    onFinish={handleSubmit}
+                    initialValues={{
+                        type: "EXPENSE",
+                        walletId: wallets[0]?._id,
+                        date: dayjs(),
+                    }}
+                >
+                    <Form.Item
+                        name="type"
+                        label="Loại giao dịch"
+                        rules={[
+                            {
+                                required: true,
+                                message: "Vui lòng chọn loại giao dịch",
+                            },
+                        ]}
+                    >
+                        <Select
+                            onChange={() =>
+                                form.setFieldsValue({ category: undefined })
+                            }
+                        >
                             <Option value="INCOME">Thu nhập</Option>
                             <Option value="EXPENSE">Chi tiêu</Option>
                         </Select>
                     </Form.Item>
-                    <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.type !== currentValues.type}>
+                    <Form.Item
+                        noStyle
+                        shouldUpdate={(prevValues, currentValues) =>
+                            prevValues.type !== currentValues.type
+                        }
+                    >
                         {({ getFieldValue }) => (
-                            <Form.Item name="category" label="Danh mục" rules={[{ required: true, message: "Vui lòng chọn hoặc nhập danh mục" }]}>
-                                <Select placeholder="Chọn danh mục hoặc nhập mới" popupRender={(menu) => (
-                                    <div>
-                                        {menu}
-                                        <div style={{ padding: "8px", borderTop: "1px solid #f0f0f0" }}>
-                                            <Input placeholder="Thêm danh mục mới" value={customCategory} onChange={(e) => {
-                                                const value = e.target.value;
-                                                setCustomCategory(value);
-                                                if (value) { form.setFieldsValue({ category: value }); }
-                                            }} />
+                            <Form.Item
+                                name="category"
+                                label="Danh mục"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message:
+                                            "Vui lòng chọn hoặc nhập danh mục",
+                                    },
+                                ]}
+                            >
+                                <Select
+                                    placeholder="Chọn danh mục hoặc nhập mới"
+                                    popupRender={(menu) => (
+                                        <div>
+                                            {menu}
+                                            <div
+                                                style={{
+                                                    padding: "8px",
+                                                    borderTop:
+                                                        "1px solid #f0f0f0",
+                                                }}
+                                            >
+                                                <Input
+                                                    placeholder="Thêm danh mục mới"
+                                                    value={customCategory}
+                                                    onChange={(e) => {
+                                                        const value =
+                                                            e.target.value;
+                                                        setCustomCategory(
+                                                            value
+                                                        );
+                                                        if (value) {
+                                                            form.setFieldsValue(
+                                                                {
+                                                                    category:
+                                                                        value,
+                                                                }
+                                                            );
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                )}>
-                                    {categories.filter((cat) => cat.type === getFieldValue("type")).map((cat) => (<Option key={cat.name} value={cat.name}>{cat.name}</Option>))}
+                                    )}
+                                >
+                                    {categories
+                                        .filter(
+                                            (cat) =>
+                                                cat.type ===
+                                                getFieldValue("type")
+                                        )
+                                        .map((cat) => (
+                                            <Option
+                                                key={cat.name}
+                                                value={cat.name}
+                                            >
+                                                {cat.name}
+                                            </Option>
+                                        ))}
                                 </Select>
                             </Form.Item>
                         )}
                     </Form.Item>
-                    <Form.Item name="amount" label="Số tiền" rules={[{ required: true, message: "Vui lòng nhập số tiền" }]}>
-                        <InputNumber style={{ width: "100%" }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} parser={(value) => (value ? Number(value.replace(/[^0-9.-]+/g, "")) : 0) as 0} min={0} />
+                    <Form.Item
+                        name="amount"
+                        label="Số tiền"
+                        rules={[
+                            {
+                                required: true,
+                                message: "Vui lòng nhập số tiền",
+                            },
+                        ]}
+                    >
+                        <InputNumber
+                            style={{ width: "100%" }}
+                            formatter={(value) =>
+                                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                            }
+                            parser={(value) =>
+                                (value
+                                    ? Number(value.replace(/[^0-9.-]+/g, ""))
+                                    : 0) as 0
+                            }
+                            min={0}
+                        />
                     </Form.Item>
-                    <Form.Item name="walletId" label="Ví" rules={[{ required: true, message: "Vui lòng chọn ví" }]}>
-                        <Select placeholder="Chọn ví" allowClear={false} showSearch>
+                    <Form.Item
+                        name="walletId"
+                        label="Ví"
+                        rules={[
+                            { required: true, message: "Vui lòng chọn ví" },
+                        ]}
+                    >
+                        <Select
+                            placeholder="Chọn ví"
+                            allowClear={false}
+                            showSearch
+                        >
                             {wallets.map((wallet) => (
-                                <Option key={wallet._id} value={wallet._id}>{`${wallet.name} (${formatCurrency(wallet.balance)})`}</Option>
+                                <Option key={wallet._id} value={wallet._id}>{`${
+                                    wallet.name
+                                } (${formatCurrency(wallet.balance)})`}</Option>
                             ))}
                         </Select>
                     </Form.Item>
                     <Form.Item name="date" label="Ngày giao dịch">
-                        <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                        <DatePicker
+                            style={{ width: "100%" }}
+                            format="DD/MM/YYYY"
+                        />
                     </Form.Item>
                     <Form.Item name="note" label="Ghi chú">
-                        <Input.TextArea rows={3} placeholder="Nhập ghi chú (nếu có)" />
+                        <Input.TextArea
+                            rows={3}
+                            placeholder="Nhập ghi chú (nếu có)"
+                        />
                     </Form.Item>
                     <Form.Item style={{ textAlign: "right", marginBottom: 0 }}>
-                        <Button style={{ marginRight: 8 }} onClick={() => setIsModalVisible(false)} disabled={loading}>Hủy</Button>
-                        <Button type="primary" htmlType="submit" loading={loading}>{editingTransaction ? "Cập nhật" : "Thêm mới"}</Button>
+                        <Button
+                            style={{ marginRight: 8 }}
+                            onClick={() => setIsModalVisible(false)}
+                            disabled={loading}
+                        >
+                            Hủy
+                        </Button>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            loading={loading}
+                        >
+                            {editingTransaction ? "Cập nhật" : "Thêm mới"}
+                        </Button>
                     </Form.Item>
                 </Form>
             </Modal>
