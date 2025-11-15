@@ -43,6 +43,7 @@ export const verifyToken = async (req: AuthenticatedRequest, res: Response) => {
             email: user.email,
             displayName: user.displayName,
             createdAt: user.createdAt,
+            newUser: user.newUser,
         });
     } catch (error) {
         console.error("Lỗi khi xác thực token:", error);

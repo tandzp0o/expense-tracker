@@ -5,6 +5,7 @@ export interface IUser extends Document {
     email: string;
     displayName?: string;
     createdAt: Date;
+    newUser: boolean;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -12,6 +13,7 @@ const UserSchema = new Schema<IUser>({
     email: { type: String, required: true, unique: true },
     displayName: String,
     createdAt: { type: Date, default: Date.now },
+    newUser: { type: Boolean, default: true },
 });
 
 export default mongoose.model<IUser>("User", UserSchema);

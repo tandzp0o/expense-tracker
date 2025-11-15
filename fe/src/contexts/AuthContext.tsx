@@ -1,109 +1,173 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, signInWithGoogle } from '../firebase/config';
-import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import React, {
+    createContext,
+    useContext,
+    useState,
+    useEffect,
+    ReactNode,
+} from "react";
+import { auth, signInWithGoogle } from "../firebase/config"; // Giả sử firebase/config export hàm signInWithGoogle
+import {
+    User as FirebaseUser,
+    onAuthStateChanged,
+    signOut as firebaseSignOut,
+} from "firebase/auth";
 
+// 1. Định nghĩa interface cho người dùng của bạn từ backend
+interface AppUser {
+    uid: string;
+    email: string | null;
+    displayName: string;
+    newUser: boolean;
+    // Thêm các thuộc tính khác nếu backend có trả về
+}
+
+// 2. Cập nhật AuthContextType để sử dụng AppUser và thêm hàm mới
 type AuthContextType = {
-  currentUser: User | null;
-  loading: boolean;
-  signInWithGoogle: () => Promise<string | undefined>;
-  logout: () => Promise<void>;
-  isAuthenticated: boolean;
+    currentUser: AppUser | null;
+    loading: boolean;
+    signInWithGoogle: () => Promise<void>;
+    logout: () => Promise<void>;
+    isAuthenticated: boolean;
+    updateUserStatus: (isNew: boolean) => void; // <-- Hàm mới để cập nhật client state
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
 }
 
 type AuthProviderProps = {
-  children: ReactNode;
+    children: ReactNode;
+};
+
+// Hàm helper để gọi API xác thực
+const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
+    const response = await fetch(
+        "http://localhost:5000/api/auth/verify",
+        {
+            // Đảm bảo URL chính xác
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Xác thực với backend thất bại");
+    }
+
+    return response.json();
 };
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const isAuthenticated = !!currentUser;
+    const [currentUser, setCurrentUser] = useState<AppUser | null>(null); // <-- Sử dụng AppUser
+    const [loading, setLoading] = useState(true);
+    const isAuthenticated = !!currentUser;
 
-  // Đăng nhập bằng Google
-  const handleGoogleSignIn = async (): Promise<string | undefined> => {
-    try {
-      const idToken = await signInWithGoogle();
-      if (!idToken) throw new Error('Không thể lấy token đăng nhập');
-      
-      // Gọi API xác thực token với backend
-      const response = await fetch('http://localhost:5000/api/auth/verify', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+    // 3. Theo dõi trạng thái đăng nhập và đồng bộ với backend
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(
+            auth,
+            async (firebaseUser: FirebaseUser | null) => {
+                if (firebaseUser) {
+                    try {
+                        // Mỗi khi auth state thay đổi (tải lại trang, đăng nhập), lấy token và gọi backend
+                        const token = await firebaseUser.getIdToken();
+                        const appUserData = await verifyTokenWithBackend(token);
+                        setCurrentUser(appUserData); // <-- Lưu thông tin người dùng từ backend vào state
+                    } catch (error) {
+                        console.error(
+                            "Lỗi đồng bộ người dùng với backend:",
+                            error
+                        );
+                        // Nếu có lỗi, đăng xuất để tránh trạng thái không nhất quán
+                        await firebaseSignOut(auth);
+                        setCurrentUser(null);
+                    }
+                } else {
+                    // Người dùng đã đăng xuất
+                    setCurrentUser(null);
+                }
+                setLoading(false);
+            }
+        );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Xác thực thất bại');
-      }
+        return () => unsubscribe();
+    }, []);
 
-      const userData = await response.json();
-      console.log('Thông tin người dùng:', userData);
-      return idToken;
-    } catch (error) {
-      console.error('Lỗi đăng nhập bằng Google:', error);
-      // Đăng xuất nếu có lỗi
-      await firebaseSignOut(auth);
-      throw error;
-    }
-  };
-
-  // Đăng xuất
-  const logout = async () => {
-    try {
-      await firebaseSignOut(auth);
-      setCurrentUser(null);
-    } catch (error) {
-      console.error('Lỗi khi đăng xuất:', error);
-      throw error;
-    }
-  };
-
-  // Theo dõi trạng thái đăng nhập
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Lấy token mới khi user thay đổi
+    // 4. Cập nhật hàm đăng nhập Google để set state ngay lập tức
+    const handleGoogleSignIn = async (): Promise<void> => {
         try {
-          const token = await user.getIdToken();
-          // Lưu token vào localStorage hoặc state nếu cần
-          localStorage.setItem('token', token);
+            setLoading(true);
+            const idToken = await signInWithGoogle();
+            if (!idToken) throw new Error("Không thể lấy token đăng nhập");
+
+            const userData = await verifyTokenWithBackend(idToken);
+            setCurrentUser(userData); // <-- Set currentUser ngay sau khi đăng nhập thành công
         } catch (error) {
-          console.error('Lỗi khi lấy token:', error);
+            console.error("Lỗi đăng nhập bằng Google:", error);
+            await firebaseSignOut(auth);
+            setCurrentUser(null);
+            throw error; // Ném lỗi ra để component có thể xử lý (ví dụ: hiển thị thông báo)
+        } finally {
+            setLoading(false);
         }
-      } else {
-        localStorage.removeItem('token');
-      }
-      setCurrentUser(user);
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    // 5. Hàm đăng xuất không đổi
+    const logout = async () => {
+        try {
+            await firebaseSignOut(auth);
+            setCurrentUser(null);
+        } catch (error) {
+            console.error("Lỗi khi đăng xuất:", error);
+            throw error;
+        }
+    };
 
-  const value = {
-    currentUser,
-    loading,
-    signInWithGoogle: handleGoogleSignIn,
-    logout,
-    isAuthenticated,
-  };
+    // 6. Hàm mới để cập nhật trạng thái newUser từ component con
+    const updateUserStatus = (isNew: boolean) => {
+        if (currentUser) {
+            // Cập nhật lại state của context để UI thay đổi ngay lập tức
+            setCurrentUser({ ...currentUser, newUser: isNew });
+        }
+    };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+    const value = {
+        currentUser,
+        loading,
+        signInWithGoogle: handleGoogleSignIn,
+        logout,
+        isAuthenticated,
+        updateUserStatus, // <-- Cung cấp hàm này ra context
+    };
+
+    // Chỉ render children khi đã xác thực xong
+    // Bạn có thể thêm một màn hình loading đẹp hơn ở đây
+    return (
+        <AuthContext.Provider value={value}>
+            {loading ? (
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        height: "100vh",
+                    }}
+                >
+                    Loading...
+                </div>
+            ) : (
+                children
+            )}
+        </AuthContext.Provider>
+    );
 };

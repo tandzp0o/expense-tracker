@@ -36,6 +36,7 @@ import {
     WalletOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { auth } from "../firebase/config"; // <-- ĐÃ THÊM
 
 dayjs.locale("vi");
 
@@ -194,8 +195,6 @@ const DashboardContent: React.FC = () => {
     const [expenseByCategory, setExpenseByCategory] = useState<CategoryStat[]>(
         []
     );
-    const [wallets, setWallets] = useState<any[]>([]);
-
     const { currentUser } = useAuth();
     const [currentDate] = useState<Date>(new Date());
     const { showBoundary } = useErrorBoundary();
@@ -203,8 +202,16 @@ const DashboardContent: React.FC = () => {
     const fetchDashboardData = useCallback(async () => {
         if (!currentUser) return;
 
+        // BẮT ĐẦU CẬP NHẬT: LẤY TOKEN THEO CÁCH MỚI
+        const firebaseUser = auth.currentUser;
+        if (!firebaseUser) {
+            message.error("Xác thực người dùng thất bại. Vui lòng tải lại trang.");
+            setIsLoading({ stats: false, transactions: false, categories: false, wallets: false });
+            return;
+        }
+        // KẾT THÚC CẬP NHẬT
+
         try {
-            // Set all loading states to true
             setIsLoading({
                 stats: true,
                 transactions: true,
@@ -214,7 +221,7 @@ const DashboardContent: React.FC = () => {
 
             const month = currentDate.getMonth() + 1;
             const year = currentDate.getFullYear();
-            const token = await currentUser.getIdToken();
+            const token = await firebaseUser.getIdToken(); // <-- ĐÃ THAY ĐỔI
 
             // Fetch data in parallel
             const [walletsData, statsData, transactionsData, categoriesData] =
@@ -232,8 +239,6 @@ const DashboardContent: React.FC = () => {
                 ]);
 
             // Update states with the fetched data
-            setWallets(walletsData?.wallets || []);
-
             const totalBalance = walletsData?.totalBalance || 0;
             const totalIncome = statsData?.totalIncome || 0;
             const totalExpense = statsData?.totalExpense || 0;
@@ -242,8 +247,8 @@ const DashboardContent: React.FC = () => {
                 totalBalance,
                 totalIncome,
                 totalExpense,
-                incomeChange: 0, // Calculate based on previous period if needed
-                expenseChange: 0, // Calculate based on previous period if needed
+                incomeChange: 0,
+                expenseChange: 0,
             });
 
             setRecentTransactions(
@@ -270,31 +275,22 @@ const DashboardContent: React.FC = () => {
                 }))
             );
         } catch (error) {
-            console.error("Error fetching dashboard data:", error);
+            console.error("Lỗi khi tải dữ liệu dashboard:", error);
             showBoundary(error);
         } finally {
-            setIsLoading((prev) => ({
-                ...prev,
+            setIsLoading({
                 stats: false,
                 transactions: false,
                 categories: false,
                 wallets: false,
-            }));
+            });
         }
     }, [currentUser, currentDate, showBoundary]);
 
     const getCategoryColor = useCallback((categoryId: string): string => {
         const colors = [
-            "#1890ff",
-            "#52c41a",
-            "#faad14",
-            "#f5222d",
-            "#722ed1",
-            "#13c2c2",
-            "#fa8c16",
-            "#eb2f96",
-            "#2f54eb",
-            "#fa541c",
+            "#1890ff", "#52c41a", "#faad14", "#f5222d", "#722ed1",
+            "#13c2c2", "#fa8c16", "#eb2f96", "#2f54eb", "#fa541c",
         ];
         const index =
             categoryId
@@ -377,36 +373,21 @@ const DashboardContent: React.FC = () => {
                 </Space>
             </div>
 
-            {/* Thêm style cho phần in */}
             <style>{`
-            @media print {
-                .no-print {
-                    display: none !important;
-                }
-                * {
-                    -webkit-print-color-adjust: exact !important;
-                    color-adjust: exact !important;
-                }
-            }
-            .print-only {
-                display: none;
                 @media print {
-                    display: block;
+                    .no-print { display: none !important; }
+                    * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
                 }
-            }
-        `}</style>
+                .print-only { display: none; }
+                @media print { .print-only { display: block; } }
+            `}</style>
 
-            {/* Thêm tiêu đề báo cáo chỉ hiển thị khi in */}
-            <div
-                className="print-only"
-                style={{ textAlign: "center", marginBottom: "20px" }}
-            >
+            <div className="print-only" style={{ textAlign: "center", marginBottom: "20px" }}>
                 <h2>Báo cáo tài chính</h2>
                 <p>Ngày xuất: {dayjs().format("DD/MM/YYYY HH:mm")}</p>
             </div>
 
             <div id="dashboard-content">
-                {/* Stats Cards */}
                 <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
                     <Col xs={24} sm={12} lg={6}>
                         <Card>
@@ -425,7 +406,7 @@ const DashboardContent: React.FC = () => {
                     <Col xs={24} sm={12} lg={6}>
                         <Card>
                             <Statistic
-                                title="Tổng thu nhập"
+                                title="Tổng thu nhập tháng"
                                 value={stats.totalIncome}
                                 precision={0}
                                 valueStyle={{ color: "#52c41a" }}
@@ -434,36 +415,12 @@ const DashboardContent: React.FC = () => {
                                     formatCurrency(value as number)
                                 }
                             />
-                            {stats.incomeChange !== 0 && (
-                                <div
-                                    style={{
-                                        fontSize: "12px",
-                                        marginTop: "8px",
-                                    }}
-                                >
-                                    <Text
-                                        type={
-                                            stats.incomeChange >= 0
-                                                ? "success"
-                                                : "danger"
-                                        }
-                                    >
-                                        {stats.incomeChange >= 0 ? (
-                                            <ArrowUpOutlined />
-                                        ) : (
-                                            <ArrowDownOutlined />
-                                        )}
-                                        {Math.abs(stats.incomeChange)}% so với
-                                        tháng trước
-                                    </Text>
-                                </div>
-                            )}
                         </Card>
                     </Col>
                     <Col xs={24} sm={12} lg={6}>
                         <Card>
                             <Statistic
-                                title="Tổng chi tiêu"
+                                title="Tổng chi tiêu tháng"
                                 value={stats.totalExpense}
                                 precision={0}
                                 valueStyle={{ color: "#f5222d" }}
@@ -472,44 +429,15 @@ const DashboardContent: React.FC = () => {
                                     formatCurrency(value as number)
                                 }
                             />
-                            {stats.expenseChange !== 0 && (
-                                <div
-                                    style={{
-                                        fontSize: "12px",
-                                        marginTop: "8px",
-                                    }}
-                                >
-                                    <Text
-                                        type={
-                                            stats.expenseChange <= 0
-                                                ? "success"
-                                                : "danger"
-                                        }
-                                    >
-                                        {stats.expenseChange <= 0 ? (
-                                            <ArrowDownOutlined />
-                                        ) : (
-                                            <ArrowUpOutlined />
-                                        )}
-                                        {Math.abs(stats.expenseChange)}% so với
-                                        tháng trước
-                                    </Text>
-                                </div>
-                            )}
                         </Card>
                     </Col>
                     <Col xs={24} sm={12} lg={6}>
                         <Card>
                             <Statistic
-                                title="Số dư khả dụng"
-                                value={stats.totalBalance}
+                                title="Thu chi tháng"
+                                value={stats.totalIncome - stats.totalExpense}
                                 precision={0}
-                                valueStyle={{
-                                    color:
-                                        stats.totalBalance >= 0
-                                            ? "#52c41a"
-                                            : "#f5222d",
-                                }}
+                                valueStyle={{ color: (stats.totalIncome - stats.totalExpense) >= 0 ? "#52c41a" : "#f5222d" }}
                                 formatter={(value) =>
                                     formatCurrency(value as number)
                                 }
@@ -519,12 +447,10 @@ const DashboardContent: React.FC = () => {
                 </Row>
 
                 <Row gutter={[16, 16]}>
-                    {/* Recent Transactions */}
                     <Col xs={24} lg={16}>
                         <Card
                             title="Giao dịch gần đây"
                             extra={<Button type="link" onClick={() => navigate('/transactions')}>Xem tất cả</Button>}
-                            style={{ marginBottom: "16px" }}
                         >
                             {recentTransactions.length > 0 ? (
                                 <List
@@ -534,101 +460,31 @@ const DashboardContent: React.FC = () => {
                                         <List.Item>
                                             <List.Item.Meta
                                                 avatar={
-                                                    <div
-                                                        style={{
-                                                            width: 40,
-                                                            height: 40,
-                                                            borderRadius: "50%",
-                                                            background:
-                                                                item.type ===
-                                                                "INCOME"
-                                                                    ? "#e6f7ff"
-                                                                    : "#fff1f0",
-                                                            display: "flex",
-                                                            alignItems:
-                                                                "center",
-                                                            justifyContent:
-                                                                "center",
-                                                        }}
-                                                    >
-                                                        {item.type ===
-                                                        "INCOME" ? (
-                                                            <IncomeIcon
-                                                                style={{
-                                                                    color: "#52c41a",
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <ExpenseIcon
-                                                                style={{
-                                                                    color: "#f5222d",
-                                                                }}
-                                                            />
-                                                        )}
+                                                    <div style={{
+                                                        width: 40, height: 40, borderRadius: "50%",
+                                                        background: item.type === "INCOME" ? "#e6f7ff" : "#fff1f0",
+                                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                                    }}>
+                                                        {item.type === "INCOME" ? <IncomeIcon style={{ color: "#52c41a" }} /> : <ExpenseIcon style={{ color: "#f5222d" }} />}
                                                     </div>
                                                 }
                                                 title={
-                                                    <div
-                                                        style={{
-                                                            display: "flex",
-                                                            justifyContent:
-                                                                "space-between",
-                                                        }}
-                                                    >
-                                                        <span>
-                                                            {item.category}
-                                                        </span>
-                                                        <span
-                                                            style={{
-                                                                color:
-                                                                    item.type ===
-                                                                    "INCOME"
-                                                                        ? "#52c41a"
-                                                                        : "#f5222d",
-                                                                fontWeight: 500,
-                                                            }}
-                                                        >
-                                                            {item.type ===
-                                                            "INCOME"
-                                                                ? "+"
-                                                                : "-"}
-                                                            {formatCurrency(
-                                                                item.amount
-                                                            )}
+                                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                                        <span>{item.category}</span>
+                                                        <span style={{ color: item.type === "INCOME" ? "#52c41a" : "#f5222d", fontWeight: 500 }}>
+                                                            {item.type === "INCOME" ? "+" : "-"}
+                                                            {formatCurrency(item.amount)}
                                                         </span>
                                                     </div>
                                                 }
                                                 description={
-                                                    <div
-                                                        style={{
-                                                            display: "flex",
-                                                            justifyContent:
-                                                                "space-between",
-                                                        }}
-                                                    >
+                                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
                                                         <span>
-                                                            {item.walletName && (
-                                                                <Tag
-                                                                    color="blue"
-                                                                    style={{
-                                                                        marginRight: 8,
-                                                                    }}
-                                                                >
-                                                                    {
-                                                                        item.walletName
-                                                                    }
-                                                                </Tag>
-                                                            )}
+                                                            {item.walletName && <Tag color="blue" style={{ marginRight: 8 }}>{item.walletName}</Tag>}
                                                             {item.note}
                                                         </span>
-                                                        <span
-                                                            style={{
-                                                                color: "rgba(0, 0, 0, 0.45)",
-                                                            }}
-                                                        >
-                                                            {formatDate(
-                                                                item.date
-                                                            )}
+                                                        <span style={{ color: "rgba(0, 0, 0, 0.45)" }}>
+                                                            {formatDate(item.date)}
                                                         </span>
                                                     </div>
                                                 }
@@ -637,76 +493,32 @@ const DashboardContent: React.FC = () => {
                                     )}
                                 />
                             ) : (
-                                <Empty
-                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                    description="Không có giao dịch gần đây"
-                                />
+                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có giao dịch gần đây" />
                             )}
                         </Card>
                     </Col>
 
-                    {/* Expense by Category */}
                     <Col xs={24} lg={8}>
-                        <Card
-                            title="Chi tiêu theo danh mục"
-                            style={{ marginBottom: "16px" }}
-                        >
+                        <Card title="Chi tiêu tháng theo danh mục">
                             {expenseByCategory.length > 0 ? (
                                 <div>
                                     {expenseByCategory.map((category) => (
-                                        <div
-                                            key={category._id}
-                                            style={{ marginBottom: 16 }}
-                                        >
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    justifyContent:
-                                                        "space-between",
-                                                    marginBottom: 4,
-                                                }}
-                                            >
+                                        <div key={category._id} style={{ marginBottom: 16 }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                                                 <span>{category.name}</span>
-                                                <span>
-                                                    {formatCurrency(
-                                                        category.total
-                                                    )}
-                                                </span>
+                                                <span>{formatCurrency(category.total)}</span>
                                             </div>
                                             <Progress
                                                 percent={category.percentage}
-                                                showInfo={false}
+                                                showInfo={true}
                                                 strokeColor={category.color}
+                                                format={(percent) => `${percent}%`}
                                             />
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    justifyContent:
-                                                        "space-between",
-                                                    fontSize: 12,
-                                                    color: "rgba(0, 0, 0, 0.45)",
-                                                }}
-                                            >
-                                                <span>
-                                                    {category.percentage}%
-                                                </span>
-                                                <span>
-                                                    {Math.round(
-                                                        (category.total /
-                                                            stats.totalExpense) *
-                                                            100
-                                                    )}
-                                                    % of total
-                                                </span>
-                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <Empty
-                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                    description="Không có dữ liệu chi tiêu"
-                                />
+                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có dữ liệu chi tiêu" />
                             )}
                         </Card>
                     </Col>
@@ -729,5 +541,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-
-
