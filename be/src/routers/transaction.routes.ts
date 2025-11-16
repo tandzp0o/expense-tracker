@@ -6,7 +6,8 @@ import {
   getTransactionById,
   updateTransaction,
   deleteTransaction,
-  getTransactionsByWallet
+  getTransactionsByWallet,
+  getStatementReport
 } from '../controllers/transaction.controller';
 
 const router = express.Router();
@@ -24,6 +25,14 @@ router.get('/', verifyFirebaseToken, getTransactions);
  * @access  Private
  */
 router.get('/wallet/:walletId', verifyFirebaseToken, getTransactionsByWallet);
+
+/**
+ * @route   GET /api/transactions/statement-report
+ * @desc    Lấy báo cáo giao dịch
+ * @access  Private
+ */
+router.get('/statement-report', verifyFirebaseToken, getStatementReport);
+
 
 /**
  * @route   POST /api/transactions

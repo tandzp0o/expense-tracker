@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Transaction, { TransactionType, ITransaction } from '../models/Transaction';
 import Wallet from '../models/Wallet';
+import { Types } from 'mongoose';
 
 export const createTransaction = async (req: any, res: Response) => {
   const session = await Transaction.startSession();
@@ -58,59 +59,78 @@ export const createTransaction = async (req: any, res: Response) => {
   }
 };
 
-// export const getTransactions = async (req: any, res: Response) => {
-//   try {
-//     const { startDate, endDate, type, category, walletId } = req.query;
-//     const userId = req.user.uid;
+export const getStatementReport = async (req: Request, res: Response) => {
+    try {
+        const { walletId, startDate, endDate } = req.query;
+        
+        // 1. Lấy số dư đầu kỳ
+        const startBalance = await Transaction.aggregate([
+            {
+                $match: {
+                    walletId: new Types.ObjectId(walletId as string),
+                    date: { $lt: new Date(startDate as string) }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalIncome: { 
+                        $sum: { 
+                            $cond: [{ $eq: ["$type", "INCOME"] }, "$amount", 0] 
+                        } 
+                    },
+                    totalExpense: { 
+                        $sum: { 
+                            $cond: [{ $eq: ["$type", "EXPENSE"] }, "$amount", 0] 
+                        } 
+                    }
+                }
+            }
+        ]);
 
-//     const query: any = { userId };
+        // 2. Lấy giao dịch trong kỳ
+        const transactions = await Transaction.find({
+            walletId,
+            date: { 
+                $gte: new Date(startDate as string), 
+                $lte: new Date(endDate as string) 
+            }
+        }).sort({ date: 1 });
 
-//     if (walletId) query.walletId = walletId;
-//     if (type) query.type = type;
-//     if (category) query.category = category;
+        // 3. Tính toán tổng thu/chi trong kỳ
+        const periodTotals = transactions.reduce((acc, t) => {
+            if (t.type === 'INCOME') {
+                acc.totalIncome += t.amount;
+            } else {
+                acc.totalExpense += t.amount;
+            }
+            return acc;
+        }, { totalIncome: 0, totalExpense: 0 });
 
-//     if (startDate || endDate) {
-//       query.date = {};
-//       if (startDate) query.date.$gte = new Date(startDate as string);
-//       if (endDate) query.date.$lte = new Date(endDate as string);
-//     }
+        // 4. Tính số dư
+        const initialBalance = (startBalance[0]?.totalIncome || 0) - (startBalance[0]?.totalExpense || 0);
+        const endBalance = initialBalance + periodTotals.totalIncome - periodTotals.totalExpense;
 
-// const transactions = await Transaction.find(query)
-//   .sort({ date: -1, createdAt: -1 })  // Sắp xếp theo date giảm dần, sau đó theo createdAt giảm dần
-//   .populate('walletId', 'name');
+        res.json({
+            success: true,
+            data: {
+                startBalance: initialBalance,
+                endBalance,
+                totalIncome: periodTotals.totalIncome,
+                totalExpense: periodTotals.totalExpense,
+                transactions
+            }
+        });
+    } catch (error) {
+        console.error('Lỗi khi lấy báo cáo sao kê:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy báo cáo sao kê',
+            error: error instanceof Error ? error.message : 'Lỗi không xác định'
+        });
+    }
+};
 
-//     // Tính tổng thu, chi, lợi nhuận
-//     const summary = transactions.reduce(
-//       (acc, t) => {
-//         if (t.type === TransactionType.INCOME) {
-//           acc.income += t.amount;
-//         } else {
-//           acc.expense += t.amount;
-//         }
-//         return acc;
-//       },
-//       { income: 0, expense: 0, profit: 0 }
-//     );
-
-//     summary.profit = summary.income - summary.expense;
-
-//     res.json({
-//       success: true,
-//       data: {
-//         transactions,
-//         summary,
-//         total: transactions.length,
-//       }
-//     });
-//   } catch (error) {
-//     console.error('Lỗi khi lấy danh sách giao dịch:', error);
-//     res.status(500).json({ 
-//       success: false,
-//       message: 'Lỗi khi lấy danh sách giao dịch',
-//       error: error instanceof Error ? error.message : 'Lỗi không xác định'
-//     });
-//   }
-// };
 export const getTransactions = async (req: any, res: Response) => {
   try {
     // 1. Thêm 'note' vào đây để lấy nó ra từ query

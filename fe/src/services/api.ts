@@ -198,6 +198,18 @@ export const transactionApi = {
         }
     },
 
+    // Get statement report
+    getStatementReport: async (params: any, token: any) => {
+        const apiClient = createApiClient(token);
+        const response = await apiClient.get("/transactions/statement-report", {
+            params: {
+                ...params,
+                // Thêm các tham số cần thiết khác nếu có
+            },
+        });
+        return response.data;
+    },
+
     // Get expenses by category
     getExpenseByCategory: async (
         month: number,
