@@ -856,45 +856,107 @@ const DashboardContent: React.FC = () => {
         }
     }, [currentUser, showBoundary]);
 
-    const fetchStatementReport = async (values: any) => {
-        if (!currentUser) return;
+    // const fetchStatementReport = async (values: any) => {
+    //     if (!currentUser) return;
 
-        try {
-            setIsLoadingReport(true);
-            const firebaseUser = auth.currentUser;
-            if (!firebaseUser) {
-                message.error("Vui lòng đăng nhập lại");
-                return;
-            }
+    //     try {
+    //         setIsLoadingReport(true);
+    //         const firebaseUser = auth.currentUser;
+    //         if (!firebaseUser) {
+    //             message.error("Vui lòng đăng nhập lại");
+    //             return;
+    //         }
 
-            const token = await firebaseUser.getIdToken();
+    //         const token = await firebaseUser.getIdToken();
 
-            const response = await transactionApi.getStatementReport(
+    //         const response = await transactionApi.getStatementReport(
+    //         {
+    //             walletId: values.walletId,
+    //             startDate: values.dateRange[0].toISOString(),
+    //             endDate: values.dateRange[1].toISOString()
+    //         },
+    //         token
+    //     );
+
+    //     setStatementReport({
+    //         startBalance: response.data.startBalance,
+    //         endBalance: response.data.endBalance,
+    //         totalIncome: response.data.totalIncome,
+    //         totalExpense: response.data.totalExpense,
+    //         transactions: response.data.transactions.map((t: any) => ({
+    //             ...t,
+    //             walletName: wallets.find(w => w._id === t.walletId)?.name || 'Không xác định'
+    //         }))
+    //     });
+    //     } catch (error) {
+    //         console.error("Lỗi khi tải báo cáo sao kê:", error);
+    //         message.error("Không thể tải báo cáo sao kê");
+    //     } finally {
+    //         setIsLoadingReport(false);
+    //     }
+    // };
+// TÌM HÀM NÀY TRONG CODE CỦA BẠN
+const fetchStatementReport = async (values: any) => {
+    if (!currentUser) return;
+
+    try {
+        setIsLoadingReport(true);
+        const firebaseUser = auth.currentUser;
+        if (!firebaseUser) {
+            message.error("Vui lòng đăng nhập lại");
+            return;
+        }
+
+        const token = await firebaseUser.getIdToken();
+
+        const response = await transactionApi.getStatementReport(
             {
                 walletId: values.walletId,
                 startDate: values.dateRange[0].toISOString(),
-                endDate: values.dateRange[1].toISOString()
+                endDate: values.dateRange[1].toISOString(),
             },
             token
         );
+
+        // BẮT ĐẦU THAY ĐỔI: TÍNH TOÁN SỐ DƯ CHẠY (RUNNING BALANCE)
+        let currentBalance = response.data.startBalance;
+        const transactionsWithRunningBalance = response.data.transactions.map((t: any) => {
+            const beginningBalance = currentBalance;
+            
+            if (t.type === 'INCOME') {
+                currentBalance += t.amount;
+            } else { // EXPENSE
+                currentBalance -= t.amount;
+            }
+            
+            const endingBalance = currentBalance;
+
+            return {
+                ...t,
+                beginningBalance,
+                endingBalance,
+                walletName: wallets.find(w => w._id === t.walletId)?.name || 'Không xác định'
+            };
+        });
+        // KẾT THÚC THAY ĐỔI
 
         setStatementReport({
             startBalance: response.data.startBalance,
             endBalance: response.data.endBalance,
             totalIncome: response.data.totalIncome,
             totalExpense: response.data.totalExpense,
-            transactions: response.data.transactions.map((t: any) => ({
-                ...t,
-                walletName: wallets.find(w => w._id === t.walletId)?.name || 'Không xác định'
-            }))
+            // Sử dụng danh sách giao dịch đã được tính toán
+            transactions: transactionsWithRunningBalance
         });
-        } catch (error) {
-            console.error("Lỗi khi tải báo cáo sao kê:", error);
-            message.error("Không thể tải báo cáo sao kê");
-        } finally {
-            setIsLoadingReport(false);
-        }
-    };
+
+    } catch (error) {
+        console.error("Lỗi khi tải báo cáo sao kê:", error);
+        message.error("Không thể tải báo cáo sao kê");
+    } finally {
+        setIsLoadingReport(false);
+    }
+};
+
 
     const getCategoryColor = useCallback((categoryId: string): string => {
         const colors = [
@@ -926,52 +988,111 @@ const DashboardContent: React.FC = () => {
         [isLoading]
     );
 
-    const transactionColumns = [
-        {
-            title: "Ngày",
-            dataIndex: "date",
-            key: "date",
-            render: (date: string) => formatDate(date),
-            sorter: (a: any, b: any) =>
-                new Date(a.date).getTime() - new Date(b.date).getTime(),
-        },
-        {
-            title: "Mô tả",
-            dataIndex: "note",
-            key: "note",
-            render: (note: string, record: Transaction) => (
-                <div>
-                    <div>{record.category}</div>
-                    {note && (
-                        <div style={{ color: "#999", fontSize: "12px" }}>
-                            {note}
-                        </div>
-                    )}
-                </div>
-            ),
-        },
-        {
-            title: "Ví",
-            dataIndex: "walletName",
-            key: "walletName",
-        },
-        {
-            title: "Số tiền",
-            dataIndex: "amount",
-            key: "amount",
-            align: "right" as const,
-            render: (amount: number, record: Transaction) => (
-                <span
-                    style={{
-                        color: record.type === "INCOME" ? "#52c41a" : "#f5222d",
-                    }}
-                >
-                    {record.type === "INCOME" ? "+" : "-"}{" "}
-                    {formatCurrency(amount)}
-                </span>
-            ),
-            sorter: (a: any, b: any) => a.amount - b.amount,
-        },
+    // const transactionColumns = [
+    //     {
+    //         title: "Ngày",
+    //         dataIndex: "date",
+    //         key: "date",
+    //         render: (date: string) => formatDate(date),
+    //         sorter: (a: any, b: any) =>
+    //             new Date(a.date).getTime() - new Date(b.date).getTime(),
+    //     },
+    //     {
+    //         title: "Mô tả",
+    //         dataIndex: "note",
+    //         key: "note",
+    //         render: (note: string, record: Transaction) => (
+    //             <div>
+    //                 <div>{record.category}</div>
+    //                 {note && (
+    //                     <div style={{ color: "#999", fontSize: "12px" }}>
+    //                         {note}
+    //                     </div>
+    //                 )}
+    //             </div>
+    //         ),
+    //     },
+    //     {
+    //         title: "Ví",
+    //         dataIndex: "walletName",
+    //         key: "walletName",
+    //     },
+    //     {
+    //         title: "Số tiền",
+    //         dataIndex: "amount",
+    //         key: "amount",
+    //         align: "right" as const,
+    //         render: (amount: number, record: Transaction) => (
+    //             <span
+    //                 style={{
+    //                     color: record.type === "INCOME" ? "#52c41a" : "#f5222d",
+    //                 }}
+    //             >
+    //                 {record.type === "INCOME" ? "+" : "-"}{" "}
+    //                 {formatCurrency(amount)}
+    //             </span>
+    //         ),
+    //         sorter: (a: any, b: any) => a.amount - b.amount,
+    //     },
+    // ];
+
+        const transactionColumns = [
+    {
+        title: "Ngày",
+        dataIndex: "date",
+        key: "date",
+        render: (date: string) => formatDate(date),
+        sorter: (a: any, b: any) =>
+            new Date(a.date).getTime() - new Date(b.date).getTime(),
+    },
+    {
+        title: "Mô tả",
+        dataIndex: "note",
+        key: "note",
+        render: (note: string, record: Transaction) => (
+            <div>
+                <div>{record.category}</div>
+                {note && (
+                    <div style={{ color: "#999", fontSize: "12px" }}>
+                        {note}
+                    </div>
+                )}
+            </div>
+        ),
+    },
+    // BẮT ĐẦU THAY ĐỔI: THÊM CÁC CỘT MỚI
+    {
+        title: "Số dư đầu kỳ",
+        dataIndex: "beginningBalance",
+        key: "beginningBalance",
+        align: "right" as const,
+        render: (amount: number) => formatCurrency(amount),
+    },
+    {
+        title: "Giao dịch",
+        dataIndex: "amount",
+        key: "amount",
+        align: "right" as const,
+        render: (amount: number, record: Transaction) => (
+            <span
+                style={{
+                    color: record.type === "INCOME" ? "#52c41a" : "#f5222d",
+                    fontWeight: 'bold',
+                }}
+            >
+                {record.type === "INCOME" ? "+" : "-"}
+                {formatCurrency(amount)}
+            </span>
+        ),
+        sorter: (a: any, b: any) => a.amount - b.amount,
+    },
+    {
+        title: "Số dư cuối kỳ",
+        dataIndex: "endingBalance",
+        key: "endingBalance",
+        align: "right" as const,
+        render: (amount: number) => formatCurrency(amount),
+    },
     ];
 
     if (isLoadingAny) {
