@@ -1,6 +1,12 @@
 import axios, { AxiosInstance } from "axios";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.REACT_APP_API_URL 
+    ? (process.env.REACT_APP_API_URL.endsWith('/api') 
+        ? process.env.REACT_APP_API_URL 
+        : `${process.env.REACT_APP_API_URL}/api`)
+    : "http://localhost:5000/api"; // Chỉ dùng localhost khi chạy ở máy (development)
+
+console.log("Cấu hình API URL hiện tại:", API_URL); // Thêm dòng này để kiểm tra log trình duyệt
 
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
