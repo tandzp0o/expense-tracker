@@ -67,16 +67,18 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Cấu hình CORS động
+// Tin tưởng Proxy của Railway
+app.set('trust proxy', 1);
+
+// Cấu hình CORS động - Lọc bỏ undefined/null
 const allowedOrigins = [
   'http://localhost:3000',
-  process.env.FRONTEND_URL // URL của FE sau khi deploy trên Railway/Vercel
-];
+  process.env.FRONTEND_URL
+].filter(Boolean) as string[];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Cho phép các request không có origin (như Postman hoặc thiết bị di động) 
-    // hoặc các origin nằm trong danh sách cho phép
+    // Cho phép request không origin hoặc nằm trong danh sách
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -88,6 +90,12 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 204
 }));
+
+// GIẢI QUYẾT LỖI POPUP GOOGLE: Thêm Header COOP
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
 
 app.use(express.json());
 app.use(morgan('dev'));
@@ -104,13 +112,12 @@ app.get('/health', (req, res) => {
 
 // Kết nối MongoDB và khởi động server
 connectDB().then(() => {
-  // Quan trọng: Phải có '0.0.0.0' để Docker bên ngoài truy cập được vào trong
   app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`Server đang chạy trên cổng ${PORT}`);
-    console.log(`Cho phép CORS từ: ${allowedOrigins.filter(Boolean).join(', ')}`);
+    console.log(`✅ Server đang chạy trên cổng ${PORT}`);
+    console.log(`✅ Cho phép CORS từ: ${allowedOrigins.join(', ')}`);
   });
 }).catch(err => {
-  console.error('Không thể kết nối Database:', err);
+  console.error('❌ Không thể kết nối Database:', err);
   process.exit(1);
 });
 
