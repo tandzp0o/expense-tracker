@@ -1,32 +1,35 @@
-# Build stage
-FROM node:18-alpine AS builder
+# Bước 1: Build React app
+FROM node:18-alpine AS build
+
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
+RUN npm install
 
-# Install dependencies
-RUN npm ci
-
-# Copy source code
 COPY . .
 
-# Build the application
+# Truyền biến môi trường lúc build (Cần thiết cho React)
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
+# Bước 2: Chạy bằng Nginx (Cực nhẹ)
+FROM nginx:stable-alpine
 
-WORKDIR /app
+# Copy file build vào thư mục của Nginx
+COPY --from=build /app/build /usr/share/nginx/html
 
-# Install serve to run the app
-RUN npm install -g serve
+# Cấu hình Nginx để hỗ trợ React Router (tránh lỗi 404 khi reload trang)
+RUN echo 'server { \
+    listen 3000; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html index.htm; \
+        try_files $uri $uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
 
-# Copy built assets from builder
-COPY --from=builder /app/build ./build
-
-# Expose port 3000
 EXPOSE 3000
 
-# Start the app
-CMD ["serve", "-s", "build", "-l", "3000"]
+CMD ["nginx", "-g", "daemon off;"]

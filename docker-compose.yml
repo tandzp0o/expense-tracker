@@ -1,3 +1,98 @@
+# version: '3.8'
+
+# services:
+#   frontend:
+#     build:
+#       context: ./fe
+#       dockerfile: Dockerfile
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - NODE_ENV=production
+#       - REACT_APP_API_URL=http://localhost:5000
+#     depends_on:
+#       - backend
+#     networks:
+#       - app-network
+
+#   backend:
+#     build:
+#       context: ./be
+#       dockerfile: Dockerfile
+#     ports:
+#       - "5000:3000"
+#     environment:
+#       - NODE_ENV=production
+#       - PORT=3000
+#       - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/expense-tracker?replicaSet=rs0
+#     volumes:
+#       - ./be/expense-tracker-auth-c50cf-firebase-adminsdk-fbsvc-844c0c5410.json:/app/expense-tracker-auth-c50cf-firebase-adminsdk-fbsvc-844c0c5410.json
+#       - ./be/.env:/app/.env
+#     depends_on:
+#       - mongo1
+#       - mongo2
+#       - mongo3
+#     networks:
+#       - app-network
+#     restart: unless-stopped
+
+#   mongo1:
+#     image: mongo:5.0
+#     container_name: mongo1
+#     ports:
+#       - "27017:27017"
+#     command: ["--replSet", "rs0", "--bind_ip_all"]
+#     volumes:
+#       - mongo-data1:/data/db
+#     networks:
+#       - app-network
+
+#   mongo2:
+#     image: mongo:5.0
+#     container_name: mongo2
+#     ports:
+#       - "27018:27017"
+#     command: ["--replSet", "rs0", "--bind_ip_all"]
+#     volumes:
+#       - mongo-data2:/data/db
+#     networks:
+#       - app-network
+
+#   mongo3:
+#     image: mongo:5.0
+#     container_name: mongo3
+#     ports:
+#       - "27019:27017"
+#     command: ["--replSet", "rs0", "--bind_ip_all"]
+#     volumes:
+#       - mongo-data3:/data/db
+#     networks:
+#       - app-network
+
+#   mongo-setup:
+#     image: mongo:5.0
+#     depends_on:
+#       - mongo1
+#       - mongo2
+#       - mongo3
+#     volumes:
+#       - ./setup.js:/setup.js
+#     restart: "no"
+#     entrypoint: [ "mongo", "--host", "mongo1", "--port", "27017", "/setup.js" ]
+#     networks:
+#       - app-network
+
+# networks:
+#   app-network:
+#     driver: bridge
+
+# volumes:
+#   mongo-data1:
+#   mongo-data2:
+#   mongo-data3:
+
+
+
 version: '3.8'
 
 services:
@@ -5,11 +100,13 @@ services:
     build:
       context: ./fe
       dockerfile: Dockerfile
+      args:
+        # Cực kỳ quan trọng: React cần biến này lúc build
+        - REACT_APP_API_URL=${REACT_APP_API_URL}
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - REACT_APP_API_URL=http://localhost:5000
     depends_on:
       - backend
     networks:
@@ -20,65 +117,28 @@ services:
       context: ./be
       dockerfile: Dockerfile
     ports:
-      - "5000:3000"
+      - "5000:5000"
     environment:
       - NODE_ENV=production
-      - PORT=3000
-      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/expense-tracker?replicaSet=rs0
-    volumes:
-      - ./be/expense-tracker-auth-c50cf-firebase-adminsdk-fbsvc-844c0c5410.json:/app/expense-tracker-auth-c50cf-firebase-adminsdk-fbsvc-844c0c5410.json
-      - ./be/.env:/app/.env
+      - PORT=5000
+      # Kết nối đến service mongo trong mạng nội bộ
+      - MONGO_URI=${MONGO_URI}
+      # Biến cho Frontend URL để cấu hình CORS (đã sửa ở file index.ts trước đó)
+      - FRONTEND_URL=${FRONTEND_URL}
+      # Không nên mount file .env, hãy dùng biến môi trường của Railway
     depends_on:
-      - mongo1
-      - mongo2
-      - mongo3
+      - mongo
     networks:
       - app-network
     restart: unless-stopped
 
-  mongo1:
+  # Rút gọn MongoDB thành 1 node để tiết kiệm chi phí trên Railway
+  mongo:
     image: mongo:5.0
-    container_name: mongo1
     ports:
       - "27017:27017"
-    command: ["--replSet", "rs0", "--bind_ip_all"]
     volumes:
-      - mongo-data1:/data/db
-    networks:
-      - app-network
-
-  mongo2:
-    image: mongo:5.0
-    container_name: mongo2
-    ports:
-      - "27018:27017"
-    command: ["--replSet", "rs0", "--bind_ip_all"]
-    volumes:
-      - mongo-data2:/data/db
-    networks:
-      - app-network
-
-  mongo3:
-    image: mongo:5.0
-    container_name: mongo3
-    ports:
-      - "27019:27017"
-    command: ["--replSet", "rs0", "--bind_ip_all"]
-    volumes:
-      - mongo-data3:/data/db
-    networks:
-      - app-network
-
-  mongo-setup:
-    image: mongo:5.0
-    depends_on:
-      - mongo1
-      - mongo2
-      - mongo3
-    volumes:
-      - ./setup.js:/setup.js
-    restart: "no"
-    entrypoint: [ "mongo", "--host", "mongo1", "--port", "27017", "/setup.js" ]
+      - mongo-data:/data/db
     networks:
       - app-network
 
@@ -87,6 +147,4 @@ networks:
     driver: bridge
 
 volumes:
-  mongo-data1:
-  mongo-data2:
-  mongo-data3:
+  mongo-data:

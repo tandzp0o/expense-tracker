@@ -1,26 +1,31 @@
-# Build stage
-FROM node:18-alpine AS builder
+# Bước 1: Build stage
+FROM node:18-alpine AS build
+
 WORKDIR /app
+
+# Copy package files để tận dụng Docker cache
 COPY package*.json ./
-RUN npm ci
+RUN npm install
+
+# Copy toàn bộ code và build
 COPY . .
 RUN npm run build
 
-# Production stage
+# Bước 2: Production stage (giúp giảm dung lượng image)
 FROM node:18-alpine
+
 WORKDIR /app
 
-# Copy built application from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/.env ./
-COPY --from=builder /app/expense-tracker-auth-c50cf-firebase-adminsdk-fbsvc-844c0c5410.json ./
+# Chỉ copy những file cần thiết từ bước build
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
 
-# Install only production dependencies
-RUN npm ci --only=production
+# Biến môi trường mặc định
+ENV NODE_ENV=production
+ENV PORT=5000
 
-# Expose the port the app runs on
-EXPOSE 3000
+EXPOSE 5000
 
-# Command to run the application
+# Chạy server từ file đã build
 CMD ["node", "dist/index.js"]
