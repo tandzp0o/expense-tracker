@@ -43,7 +43,11 @@ type AuthProviderProps = {
 };
 
 const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
-    const response = await fetch("http://localhost:5000/api/auth/verify", {
+    // Sử dụng dấu backtick để template literal hoạt động
+    // Nếu biến REACT_APP_API_URL trống, nó sẽ mặc định dùng localhost
+    const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
+    
+    const response = await fetch(`${baseUrl}/api/auth/verify`, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${token}`,
@@ -52,12 +56,10 @@ const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
     });
 
     if (!response.ok) {
-        // Cố gắng đọc lỗi từ JSON nếu có
         try {
             const errorData = await response.json();
             throw new Error(errorData.message || `Server responded with ${response.status}`);
         } catch (e) {
-            // Nếu không đọc được JSON, ném lỗi chung
             throw new Error(`Server error on verification: ${response.status}`);
         }
     }
