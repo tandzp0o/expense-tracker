@@ -48,7 +48,7 @@ const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
     const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
     
     console.log("Verifying token with backend at:", `${baseUrl}/api/auth/verify`);
-    const response = await fetch(`${baseUrl}/auth/verify`, {
+    const response = await fetch(`${baseUrl}/api/auth/verify`, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${token}`,
