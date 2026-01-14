@@ -1,11 +1,11 @@
 import axios, { AxiosInstance } from "axios";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
   return axios.create({
-    baseURL: API_URL,
+    baseURL: API_URL+"/api",
     headers: {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
