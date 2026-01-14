@@ -47,7 +47,8 @@ const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
     // Nếu biến REACT_APP_API_URL trống, nó sẽ mặc định dùng localhost
     const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
     
-    const response = await fetch(`${baseUrl}/api/auth/verify`, {
+    console.log("Verifying token with backend at:", `${baseUrl}/api/auth/verify`);
+    const response = await fetch(`${baseUrl}/auth/verify`, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${token}`,

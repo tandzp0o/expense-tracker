@@ -16,6 +16,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Cấu hình CORS động
+app.set('trust proxy', 1);
 const allowedOrigins = [
   "http://localhost:3000",
   process.env.FRONTEND_URL,
