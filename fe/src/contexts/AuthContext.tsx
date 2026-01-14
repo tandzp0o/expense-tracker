@@ -42,18 +42,8 @@ type AuthProviderProps = {
     children: ReactNode;
 };
 
-// const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
-//     const response = await fetch("${process.env.REACT_APP_API_URL}/api/auth/verify", {
-//         method: "GET",
-//         headers: {
-//             Authorization: `Bearer ${token}`,
-//             "Content-Type": "application/json",
-//         },
-//     });
-
 const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
-    // SỬA Ở ĐÂY: Dùng dấu backtick ` thay vì nháy kép "
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/verify`, {
+    const response = await fetch("http://localhost:5000/api/auth/verify", {
         method: "GET",
         headers: {
             Authorization: `Bearer ${token}`,
