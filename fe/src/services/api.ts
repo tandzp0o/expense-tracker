@@ -5,9 +5,20 @@ const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
   return axios.create({
-    baseURL: API_URL+"/api",
+    baseURL: API_URL + "/api",
     headers: {
       "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
+};
+
+// Create an authenticated API client for multipart/form-data
+const createMultipartApiClient = (token?: string): AxiosInstance => {
+  return axios.create({
+    baseURL: API_URL + "/api",
+    headers: {
+      // Let the browser set the Content-Type to multipart/form-data
       ...(token && { Authorization: `Bearer ${token}` }),
     },
   });
@@ -250,13 +261,7 @@ export const dishApi = {
   // Create a new dish
   createDish: async (dishData: FormData, token?: string) => {
     try {
-      const apiClient = axios.create({
-        baseURL: API_URL,
-        headers: {
-          "Content-Type": "multipart/form-data",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
+      const apiClient = createMultipartApiClient(token);
       const response = await apiClient.post("/dishes", dishData);
       return response.data;
     } catch (error) {
@@ -293,13 +298,7 @@ export const dishApi = {
   // Update a dish
   updateDish: async (id: string, dishData: FormData, token?: string) => {
     try {
-      const apiClient = axios.create({
-        baseURL: API_URL,
-        headers: {
-          "Content-Type": "multipart/form-data",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
+      const apiClient = createMultipartApiClient(token);
       const response = await apiClient.put(`/dishes/${id}`, dishData);
       return response.data;
     } catch (error) {
@@ -406,6 +405,17 @@ export const userApi = {
     try {
       const apiClient = createApiClient(token);
       const response = await apiClient.get("/users/profile/stats");
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  // Upload user avatar
+  uploadAvatar: async (imageData: FormData, token?: string) => {
+    try {
+      const apiClient = createMultipartApiClient(token);
+      const response = await apiClient.post("/users/profile/avatar", imageData);
       return response.data;
     } catch (error) {
       return handleApiError(error);

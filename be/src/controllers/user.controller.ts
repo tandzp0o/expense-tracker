@@ -105,6 +105,36 @@ export const updateProfile = async (req: any, res: Response) => {
   }
 };
 
+export const uploadAvatar = async (req: any, res: Response) => {
+  try {
+    const userId = req.user.uid;
+
+    // req.file sẽ được cung cấp bởi middleware (ví dụ: multer)
+    if (!req.file) {
+      return res.status(400).json({ message: "Vui lòng chọn ảnh để tải lên" });
+    }
+
+    const user = await User.findOne({ uid: userId });
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    // Giả sử file được lưu trong thư mục uploads và có thể truy cập qua URL
+    const avatarUrl = `/uploads/${req.file.filename}`;
+
+    user.avatar = avatarUrl;
+    await user.save();
+
+    res.json({
+      message: "Cập nhật ảnh đại diện thành công",
+      avatarUrl: user.avatar,
+    });
+  } catch (error) {
+    console.error("Error uploading avatar:", error);
+    res.status(500).json({ message: "Lỗi tải lên ảnh đại diện" });
+  }
+};
+
 export const getProfileStats = async (req: any, res: Response) => {
   try {
     const userId = req.user.uid;

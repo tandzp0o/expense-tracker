@@ -111,11 +111,50 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleAvatarChange = (info: any) => {
+  const handleAvatarChange = async (info: any) => {
     if (info.file.status === "done") {
-      // In real app, upload to cloud storage
-      message.success("Cập nhật ảnh đại diện thành công!");
+      message.success("Ảnh đại diện đã được tải lên thành công!");
+      loadProfile(); // Tải lại hồ sơ để hiển thị ảnh mới
+    } else if (info.file.status === "error") {
+      message.error(`${info.file.name} tải lên thất bại.`);
     }
+  };
+
+  const customRequest = async ({ file, onSuccess, onError }: any) => {
+    const user = auth.currentUser;
+    if (!user) {
+      onError("Xác thực người dùng thất bại.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const response = await userApi.uploadAvatar(formData, token);
+      if (response.avatarUrl) {
+        onSuccess(response, file);
+      } else {
+        onError("Không nhận được URL ảnh đại diện từ máy chủ.");
+      }
+    } catch (error: any) {
+      onError(error.message || "Lỗi tải lên ảnh đại diện.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const beforeUpload = (file: any) => {
+    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
+    if (!isJpgOrPng) {
+      message.error("Bạn chỉ có thể tải lên file JPG/PNG!");
+    }
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isLt2M) {
+      message.error("Kích thước ảnh phải nhỏ hơn 2MB!");
+    }
+    return isJpgOrPng && isLt2M;
   };
 
   if (!profile) {
@@ -148,6 +187,8 @@ const Profile: React.FC = () => {
             <Upload
               showUploadList={false}
               onChange={handleAvatarChange}
+              beforeUpload={beforeUpload}
+              customRequest={customRequest}
               accept="image/*"
             >
               <Button
@@ -282,9 +323,8 @@ const Profile: React.FC = () => {
               <Col span={6}>
                 <Statistic
                   title="Mục tiêu hoàn thành"
-                  value={`${profile.goalsCompleted}/${
-                    profile.goalsCompleted + profile.goalsActive
-                  }`}
+                  value={profile.goalsCompleted}
+                  suffix={`/ ${profile.goalsCompleted + profile.goalsActive}`}
                   valueStyle={{ color: "#1890ff" }}
                 />
               </Col>

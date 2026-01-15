@@ -4,6 +4,7 @@ import {
   getProfile,
   updateProfile,
   getProfileStats,
+  uploadAvatar,
 } from "../controllers/user.controller";
 
 const router = Router();
@@ -14,6 +15,7 @@ router.use(verifyFirebaseToken);
 // Profile routes
 router.get("/profile", getProfile);
 router.put("/profile", updateProfile);
+router.post("/profile/avatar", uploadAvatar);
 router.get("/profile/stats", getProfileStats);
 
 export default router;
