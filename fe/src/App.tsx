@@ -73,17 +73,20 @@
 
 import React from "react";
 import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-  Outlet,
-  useLocation,
+    BrowserRouter as Router,
+    Routes,
+    Route,
+    Navigate,
+    Outlet,
+    useLocation,
 } from "react-router-dom"; // <-- Import useLocation
 import { ConfigProvider, Spin } from "antd";
 import viVN from "antd/locale/vi_VN";
 import "antd/dist/reset.css";
 import "./App.less";
+import "./assets/styles/main.css";
+import "./assets/styles/themeOverrides.css";
+import "./assets/styles/responsive.css";
 
 // Layouts
 import MainLayout from "./layouts/MainLayout";
@@ -105,81 +108,87 @@ import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 
 // Theme wrapper component
 const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({
-  children,
+    children,
 }) => {
-  const { antdTheme } = useTheme();
+    const { antdTheme } = useTheme();
 
-  return (
-    <ConfigProvider locale={viVN} theme={antdTheme}>
-      {children}
-    </ConfigProvider>
-  );
+    return (
+        <ConfigProvider locale={viVN} theme={antdTheme}>
+            {children}
+        </ConfigProvider>
+    );
 };
 
 // Protected route component
 const ProtectedRoute = () => {
-  const { currentUser, loading } = useAuth();
-  const location = useLocation(); // <-- Lấy vị trí (location) hiện tại
+    const { currentUser, loading } = useAuth();
+    const location = useLocation(); // <-- Lấy vị trí (location) hiện tại
 
-  if (loading) {
+    if (loading) {
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100vh",
+                }}
+            >
+                <Spin size="large" />
+            </div>
+        );
+    }
+
+    // Nếu người dùng chưa được xác thực, chuyển hướng họ về trang đăng nhập
+    if (!currentUser) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    // *** LOGIC MỚI CHO LUỒNG ONBOARDING (CHÀO MỪNG NGƯỜI DÙNG MỚI) ***
+    // Nếu là người dùng mới VÀ họ đang cố gắng truy cập một trang khác ngoài /wallets
+    if (currentUser.newUser && location.pathname !== "/wallets") {
+        // Buộc họ phải chuyển đến trang /wallets để tạo ví đầu tiên
+        return <Navigate to="/wallets" replace />;
+    }
+
+    // Nếu mọi thứ đều ổn, hiển thị layout chính và nội dung của trang
     return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <Spin size="large" />
-      </div>
+        <MainLayout>
+            <Outlet />
+        </MainLayout>
     );
-  }
-
-  // Nếu người dùng chưa được xác thực, chuyển hướng họ về trang đăng nhập
-  if (!currentUser) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  // *** LOGIC MỚI CHO LUỒNG ONBOARDING (CHÀO MỪNG NGƯỜI DÙNG MỚI) ***
-  // Nếu là người dùng mới VÀ họ đang cố gắng truy cập một trang khác ngoài /wallets
-  if (currentUser.newUser && location.pathname !== "/wallets") {
-    // Buộc họ phải chuyển đến trang /wallets để tạo ví đầu tiên
-    return <Navigate to="/wallets" replace />;
-  }
-
-  // Nếu mọi thứ đều ổn, hiển thị layout chính và nội dung của trang
-  return (
-    <MainLayout>
-      <Outlet />
-    </MainLayout>
-  );
 };
 
 function App() {
-  return (
-    <Router>
-      <ThemeProvider>
-        <AuthProvider>
-          <ThemeWrapper>
-            <Routes>
-              <Route path="/login" element={<Login />} />
+    return (
+        <Router>
+            <ThemeProvider>
+                <AuthProvider>
+                    <ThemeWrapper>
+                        <Routes>
+                            <Route path="/login" element={<Login />} />
 
-              {/* Tất cả các route được bảo vệ giờ đây đều sử dụng logic đã được cập nhật */}
-              <Route element={<ProtectedRoute />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/transactions" element={<Transactions />} />
-                <Route path="/wallets" element={<Wallets />} />
-                <Route path="/dishes" element={<DishSuggestions />} />
-                <Route path="/goals" element={<Goals />} />
-                <Route path="/profile" element={<Profile />} />
-              </Route>
-            </Routes>
-          </ThemeWrapper>
-        </AuthProvider>
-      </ThemeProvider>
-    </Router>
-  );
+                            {/* Tất cả các route được bảo vệ giờ đây đều sử dụng logic đã được cập nhật */}
+                            <Route element={<ProtectedRoute />}>
+                                <Route path="/" element={<Dashboard />} />
+                                <Route
+                                    path="/transactions"
+                                    element={<Transactions />}
+                                />
+                                <Route path="/wallets" element={<Wallets />} />
+                                <Route
+                                    path="/dishes"
+                                    element={<DishSuggestions />}
+                                />
+                                <Route path="/goals" element={<Goals />} />
+                                <Route path="/profile" element={<Profile />} />
+                            </Route>
+                        </Routes>
+                    </ThemeWrapper>
+                </AuthProvider>
+            </ThemeProvider>
+        </Router>
+    );
 }
 
 export default App;

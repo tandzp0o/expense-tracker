@@ -1,80 +1,160 @@
-import React, { useEffect, useState } from "react";
-import { Button, Typography, Box, Container, Paper, CircularProgress } from "@mui/material";
-import GoogleIcon from "@mui/icons-material/Google";
-import { useAuth } from "../contexts/AuthContext";
+import React, { useState } from "react";
+import { Form, Button, Typography, message } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+
+import googleLogo from "../assets/images/Google__G__Logo.svg.png";
+
+const { Title } = Typography;
 
 const Login: React.FC = () => {
-    const { currentUser, signInWithGoogle } = useAuth(); // <-- Lấy hàm signInWithGoogle từ context
+    const { currentUser, signInWithGoogle } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const from = location.state?.from || '/';
+    const from = location.state?.from || "/";
     const [loading, setLoading] = useState(false);
-
-    // Tự động chuyển hướng nếu người dùng đã được xác thực
-    useEffect(() => {
-        if (currentUser) {
-            navigate(from, { replace: true });
-        }
-    }, [currentUser, from, navigate]);
 
     const handleGoogleSignIn = async () => {
         setLoading(true);
         try {
-            // Chỉ cần gọi hàm từ context, không cần xử lý token hay fetch ở đây
             await signInWithGoogle();
-            
-            // AuthContext sẽ tự động cập nhật currentUser
-            // và useEffect ở trên sẽ xử lý việc chuyển hướng.
-            // Chúng ta không cần gọi navigate ở đây nữa.
-            
+            navigate(from, { replace: true });
         } catch (error) {
             console.error("Lỗi chi tiết khi đăng nhập:", error);
-            // Có thể thêm thông báo lỗi cho người dùng ở đây nếu muốn
-            alert("Đăng nhập thất bại. Vui lòng thử lại.");
+            message.error("Đăng nhập thất bại. Vui lòng thử lại.");
         } finally {
             setLoading(false);
         }
     };
-    
-    // Nếu currentUser đã có giá trị, không render gì cả để useEffect thực hiện chuyển hướng
+
     if (currentUser) {
-        return null; 
+        return null;
     }
 
     return (
-        <Container component="main" maxWidth="xs">
-            <Box
-                sx={{
-                    marginTop: 8,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                }}
-            >
-                <Paper elevation={3} sx={{ p: 4, width: "100%" }}>
-                    <Typography
-                        component="h1"
-                        variant="h5"
-                        align="center"
-                        mb={3}
+        <>
+            <div className="layout-default layout-signin">
+                <div style={{ padding: "0 24px" }}>
+                    <div className="header-col header-brand">
+                        <h5
+                            style={{ margin: 0, fontSize: 24, fontWeight: 600 }}
+                        >
+                            Quản lý tài chính
+                        </h5>
+                    </div>
+                </div>
+                <div className="signin">
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            minHeight: "calc(100vh - 200px)",
+                        }}
                     >
-                        Đăng nhập
-                    </Typography>
-                    <Button
-                        fullWidth
-                        variant="contained"
-                        color="primary"
-                        onClick={handleGoogleSignIn}
-                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <GoogleIcon />}
-                        disabled={loading}
-                        sx={{ mb: 2 }}
-                    >
-                        {loading ? "Đang xử lý..." : "Đăng nhập với Google"}
-                    </Button>
-                </Paper>
-            </Box>
-        </Container>
+                        <div
+                            style={{
+                                width: "100%",
+                                maxWidth: 400,
+                                margin: "0 auto",
+                            }}
+                        >
+                            <Title
+                                className="mb-15"
+                                level={2}
+                                style={{ textAlign: "center" }}
+                            >
+                                Đăng nhập
+                            </Title>
+                            <Title
+                                className="font-regular text-muted"
+                                level={5}
+                                style={{
+                                    textAlign: "center",
+                                    marginBottom: 32,
+                                }}
+                            >
+                                Quản lý tài chính cá nhân của bạn
+                            </Title>
+
+                            <Form layout="vertical">
+                                <Form.Item>
+                                    <Button
+                                        type="primary"
+                                        size="large"
+                                        block
+                                        onClick={handleGoogleSignIn}
+                                        loading={loading}
+                                        icon={
+                                            <img
+                                                src={googleLogo}
+                                                alt="Google"
+                                                style={{
+                                                    width: 18,
+                                                    height: 18,
+                                                    marginRight: 8,
+                                                }}
+                                            />
+                                        }
+                                    >
+                                        {loading
+                                            ? "Đang xử lý..."
+                                            : "Đăng nhập với Google"}
+                                    </Button>
+                                </Form.Item>
+
+                                <Form.Item style={{ textAlign: "center" }}>
+                                    <p
+                                        style={{
+                                            marginBottom: 0,
+                                            color: "#999",
+                                        }}
+                                    >
+                                        Bằng cách đăng nhập, bạn đồng ý với{" "}
+                                        <button
+                                            type="button"
+                                            style={{
+                                                color: "#1890ff",
+                                                background: "transparent",
+                                                border: "none",
+                                                padding: 0,
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            Điều khoản sử dụng
+                                        </button>{" "}
+                                        và{" "}
+                                        <button
+                                            type="button"
+                                            style={{
+                                                color: "#1890ff",
+                                                background: "transparent",
+                                                border: "none",
+                                                padding: 0,
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            Chính sách bảo mật
+                                        </button>
+                                    </p>
+                                </Form.Item>
+                            </Form>
+                        </div>
+                    </div>
+                </div>
+                <div
+                    style={{
+                        textAlign: "center",
+                        padding: "24px",
+                        color: "#999",
+                    }}
+                >
+                    <p style={{ marginBottom: 0 }}>
+                        Copyright © 2024 Quản lý tài chính. All Rights Reserved.
+                    </p>
+                </div>
+            </div>
+        </>
     );
 };
 

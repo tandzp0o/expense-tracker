@@ -1,597 +1,29 @@
-// import React, { useCallback, useEffect, useState, useMemo } from "react";
-// import {
-//     Card,
-//     Row,
-//     Col,
-//     Statistic,
-//     Typography,
-//     List,
-//     Tag,
-//     Spin,
-//     Empty,
-//     message,
-//     Button,
-//     Progress,
-//     Space,
-// } from "antd";
-// import {
-//     ErrorBoundary,
-//     FallbackProps,
-//     useErrorBoundary,
-// } from "react-error-boundary";
-// import * as XLSX from "xlsx";
-// import jsPDF from "jspdf";
-// import html2canvas from "html2canvas";
-// import { FileExcelOutlined, FilePdfOutlined } from "@ant-design/icons";
-// import { useAuth } from "../contexts/AuthContext";
-// import { walletApi, transactionApi } from "../services/api";
-// import { formatCurrency, formatDate } from "../utils/formatters";
-// import dayjs from "dayjs";
-// import "dayjs/locale/vi";
-// import {
-//     ArrowUpOutlined,
-//     ArrowDownOutlined,
-//     ArrowUpOutlined as IncomeIcon,
-//     ArrowDownOutlined as ExpenseIcon,
-//     WalletOutlined,
-// } from "@ant-design/icons";
-// import { useNavigate } from "react-router-dom";
-// import { auth } from "../firebase/config"; // <-- ĐÃ THÊM
-
-// dayjs.locale("vi");
-
-// interface Transaction {
-//     _id: string;
-//     type: "INCOME" | "EXPENSE";
-//     amount: number;
-//     category: string;
-//     date: string;
-//     note?: string;
-//     walletId?: {
-//         _id: string;
-//         name: string;
-//     };
-//     walletName?: string;
-// }
-
-// interface DashboardStats {
-//     totalBalance: number;
-//     totalIncome: number;
-//     totalExpense: number;
-//     incomeChange: number;
-//     expenseChange: number;
-// }
-
-// interface CategoryStat {
-//     _id: string;
-//     name: string;
-//     total: number;
-//     color: string;
-//     percentage?: number;
-// }
-
-// interface LoadingState {
-//     stats: boolean;
-//     transactions: boolean;
-//     categories: boolean;
-//     wallets: boolean;
-// }
-
-// const { Title, Text } = Typography;
-
-// // Error Fallback Component
-// const ErrorFallback: React.FC<FallbackProps> = ({
-//     error,
-//     resetErrorBoundary,
-// }) => {
-//     return (
-//         <div
-//             style={{
-//                 padding: "24px",
-//                 textAlign: "center",
-//                 maxWidth: "600px",
-//                 margin: "40px auto",
-//                 borderRadius: "8px",
-//                 boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-//             }}
-//         >
-//             <Title level={3} style={{ color: "#ff4d4f", marginBottom: "16px" }}>
-//                 Đã xảy ra lỗi
-//             </Title>
-//             <div
-//                 style={{
-//                     background: "#fff2f0",
-//                     padding: "16px",
-//                     borderRadius: "4px",
-//                     marginBottom: "20px",
-//                     textAlign: "left",
-//                     fontFamily: "monospace",
-//                     whiteSpace: "pre-wrap",
-//                     wordBreak: "break-word",
-//                 }}
-//             >
-//                 {error.message || "Không có thông tin lỗi"}
-//             </div>
-//             <Button
-//                 type="primary"
-//                 onClick={resetErrorBoundary}
-//                 icon={<ArrowDownOutlined />}
-//             >
-//                 Tải lại trang
-//             </Button>
-//         </div>
-//     );
-// };
-
-// const exportToExcel = (recentTransactions: Transaction[]) => {
-//     // Tạo dữ liệu cho Excel
-//     const data = recentTransactions.map((trans) => ({
-//         Ngày: dayjs(trans.date).format("DD/MM/YYYY"),
-//         Loại: trans.type === "INCOME" ? "Thu nhập" : "Chi tiêu",
-//         "Danh mục": trans.category,
-//         "Số tiền": trans.amount.toLocaleString("vi-VN"),
-//         "Ghi chú": trans.note || "",
-//     }));
-
-//     const ws = XLSX.utils.json_to_sheet(data);
-//     const wb = XLSX.utils.book_new();
-//     XLSX.utils.book_append_sheet(wb, ws, "Giao dịch");
-//     XLSX.writeFile(
-//         wb,
-//         `bao-cao-giao-dich-${dayjs().format("DD-MM-YYYY")}.xlsx`
-//     );
-// };
-
-// const exportToPdf = async () => {
-//     const input = document.getElementById("dashboard-content");
-//     if (!input) return;
-
-//     const canvas = await (html2canvas as any)(input, {
-//         scale: window.devicePixelRatio,
-//         useCORS: true,
-//     });
-
-//     const imgData = canvas.toDataURL("image/png");
-//     const pdf = new jsPDF("p", "mm", "a4");
-//     const imgWidth = 210; // A4 width in mm
-//     const pageHeight = 295; // A4 height in mm
-//     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-//     let heightLeft = imgHeight;
-//     let position = 0;
-
-//     pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-//     heightLeft -= pageHeight;
-
-//     while (heightLeft >= 0) {
-//         position = heightLeft - imgHeight;
-//         pdf.addPage();
-//         pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-//         heightLeft -= pageHeight;
-//     }
-
-//     pdf.save(`bao-cao-${dayjs().format("DD-MM-YYYY")}.pdf`);
-// };
-
-// const DashboardContent: React.FC = () => {
-//     const navigate = useNavigate();
-//     const [isLoading, setIsLoading] = useState<LoadingState>({
-//         stats: true,
-//         transactions: true,
-//         categories: true,
-//         wallets: true,
-//     });
-
-//     const [stats, setStats] = useState<DashboardStats>({
-//         totalBalance: 0,
-//         totalIncome: 0,
-//         totalExpense: 0,
-//         incomeChange: 0,
-//         expenseChange: 0,
-//     });
-
-//     const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
-//         []
-//     );
-//     const [expenseByCategory, setExpenseByCategory] = useState<CategoryStat[]>(
-//         []
-//     );
-//     const { currentUser } = useAuth();
-//     const [currentDate] = useState<Date>(new Date());
-//     const { showBoundary } = useErrorBoundary();
-
-//     const fetchDashboardData = useCallback(async () => {
-//         if (!currentUser) return;
-
-//         // BẮT ĐẦU CẬP NHẬT: LẤY TOKEN THEO CÁCH MỚI
-//         const firebaseUser = auth.currentUser;
-//         if (!firebaseUser) {
-//             message.error("Xác thực người dùng thất bại. Vui lòng tải lại trang.");
-//             setIsLoading({ stats: false, transactions: false, categories: false, wallets: false });
-//             return;
-//         }
-//         // KẾT THÚC CẬP NHẬT
-
-//         try {
-//             setIsLoading({
-//                 stats: true,
-//                 transactions: true,
-//                 categories: true,
-//                 wallets: true,
-//             });
-
-//             const month = currentDate.getMonth() + 1;
-//             const year = currentDate.getFullYear();
-//             const token = await firebaseUser.getIdToken(); // <-- ĐÃ THAY ĐỔI
-
-//             // Fetch data in parallel
-//             const [walletsData, statsData, transactionsData, categoriesData] =
-//                 await Promise.all([
-//                     walletApi.getWallets(token),
-//                     transactionApi.getDashboardStats(month, year, token),
-//                     transactionApi.getTransactions(
-//                         {
-//                             limit: 5,
-//                             sort: "-date",
-//                         },
-//                         token
-//                     ),
-//                     transactionApi.getExpenseByCategory(month, year, token),
-//                 ]);
-
-//             // Update states with the fetched data
-//             const totalBalance = walletsData?.totalBalance || 0;
-//             const totalIncome = statsData?.totalIncome || 0;
-//             const totalExpense = statsData?.totalExpense || 0;
-
-//             setStats({
-//                 totalBalance,
-//                 totalIncome,
-//                 totalExpense,
-//                 incomeChange: 0,
-//                 expenseChange: 0,
-//             });
-
-//             setRecentTransactions(
-//                 transactionsData?.data?.transactions?.map((t: any) => ({
-//                     ...t,
-//                     walletName: t.walletId?.name || "Unknown",
-//                 })) || []
-//             );
-
-//             const totalExpenseForCategories = (
-//                 categoriesData?.data || []
-//             ).reduce((sum: number, cat: any) => sum + (cat.total || 0), 0);
-
-//             setExpenseByCategory(
-//                 (categoriesData?.data || []).map((cat: any) => ({
-//                     ...cat,
-//                     color: getCategoryColor(cat._id),
-//                     percentage:
-//                         totalExpenseForCategories > 0
-//                             ? Math.round(
-//                                   (cat.total / totalExpenseForCategories) * 100
-//                               )
-//                             : 0,
-//                 }))
-//             );
-//         } catch (error) {
-//             console.error("Lỗi khi tải dữ liệu dashboard:", error);
-//             showBoundary(error);
-//         } finally {
-//             setIsLoading({
-//                 stats: false,
-//                 transactions: false,
-//                 categories: false,
-//                 wallets: false,
-//             });
-//         }
-//     }, [currentUser, currentDate, showBoundary]);
-
-//     const getCategoryColor = useCallback((categoryId: string): string => {
-//         const colors = [
-//             "#1890ff", "#52c41a", "#faad14", "#f5222d", "#722ed1",
-//             "#13c2c2", "#fa8c16", "#eb2f96", "#2f54eb", "#fa541c",
-//         ];
-//         const index =
-//             categoryId
-//                 .split("")
-//                 .reduce((acc, char) => acc + char.charCodeAt(0), 0) %
-//             colors.length;
-//         return colors[index];
-//     }, []);
-
-//     useEffect(() => {
-//         fetchDashboardData();
-//     }, [fetchDashboardData]);
-
-//     const isLoadingAny = useMemo(
-//         () => Object.values(isLoading).some((loading) => loading),
-//         [isLoading]
-//     );
-
-//     if (isLoadingAny) {
-//         return (
-//             <div
-//                 style={{
-//                     display: "flex",
-//                     justifyContent: "center",
-//                     alignItems: "center",
-//                     minHeight: "60vh",
-//                 }}
-//             >
-//                 <Spin size="large" tip="Đang tải dữ liệu..." spinning={true}>
-//                     <div
-//                         style={{
-//                             padding: "50px",
-//                             background: "rgba(0, 0, 0, 0.05)",
-//                             borderRadius: "4px",
-//                         }}
-//                     />
-//                 </Spin>
-//             </div>
-//         );
-//     }
-
-//     return (
-//         <div className="dashboard" style={{ padding: "24px" }}>
-//             <div
-//                 className="page-header"
-//                 style={{
-//                     marginBottom: "24px",
-//                     display: "flex",
-//                     justifyContent: "space-between",
-//                     alignItems: "center",
-//                 }}
-//             >
-//                 <div>
-//                     <Title level={3} style={{ margin: 0 }}>
-//                         Tổng quan
-//                     </Title>
-//                     <Text type="secondary">
-//                         {dayjs().format("dddd, D MMMM YYYY")}
-//                     </Text>
-//                 </div>
-
-//                 <Space>
-//                     <Button
-//                         type="primary"
-//                         icon={<FileExcelOutlined />}
-//                         onClick={() => exportToExcel(recentTransactions)}
-//                         disabled={recentTransactions.length === 0}
-//                     >
-//                         Xuất Excel
-//                     </Button>
-//                     <Button
-//                         type="primary"
-//                         danger
-//                         icon={<FilePdfOutlined />}
-//                         onClick={exportToPdf}
-//                         disabled={recentTransactions.length === 0}
-//                     >
-//                         Xuất PDF
-//                     </Button>
-//                 </Space>
-//             </div>
-
-//             <style>{`
-//                 @media print {
-//                     .no-print { display: none !important; }
-//                     * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
-//                 }
-//                 .print-only { display: none; }
-//                 @media print { .print-only { display: block; } }
-//             `}</style>
-
-//             <div className="print-only" style={{ textAlign: "center", marginBottom: "20px" }}>
-//                 <h2>Báo cáo tài chính</h2>
-//                 <p>Ngày xuất: {dayjs().format("DD/MM/YYYY HH:mm")}</p>
-//             </div>
-
-//             <div id="dashboard-content">
-//                 <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
-//                     <Col xs={24} sm={12} lg={6}>
-//                         <Card>
-//                             <Statistic
-//                                 title="Tổng số dư"
-//                                 value={stats.totalBalance}
-//                                 precision={0}
-//                                 valueStyle={{ color: "#1890ff" }}
-//                                 prefix={<WalletOutlined />}
-//                                 formatter={(value) =>
-//                                     formatCurrency(value as number)
-//                                 }
-//                             />
-//                         </Card>
-//                     </Col>
-//                     <Col xs={24} sm={12} lg={6}>
-//                         <Card>
-//                             <Statistic
-//                                 title="Tổng thu nhập tháng"
-//                                 value={stats.totalIncome}
-//                                 precision={0}
-//                                 valueStyle={{ color: "#52c41a" }}
-//                                 prefix={<IncomeIcon />}
-//                                 formatter={(value) =>
-//                                     formatCurrency(value as number)
-//                                 }
-//                             />
-//                         </Card>
-//                     </Col>
-//                     <Col xs={24} sm={12} lg={6}>
-//                         <Card>
-//                             <Statistic
-//                                 title="Tổng chi tiêu tháng"
-//                                 value={stats.totalExpense}
-//                                 precision={0}
-//                                 valueStyle={{ color: "#f5222d" }}
-//                                 prefix={<ExpenseIcon />}
-//                                 formatter={(value) =>
-//                                     formatCurrency(value as number)
-//                                 }
-//                             />
-//                         </Card>
-//                     </Col>
-//                     <Col xs={24} sm={12} lg={6}>
-//                         <Card>
-//                             <Statistic
-//                                 title="Thu chi tháng"
-//                                 value={stats.totalIncome - stats.totalExpense}
-//                                 precision={0}
-//                                 valueStyle={{ color: (stats.totalIncome - stats.totalExpense) >= 0 ? "#52c41a" : "#f5222d" }}
-//                                 formatter={(value) =>
-//                                     formatCurrency(value as number)
-//                                 }
-//                             />
-//                         </Card>
-//                     </Col>
-//                 </Row>
-
-//                 <Row gutter={[16, 16]}>
-//                     <Col xs={24} lg={16}>
-//                         <Card
-//                             title="Giao dịch gần đây"
-//                             extra={<Button type="link" onClick={() => navigate('/transactions')}>Xem tất cả</Button>}
-//                         >
-//                             {recentTransactions.length > 0 ? (
-//                                 <List
-//                                     itemLayout="horizontal"
-//                                     dataSource={recentTransactions}
-//                                     renderItem={(item) => (
-//                                         <List.Item>
-//                                             <List.Item.Meta
-//                                                 avatar={
-//                                                     <div style={{
-//                                                         width: 40, height: 40, borderRadius: "50%",
-//                                                         background: item.type === "INCOME" ? "#e6f7ff" : "#fff1f0",
-//                                                         display: "flex", alignItems: "center", justifyContent: "center",
-//                                                     }}>
-//                                                         {item.type === "INCOME" ? <IncomeIcon style={{ color: "#52c41a" }} /> : <ExpenseIcon style={{ color: "#f5222d" }} />}
-//                                                     </div>
-//                                                 }
-//                                                 title={
-//                                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-//                                                         <span>{item.category}</span>
-//                                                         <span style={{ color: item.type === "INCOME" ? "#52c41a" : "#f5222d", fontWeight: 500 }}>
-//                                                             {item.type === "INCOME" ? "+" : "-"}
-//                                                             {formatCurrency(item.amount)}
-//                                                         </span>
-//                                                     </div>
-//                                                 }
-//                                                 description={
-//                                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-//                                                         <span>
-//                                                             {item.walletName && <Tag color="blue" style={{ marginRight: 8 }}>{item.walletName}</Tag>}
-//                                                             {item.note}
-//                                                         </span>
-//                                                         <span style={{ color: "rgba(0, 0, 0, 0.45)" }}>
-//                                                             {formatDate(item.date)}
-//                                                         </span>
-//                                                     </div>
-//                                                 }
-//                                             />
-//                                         </List.Item>
-//                                     )}
-//                                 />
-//                             ) : (
-//                                 <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có giao dịch gần đây" />
-//                             )}
-//                         </Card>
-//                     </Col>
-
-//                     <Col xs={24} lg={8}>
-//                         <Card title="Chi tiêu tháng theo danh mục">
-//                             {expenseByCategory.length > 0 ? (
-//                                 <div>
-//                                     {expenseByCategory.map((category) => (
-//                                         <div key={category._id} style={{ marginBottom: 16 }}>
-//                                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-//                                                 <span>{category.name}</span>
-//                                                 <span>{formatCurrency(category.total)}</span>
-//                                             </div>
-//                                             <Progress
-//                                                 percent={category.percentage}
-//                                                 showInfo={true}
-//                                                 strokeColor={category.color}
-//                                                 format={(percent) => `${percent}%`}
-//                                             />
-//                                         </div>
-//                                     ))}
-//                                 </div>
-//                             ) : (
-//                                 <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có dữ liệu chi tiêu" />
-//                             )}
-//                         </Card>
-//                     </Col>
-//                 </Row>
-//             </div>
-//         </div>
-//     );
-// };
-
-// // Wrap the Dashboard with ErrorBoundary
-// const Dashboard: React.FC = () => {
-//     return (
-//         <ErrorBoundary
-//             FallbackComponent={ErrorFallback}
-//             onReset={() => window.location.reload()}
-//         >
-//             <DashboardContent />
-//         </ErrorBoundary>
-//     );
-// };
-
-// export default Dashboard;
-
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
     Card,
-    Row,
     Col,
-    Statistic,
+    Row,
     Typography,
-    List,
-    Tag,
-    Spin,
-    Empty,
-    message,
-    Button,
     Progress,
-    Space,
-    DatePicker,
-    Select,
-    Form,
-    Divider,
-    Table,
+    Button,
+    Timeline,
+    message,
+    Spin,
 } from "antd";
-import {
-    ErrorBoundary,
-    FallbackProps,
-    useErrorBoundary,
-} from "react-error-boundary";
-import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import {
-    FileExcelOutlined,
-    FilePdfOutlined,
-    SearchOutlined,
-    ArrowUpOutlined,
-    ArrowDownOutlined,
-    WalletOutlined,
-    DownloadOutlined,
-} from "@ant-design/icons";
-import { useAuth } from "../contexts/AuthContext";
+import { MenuUnfoldOutlined } from "@ant-design/icons";
+import Paragraph from "antd/lib/typography/Paragraph";
 import { walletApi, transactionApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
-import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase/config";
-import type { TableProps } from "antd";
+
+import BarChart from "../components/charts/BarChart";
+import LineChart from "../components/charts/LineChart";
+import PieChart from "../components/charts/PieChart";
+import AreaChart from "../components/charts/AreaChart";
 
 dayjs.locale("vi");
-const { RangePicker } = DatePicker;
-const { Title, Text } = Typography;
 
 interface Transaction {
     _id: string;
@@ -604,38 +36,6 @@ interface Transaction {
         _id: string;
         name: string;
     };
-    walletName?: string;
-}
-
-interface DashboardStats {
-    totalBalance: number;
-    totalIncome: number;
-    totalExpense: number;
-    incomeChange: number;
-    expenseChange: number;
-}
-
-interface CategoryStat {
-    _id: string;
-    name: string;
-    total: number;
-    color: string;
-    percentage?: number;
-}
-
-interface LoadingState {
-    stats: boolean;
-    transactions: boolean;
-    categories: boolean;
-    wallets: boolean;
-}
-
-interface StatementReport {
-    startBalance: number;
-    endBalance: number;
-    totalIncome: number;
-    totalExpense: number;
-    transactions: Transaction[];
 }
 
 interface Wallet {
@@ -644,897 +44,805 @@ interface Wallet {
     balance: number;
 }
 
-// Error Fallback Component
-const ErrorFallback: React.FC<FallbackProps> = ({
-    error,
-    resetErrorBoundary,
-}) => {
-    return (
-        <div
-            style={{
-                padding: "24px",
-                textAlign: "center",
-                maxWidth: "600px",
-                margin: "40px auto",
-            }}
-        >
-            <Title level={3} style={{ color: "#ff4d4f", marginBottom: "16px" }}>
-                Đã xảy ra lỗi
-            </Title>
-            <div
-                style={{
-                    background: "#fff2f0",
-                    padding: "16px",
-                    borderRadius: "4px",
-                    marginBottom: "20px",
-                }}
-            >
-                {error.message || "Không có thông tin lỗi"}
-            </div>
-            <Button
-                type="primary"
-                onClick={resetErrorBoundary}
-                icon={<ArrowDownOutlined />}
-            >
-                Tải lại trang
-            </Button>
-        </div>
-    );
-};
-
-const exportToExcel = (
-    transactions: Transaction[],
-    reportName: string = "giao-dich"
-) => {
-    const data = transactions.map((trans) => ({
-        Ngày: dayjs(trans.date).format("DD/MM/YYYY"),
-        Loại: trans.type === "INCOME" ? "Thu nhập" : "Chi tiêu",
-        "Danh mục": trans.category,
-        "Số tiền": trans.amount,
-        "Ghi chú": trans.note || "",
-        Ví: trans.walletName || "",
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Giao dịch");
-    XLSX.writeFile(
-        wb,
-        `bao-cao-${reportName}-${dayjs().format("DD-MM-YYYY")}.xlsx`
-    );
-};
-
-const exportToPdf = async (elementId: string, filename: string) => {
-    const input = document.getElementById(elementId);
-    if (!input) return;
-
-    const canvas = await html2canvas(input, {
-        scale: window.devicePixelRatio,
-        useCORS: true,
-    } as any);
-
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-    const imgWidth = 210;
-    const pageHeight = 295;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-    }
-
-    pdf.save(`${filename}-${dayjs().format("DD-MM-YYYY")}.pdf`);
-};
-
-const DashboardContent: React.FC = () => {
-    const navigate = useNavigate();
-    const [form] = Form.useForm();
-    const [isLoading, setIsLoading] = useState<LoadingState>({
-        stats: true,
-        transactions: true,
-        categories: true,
-        wallets: true,
-    });
-    const [statementReport, setStatementReport] =
-        useState<StatementReport | null>(null);
-    const [isLoadingReport, setIsLoadingReport] = useState(false);
+const Dashboard = () => {
+    const { Title, Text } = Typography;
     const [wallets, setWallets] = useState<Wallet[]>([]);
-    const [selectedWallet, setSelectedWallet] = useState<string | undefined>();
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [reverse, setReverse] = useState(false);
 
-    const [stats, setStats] = useState<DashboardStats>({
-        totalBalance: 0,
-        totalIncome: 0,
-        totalExpense: 0,
-        incomeChange: 0,
-        expenseChange: 0,
-    });
+    useEffect(() => {
+        fetchData();
+    }, []);
 
-    const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
-        []
-    );
-    const [expenseByCategory, setExpenseByCategory] = useState<CategoryStat[]>(
-        []
-    );
-    const { currentUser } = useAuth();
-    const { showBoundary } = useErrorBoundary();
-
-    const fetchDashboardData = useCallback(async () => {
-        if (!currentUser) return;
-
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) {
-            message.error(
-                "Xác thực người dùng thất bại. Vui lòng tải lại trang."
-            );
-            setIsLoading({
-                stats: false,
-                transactions: false,
-                categories: false,
-                wallets: false,
-            });
-            return;
-        }
-
+    const fetchData = async () => {
         try {
-            setIsLoading({
-                stats: true,
-                transactions: true,
-                categories: true,
-                wallets: true,
-            });
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) return;
 
-            const month = new Date().getMonth() + 1;
-            const year = new Date().getFullYear();
             const token = await firebaseUser.getIdToken();
 
-            const [walletsData, statsData, transactionsData, categoriesData] =
-                await Promise.all([
-                    walletApi.getWallets(token),
-                    transactionApi.getDashboardStats(month, year, token),
-                    transactionApi.getTransactions(
-                        { limit: 5, sort: "-date" },
-                        token
-                    ),
-                    transactionApi.getExpenseByCategory(month, year, token),
-                ]);
+            const now = dayjs();
+            const startDate = now
+                .subtract(29, "day")
+                .startOf("day")
+                .toISOString();
+            const endDate = now.endOf("day").toISOString();
 
-            setWallets(walletsData.wallets || []);
+            const [walletsRes, transactionsRes] = await Promise.all([
+                walletApi.getWallets(token),
+                transactionApi.getTransactions(
+                    {
+                        startDate,
+                        endDate,
+                    },
+                    token,
+                ),
+            ]);
 
-            const totalBalance = walletsData?.totalBalance || 0;
-            const totalIncome = statsData?.totalIncome || 0;
-            const totalExpense = statsData?.totalExpense || 0;
-
-            setStats({
-                totalBalance,
-                totalIncome,
-                totalExpense,
-                incomeChange: 0,
-                expenseChange: 0,
-            });
-
-            setRecentTransactions(
-                transactionsData?.data?.transactions?.map((t: any) => ({
-                    ...t,
-                    walletName: t.walletId?.name || "Không xác định",
-                })) || []
-            );
-
-            const totalExpenseForCategories = (
-                categoriesData?.data || []
-            ).reduce((sum: number, cat: any) => sum + (cat.total || 0), 0);
-
-            setExpenseByCategory(
-                (categoriesData?.data || []).map((cat: any) => ({
-                    ...cat,
-                    color: getCategoryColor(cat._id),
-                    percentage:
-                        totalExpenseForCategories > 0
-                            ? Math.round(
-                                  (cat.total / totalExpenseForCategories) * 100
-                              )
-                            : 0,
-                }))
-            );
+            setWallets(walletsRes?.wallets || []);
+            const txs = transactionsRes?.data?.transactions || [];
+            setAllTransactions(txs);
+            setTransactions(txs.slice(0, 10));
         } catch (error) {
-            console.error("Lỗi khi tải dữ liệu dashboard:", error);
-            showBoundary(error);
+            console.error("Error fetching dashboard data:", error);
+            message.error("Không thể tải dữ liệu");
         } finally {
-            setIsLoading({
-                stats: false,
-                transactions: false,
-                categories: false,
-                wallets: false,
-            });
+            setLoading(false);
         }
-    }, [currentUser, showBoundary]);
+    };
 
-    // const fetchStatementReport = async (values: any) => {
-    //     if (!currentUser) return;
+    // Statistics
+    const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0);
+    const incomeTransactions = allTransactions.filter(
+        (t) => t.type === "INCOME",
+    );
+    const expenseTransactions = allTransactions.filter(
+        (t) => t.type === "EXPENSE",
+    );
+    const totalIncome = incomeTransactions.reduce(
+        (sum, t) => sum + t.amount,
+        0,
+    );
+    const totalExpense = expenseTransactions.reduce(
+        (sum, t) => sum + t.amount,
+        0,
+    );
 
-    //     try {
-    //         setIsLoadingReport(true);
-    //         const firebaseUser = auth.currentUser;
-    //         if (!firebaseUser) {
-    //             message.error("Vui lòng đăng nhập lại");
-    //             return;
-    //         }
-
-    //         const token = await firebaseUser.getIdToken();
-
-    //         const response = await transactionApi.getStatementReport(
-    //         {
-    //             walletId: values.walletId,
-    //             startDate: values.dateRange[0].toISOString(),
-    //             endDate: values.dateRange[1].toISOString()
-    //         },
-    //         token
-    //     );
-
-    //     setStatementReport({
-    //         startBalance: response.data.startBalance,
-    //         endBalance: response.data.endBalance,
-    //         totalIncome: response.data.totalIncome,
-    //         totalExpense: response.data.totalExpense,
-    //         transactions: response.data.transactions.map((t: any) => ({
-    //             ...t,
-    //             walletName: wallets.find(w => w._id === t.walletId)?.name || 'Không xác định'
-    //         }))
-    //     });
-    //     } catch (error) {
-    //         console.error("Lỗi khi tải báo cáo sao kê:", error);
-    //         message.error("Không thể tải báo cáo sao kê");
-    //     } finally {
-    //         setIsLoadingReport(false);
-    //     }
-    // };
-// TÌM HÀM NÀY TRONG CODE CỦA BẠN
-const fetchStatementReport = async (values: any) => {
-    if (!currentUser) return;
-
-    try {
-        setIsLoadingReport(true);
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) {
-            message.error("Vui lòng đăng nhập lại");
-            return;
-        }
-
-        const token = await firebaseUser.getIdToken();
-
-        const response = await transactionApi.getStatementReport(
-            {
-                walletId: values.walletId,
-                startDate: values.dateRange[0].toISOString(),
-                endDate: values.dateRange[1].toISOString(),
-            },
-            token
+    const dayLabels = useMemo(() => {
+        const now = dayjs();
+        return Array.from({ length: 30 }, (_, i) =>
+            now.subtract(29 - i, "day").format("DD/MM"),
         );
+    }, []);
 
-        // BẮT ĐẦU THAY ĐỔI: TÍNH TOÁN SỐ DƯ CHẠY (RUNNING BALANCE)
-        let currentBalance = response.data.startBalance;
-        const transactionsWithRunningBalance = response.data.transactions.map((t: any) => {
-            const beginningBalance = currentBalance;
-            
-            if (t.type === 'INCOME') {
-                currentBalance += t.amount;
-            } else { // EXPENSE
-                currentBalance -= t.amount;
-            }
-            
-            const endingBalance = currentBalance;
+    const dailyTotals = useMemo(() => {
+        const now = dayjs();
+        const totals = Array.from({ length: 30 }, () => ({
+            income: 0,
+            expense: 0,
+        }));
 
-            return {
-                ...t,
-                beginningBalance,
-                endingBalance,
-                walletName: wallets.find(w => w._id === t.walletId)?.name || 'Không xác định'
-            };
-        });
-        // KẾT THÚC THAY ĐỔI
-
-        setStatementReport({
-            startBalance: response.data.startBalance,
-            endBalance: response.data.endBalance,
-            totalIncome: response.data.totalIncome,
-            totalExpense: response.data.totalExpense,
-            // Sử dụng danh sách giao dịch đã được tính toán
-            transactions: transactionsWithRunningBalance
+        allTransactions.forEach((t) => {
+            const d = dayjs(t.date);
+            const diff = d
+                .startOf("day")
+                .diff(now.subtract(29, "day").startOf("day"), "day");
+            if (diff < 0 || diff > 29) return;
+            if (t.type === "INCOME")
+                totals[diff].income += Number(t.amount) || 0;
+            if (t.type === "EXPENSE")
+                totals[diff].expense += Number(t.amount) || 0;
         });
 
-    } catch (error) {
-        console.error("Lỗi khi tải báo cáo sao kê:", error);
-        message.error("Không thể tải báo cáo sao kê");
-    } finally {
-        setIsLoadingReport(false);
-    }
-};
+        return totals;
+    }, [allTransactions]);
 
+    const barChartDataFromBe = useMemo(
+        () => ({
+            labels: dayLabels,
+            datasets: [
+                {
+                    label: "Chi tiêu",
+                    data: dailyTotals.map((d) => d.expense),
+                    backgroundColor: "#f5222d",
+                    borderRadius: 5,
+                    maxBarThickness: 22,
+                },
+                {
+                    label: "Thu nhập",
+                    data: dailyTotals.map((d) => d.income),
+                    backgroundColor: "#52c41a",
+                    borderRadius: 5,
+                    maxBarThickness: 22,
+                },
+            ],
+        }),
+        [dayLabels, dailyTotals],
+    );
 
-    const getCategoryColor = useCallback((categoryId: string): string => {
-        const colors = [
+    const barChartOptionsFromBe = useMemo(
+        () => ({
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: "top" as const,
+                    labels: {
+                        color: "#9ca3af",
+                    },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context: any) => {
+                            const label = context.dataset?.label
+                                ? `${context.dataset.label}: `
+                                : "";
+                            const value =
+                                typeof context.parsed?.y === "number"
+                                    ? context.parsed.y
+                                    : 0;
+                            return `${label}${value.toLocaleString("vi-VN")} VND`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color: "#9ca3af",
+                        maxRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 10,
+                    },
+                },
+                y: {
+                    grid: {
+                        display: true,
+                        color: "#e5e7eb",
+                        borderDash: [2, 2],
+                    },
+                    ticks: {
+                        color: "#9ca3af",
+                        callback: (value: any) =>
+                            `${Number(value).toLocaleString("vi-VN")}`,
+                    },
+                    title: {
+                        display: true,
+                        text: "Số tiền (VND)",
+                        color: "#9ca3af",
+                    },
+                },
+            },
+        }),
+        [],
+    );
+
+    const pieChartDataFromBe = useMemo(() => {
+        const categories: Record<string, number> = {};
+        allTransactions
+            .filter((t) => t.type === "EXPENSE")
+            .forEach((t) => {
+                const key = t.category || "Khác";
+                categories[key] =
+                    (categories[key] || 0) + (Number(t.amount) || 0);
+            });
+
+        const entries = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+        const labels = entries.map(([name]) => name);
+        const values = entries.map(([, total]) => total);
+        const palette = [
             "#1890ff",
             "#52c41a",
             "#faad14",
             "#f5222d",
             "#722ed1",
             "#13c2c2",
-            "#fa8c16",
             "#eb2f96",
             "#2f54eb",
-            "#fa541c",
         ];
-        const index =
-            categoryId
-                .split("")
-                .reduce((acc, char) => acc + char.charCodeAt(0), 0) %
-            colors.length;
-        return colors[index];
-    }, []);
 
-    useEffect(() => {
-        fetchDashboardData();
-    }, [fetchDashboardData]);
+        return {
+            labels,
+            datasets: [
+                {
+                    label: "Chi tiêu",
+                    data: values,
+                    backgroundColor: labels.map(
+                        (_, idx) => palette[idx % palette.length],
+                    ),
+                    borderWidth: 0,
+                },
+            ],
+        };
+    }, [allTransactions]);
 
-    const isLoadingAny = useMemo(
-        () => Object.values(isLoading).some((loading) => loading),
-        [isLoading]
+    const pieChartOptionsFromBe = useMemo(
+        () => ({
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: "bottom" as const,
+                    labels: { color: "#9ca3af" },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context: any) => {
+                            const label = context.label
+                                ? `${context.label}: `
+                                : "";
+                            const value =
+                                typeof context.parsed === "number"
+                                    ? context.parsed
+                                    : 0;
+                            return `${label}${value.toLocaleString("vi-VN")} VND`;
+                        },
+                    },
+                },
+            },
+        }),
+        [],
     );
 
-    // const transactionColumns = [
-    //     {
-    //         title: "Ngày",
-    //         dataIndex: "date",
-    //         key: "date",
-    //         render: (date: string) => formatDate(date),
-    //         sorter: (a: any, b: any) =>
-    //             new Date(a.date).getTime() - new Date(b.date).getTime(),
-    //     },
-    //     {
-    //         title: "Mô tả",
-    //         dataIndex: "note",
-    //         key: "note",
-    //         render: (note: string, record: Transaction) => (
-    //             <div>
-    //                 <div>{record.category}</div>
-    //                 {note && (
-    //                     <div style={{ color: "#999", fontSize: "12px" }}>
-    //                         {note}
-    //                     </div>
-    //                 )}
-    //             </div>
-    //         ),
-    //     },
-    //     {
-    //         title: "Ví",
-    //         dataIndex: "walletName",
-    //         key: "walletName",
-    //     },
-    //     {
-    //         title: "Số tiền",
-    //         dataIndex: "amount",
-    //         key: "amount",
-    //         align: "right" as const,
-    //         render: (amount: number, record: Transaction) => (
-    //             <span
-    //                 style={{
-    //                     color: record.type === "INCOME" ? "#52c41a" : "#f5222d",
-    //                 }}
-    //             >
-    //                 {record.type === "INCOME" ? "+" : "-"}{" "}
-    //                 {formatCurrency(amount)}
-    //             </span>
-    //         ),
-    //         sorter: (a: any, b: any) => a.amount - b.amount,
-    //     },
-    // ];
+    const balanceTrendDataFromBe = useMemo(() => {
+        const dailyProfit = dailyTotals.map((d) => d.income - d.expense);
+        const cumulative: number[] = [];
+        dailyProfit.reduce((acc, v) => {
+            const next = acc + v;
+            cumulative.push(next);
+            return next;
+        }, 0);
 
-        const transactionColumns = [
-    {
-        title: "Ngày",
-        dataIndex: "date",
-        key: "date",
-        render: (date: string) => formatDate(date),
-        sorter: (a: any, b: any) =>
-            new Date(a.date).getTime() - new Date(b.date).getTime(),
-    },
-    {
-        title: "Mô tả",
-        dataIndex: "note",
-        key: "note",
-        render: (note: string, record: Transaction) => (
-            <div>
-                <div>{record.category}</div>
-                {note && (
-                    <div style={{ color: "#999", fontSize: "12px" }}>
-                        {note}
-                    </div>
-                )}
-            </div>
-        ),
-    },
-    // BẮT ĐẦU THAY ĐỔI: THÊM CÁC CỘT MỚI
-    {
-        title: "Số dư đầu kỳ",
-        dataIndex: "beginningBalance",
-        key: "beginningBalance",
-        align: "right" as const,
-        render: (amount: number) => formatCurrency(amount),
-    },
-    {
-        title: "Giao dịch",
-        dataIndex: "amount",
-        key: "amount",
-        align: "right" as const,
-        render: (amount: number, record: Transaction) => (
-            <span
-                style={{
-                    color: record.type === "INCOME" ? "#52c41a" : "#f5222d",
-                    fontWeight: 'bold',
-                }}
-            >
-                {record.type === "INCOME" ? "+" : "-"}
-                {formatCurrency(amount)}
-            </span>
-        ),
-        sorter: (a: any, b: any) => a.amount - b.amount,
-    },
-    {
-        title: "Số dư cuối kỳ",
-        dataIndex: "endingBalance",
-        key: "endingBalance",
-        align: "right" as const,
-        render: (amount: number) => formatCurrency(amount),
-    },
+        return {
+            labels: dayLabels,
+            datasets: [
+                {
+                    label: "Số dư",
+                    data: cumulative,
+                    borderColor: "#1890ff",
+                    backgroundColor: "rgba(24, 144, 255, 0.15)",
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    borderWidth: 3,
+                },
+            ],
+        };
+    }, [dayLabels, dailyTotals]);
+
+    const balanceTrendOptionsFromBe = useMemo(
+        () => ({
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context: any) => {
+                            const value =
+                                typeof context.parsed?.y === "number"
+                                    ? context.parsed.y
+                                    : 0;
+                            return `${value.toLocaleString("vi-VN")} VND`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: "#9ca3af" },
+                },
+                y: {
+                    grid: {
+                        display: true,
+                        color: "#e5e7eb",
+                        borderDash: [2, 2],
+                    },
+                    ticks: {
+                        color: "#9ca3af",
+                        callback: (value: any) =>
+                            `${Number(value).toLocaleString("vi-VN")}`,
+                    },
+                    title: {
+                        display: true,
+                        text: "Số dư (VND)",
+                        color: "#9ca3af",
+                    },
+                },
+            },
+        }),
+        [],
+    );
+
+    const dollor = [
+        <svg
+            width="22"
+            height="22"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            key={0}
+        >
+            <path
+                d="M8.43338 7.41784C8.58818 7.31464 8.77939 7.2224 9 7.15101L9.00001 8.84899C8.77939 8.7776 8.58818 8.68536 8.43338 8.58216C8.06927 8.33942 8 8.1139 8 8C8 7.8861 8.06927 7.66058 8.43338 7.41784Z"
+                fill="#fff"
+            ></path>
+            <path
+                d="M11 12.849L11 11.151C11.2206 11.2224 11.4118 11.3146 11.5666 11.4178C11.9308 11.6606 12 11.8861 12 12C12 12.1139 11.9308 12.3394 11.5666 12.5822C11.4118 12.6854 11.2206 12.7776 11 12.849Z"
+                fill="#fff"
+            ></path>
+            <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M10 18C14.4183 18 18 14.4183 18 10C18 5.58172 14.4183 2 10 2C5.58172 2 2 5.58172 2 10C2 14.4183 5.58172 18 10 18ZM11 5C11 4.44772 10.5523 4 10 4C9.44772 4 9 4.44772 9 5V5.09199C8.3784 5.20873 7.80348 5.43407 7.32398 5.75374C6.6023 6.23485 6 7.00933 6 8C6 8.99067 6.6023 9.76515 7.32398 10.2463C7.80348 10.5659 8.37841 10.7913 9.00001 10.908L9.00002 12.8492C8.60902 12.7223 8.31917 12.5319 8.15667 12.3446C7.79471 11.9275 7.16313 11.8827 6.74599 12.2447C6.32885 12.6067 6.28411 13.2382 6.64607 13.6554C7.20855 14.3036 8.05956 14.7308 9 14.9076L9 15C8.99999 15.5523 9.44769 16 9.99998 16C10.5523 16 11 15.5523 11 15L11 14.908C11.6216 14.7913 12.1965 14.5659 12.676 14.2463C13.3977 13.7651 14 12.9907 14 12C14 11.0093 13.3977 10.2348 12.676 9.75373C12.1965 9.43407 11.6216 9.20873 11 9.09199L11 7.15075C11.391 7.27771 11.6808 7.4681 11.8434 7.65538C12.2053 8.07252 12.8369 8.11726 13.254 7.7553C13.6712 7.39335 13.7159 6.76176 13.354 6.34462C12.7915 5.69637 11.9405 5.26915 11 5.09236V5Z"
+                fill="#fff"
+            ></path>
+        </svg>,
     ];
 
-    if (isLoadingAny) {
+    const profile = [
+        <svg
+            width="22"
+            height="22"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            key={0}
+        >
+            <path
+                d="M9 6C9 7.65685 7.65685 9 6 9C4.34315 9 3 7.65685 3 6C3 4.34315 4.34315 3 6 3C7.65685 3 9 4.34315 9 6Z"
+                fill="#fff"
+            ></path>
+            <path
+                d="M17 6C17 7.65685 15.6569 9 14 9C12.3431 9 11 7.65685 11 6C11 4.34315 12.3431 3 14 3C15.6569 3 17 4.34315 17 6Z"
+                fill="#fff"
+            ></path>
+            <path
+                d="M12.9291 17C12.9758 16.6734 13 16.3395 13 16C13 14.3648 12.4393 12.8606 11.4998 11.6691C12.2352 11.2435 13.0892 11 14 11C16.7614 11 19 13.2386 19 16V17H12.9291Z"
+                fill="#fff"
+            ></path>
+            <path
+                d="M6 11C8.76142 11 11 13.2386 11 16V17H1V16C1 13.2386 3.23858 11 6 11Z"
+                fill="#fff"
+            ></path>
+        </svg>,
+    ];
+
+    const heart = [
+        <svg
+            width="22"
+            height="22"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            key={0}
+        >
+            <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M3.17157 5.17157C4.73367 3.60948 7.26633 3.60948 8.82843 5.17157L10 6.34315L11.1716 5.17157C12.7337 3.60948 15.2663 3.60948 16.8284 5.17157C18.3905 6.73367 18.3905 9.26633 16.8284 10.8284L10 17.6569L3.17157 10.8284C1.60948 9.26633 1.60948 6.73367 3.17157 5.17157Z"
+                fill="#fff"
+            ></path>
+        </svg>,
+    ];
+
+    const cart = [
+        <svg
+            width="22"
+            height="22"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            key={0}
+        >
+            <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M10 2C7.79086 2 6 3.79086 6 6V7H5C4.49046 7 4.06239 7.38314 4.00612 7.88957L3.00612 16.8896C2.97471 17.1723 3.06518 17.455 3.25488 17.6669C3.44458 17.8789 3.71556 18 4 18H16C16.2844 18 16.5554 17.8789 16.7451 17.6669C16.9348 17.455 17.0253 17.1723 16.9939 16.8896L15.9939 7.88957C15.9376 7.38314 15.5096 7 15 7H14V6C14 3.79086 12.2091 2 10 2ZM12 7V6C12 4.89543 11.1046 4 10 4C8.89543 4 8 4.89543 8 6V7H12ZM6 10C6 9.44772 6.44772 9 7 9C7.55228 9 8 9.44772 8 10C8 10.5523 7.55228 11 7 11C6.44772 11 6 10.5523 6 10ZM13 9C12.4477 9 12 9.44772 12 10C12 10.5523 12.4477 11 13 11C13.5523 11 14 10.5523 14 10C14 9.44772 13.5523 9 13 9Z"
+                fill="#fff"
+            ></path>
+        </svg>,
+    ];
+
+    const count = [
+        {
+            today: "Tổng số dư",
+            title: formatCurrency(totalBalance),
+            persent: `${wallets.length} ví`,
+            icon: dollor,
+            bnb: "bnb2",
+        },
+        {
+            today: "Tổng thu nhập",
+            title: formatCurrency(totalIncome),
+            persent: `${incomeTransactions.length} ghi chép`,
+            icon: profile,
+            bnb: "bnb2",
+        },
+        {
+            today: "Tổng chi tiêu",
+            title: formatCurrency(totalExpense),
+            persent: `${expenseTransactions.length} ghi chép`,
+            icon: heart,
+            bnb: "redtext",
+        },
+        {
+            today: "Giao dịch gần đây",
+            title: allTransactions.length.toString(),
+            persent: "trong 30 ngày",
+            icon: cart,
+            bnb: "bnb2",
+        },
+    ];
+
+    const timelineList = transactions.slice(0, 6).map((t) => ({
+        title: `${t.type === "INCOME" ? "+" : "-"} ${formatCurrency(t.amount)} - ${
+            t.category
+        }`,
+        time: formatDate(t.date),
+        color: t.type === "INCOME" ? "green" : "red",
+    }));
+
+    if (loading) {
         return (
-            <div
-                style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    minHeight: "60vh",
-                }}
-            >
-                <Spin size="large" tip="Đang tải dữ liệu..." spinning={true}>
-                    <div
-                        style={{
-                            padding: "50px",
-                            background: "rgba(0, 0, 0, 0.05)",
-                            borderRadius: "4px",
-                        }}
-                    />
-                </Spin>
+            <div style={{ textAlign: "center", padding: "50px" }}>
+                <Spin size="large" />
             </div>
         );
     }
 
     return (
-        <div className="dashboard" style={{ padding: "24px" }}>
-            <div className="page-header" style={{ marginBottom: "24px" }}>
-                <Title level={3} style={{ margin: 0 }}>
-                    Tổng quan
-                </Title>
-                <Text type="secondary">
-                    {new Date().toLocaleDateString("vi-VN", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                    })}
-                </Text>
-            </div>
-
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col xs={24} md={8}>
-                    <Card>
-                        <Statistic
-                            title="Tổng số dư"
-                            value={stats.totalBalance}
-                            precision={0}
-                            valueStyle={{ color: "#1890ff" }}
-                            prefix="₫"
-                            formatter={(value) => formatCurrency(Number(value))}
-                        />
-                        <div style={{ marginTop: 8 }}>
-                            <Text type="secondary">
-                                <ArrowUpOutlined style={{ color: "#52c41a" }} />{" "}
-                                {formatCurrency(stats.totalIncome)} thu
-                            </Text>
-                            <br />
-                            <Text type="secondary">
-                                <ArrowDownOutlined
-                                    style={{ color: "#f5222d" }}
-                                />{" "}
-                                {formatCurrency(stats.totalExpense)} chi
-                            </Text>
-                        </div>
-                    </Card>
-                </Col>
-                <Col xs={24} md={8}>
-                    <Card>
-                        <Statistic
-                            title="Tổng thu nhập"
-                            value={stats.totalIncome}
-                            precision={0}
-                            valueStyle={{ color: "#52c41a" }}
-                            prefix="₫"
-                            formatter={(value) => formatCurrency(Number(value))}
-                        />
-                        <div style={{ marginTop: 8 }}>
-                            <Text
-                                type={
-                                    stats.incomeChange >= 0
-                                        ? "success"
-                                        : "danger"
-                                }
-                            >
-                                {stats.incomeChange >= 0 ? "+" : ""}
-                                {stats.incomeChange}% so với tháng trước
-                            </Text>
-                        </div>
-                    </Card>
-                </Col>
-                <Col xs={24} md={8}>
-                    <Card>
-                        <Statistic
-                            title="Tổng chi tiêu"
-                            value={stats.totalExpense}
-                            precision={0}
-                            valueStyle={{ color: "#f5222d" }}
-                            prefix="₫"
-                            formatter={(value) => formatCurrency(Number(value))}
-                        />
-                        <div style={{ marginTop: 8 }}>
-                            <Text
-                                type={
-                                    stats.expenseChange <= 0
-                                        ? "success"
-                                        : "danger"
-                                }
-                            >
-                                {stats.expenseChange >= 0 ? "+" : ""}
-                                {stats.expenseChange}% so với tháng trước
-                            </Text>
-                        </div>
-                    </Card>
-                </Col>
-            </Row>
-
-            {/* Phần sao kê chi tiết */}
-            <Card
-                title="Sao kê chi tiết"
-                style={{ marginBottom: 24 }}
-                extra={
-                    <Space>
-                        <Button
-                            type="text"
-                            icon={<SearchOutlined />}
-                            onClick={() => form.submit()}
-                            loading={isLoadingReport}
+        <>
+            <div className="layout-content">
+                {/* Statistics Cards */}
+                <Row className="rowgap-vbox" gutter={[24, 0]}>
+                    {count.map((c, index) => (
+                        <Col
+                            key={index}
+                            xs={24}
+                            sm={24}
+                            md={12}
+                            lg={6}
+                            xl={6}
+                            className="mb-24"
                         >
-                            Tìm kiếm
-                        </Button>
-                        {statementReport && (
-                            <Button
-                                type="text"
-                                icon={<DownloadOutlined />}
-                                onClick={() =>
-                                    exportToExcel(
-                                        statementReport.transactions,
-                                        "sao-ke"
-                                    )
-                                }
+                            <Card bordered={false} className="criclebox">
+                                <div className="number">
+                                    <Row align="middle" gutter={[24, 0]}>
+                                        <Col xs={18}>
+                                            <span>{c.today}</span>
+                                            <Title level={3}>
+                                                {c.title}{" "}
+                                                <small className={c.bnb}>
+                                                    {c.persent}
+                                                </small>
+                                            </Title>
+                                        </Col>
+                                        <Col xs={6}>
+                                            <div className="icon-box">
+                                                {c.icon}
+                                            </div>
+                                        </Col>
+                                    </Row>
+                                </div>
+                            </Card>
+                        </Col>
+                    ))}
+                </Row>
+
+                {/* Charts Section */}
+                <Row gutter={[24, 0]}>
+                    <Col
+                        xs={24}
+                        sm={24}
+                        md={24}
+                        lg={24}
+                        xl={16}
+                        className="mb-24"
+                    >
+                        <Card
+                            bordered={false}
+                            className="criclebox cardbody h-full"
+                        >
+                            <div className="linechart">
+                                <div>
+                                    <Title level={5}>
+                                        Phân tích thu/chi theo tháng
+                                    </Title>
+                                    <Paragraph
+                                        className="lastweek"
+                                        style={{ marginBottom: 0 }}
+                                    >
+                                        30 ngày gần nhất
+                                    </Paragraph>
+                                </div>
+                            </div>
+                            <div style={{ height: 260 }}>
+                                <BarChart
+                                    data={barChartDataFromBe}
+                                    options={barChartOptionsFromBe}
+                                />
+                            </div>
+                        </Card>
+                    </Col>
+
+                    <Col
+                        xs={24}
+                        sm={24}
+                        md={24}
+                        lg={24}
+                        xl={8}
+                        className="mb-24"
+                    >
+                        <Card bordered={false} className="criclebox h-full">
+                            <Title level={5} style={{ marginBottom: 0 }}>
+                                Cơ cấu chi tiêu
+                            </Title>
+                            <Paragraph
+                                className="lastweek"
+                                style={{ marginBottom: 16 }}
                             >
-                                Xuất Excel
-                            </Button>
-                        )}
-                    </Space>
-                }
-            >
-                <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={fetchStatementReport}
-                    initialValues={{
-                        walletId: undefined,
-                        dateRange: [
-                            dayjs().startOf("month"),
-                            dayjs().endOf("day"),
-                        ],
-                    }}
-                >
-                    <Row gutter={16}>
-                        <Col xs={24} md={8}>
-                            <Form.Item name="walletId" label="Chọn ví">
-                                <Select
-                                    placeholder="Tất cả các ví"
-                                    allowClear
-                                    onChange={(value) =>
-                                        setSelectedWallet(value as string)
-                                    }
-                                    options={wallets.map((wallet) => ({
-                                        value: wallet._id,
-                                        label: wallet.name,
+                                Theo danh mục (30 ngày gần nhất)
+                            </Paragraph>
+                            <div style={{ height: 260 }}>
+                                <PieChart
+                                    data={pieChartDataFromBe}
+                                    options={pieChartOptionsFromBe}
+                                />
+                            </div>
+                        </Card>
+                    </Col>
+                </Row>
+
+                <Row gutter={[24, 0]}>
+                    <Col
+                        xs={24}
+                        sm={24}
+                        md={24}
+                        lg={24}
+                        xl={12}
+                        className="mb-24"
+                    >
+                        <Card
+                            bordered={false}
+                            className="criclebox cardbody h-full"
+                        >
+                            <div className="linechart">
+                                <div>
+                                    <Title level={5}>Xu hướng số dư</Title>
+                                    <Paragraph
+                                        className="lastweek"
+                                        style={{ marginBottom: 0 }}
+                                    >
+                                        Lũy kế thu - chi theo tháng
+                                    </Paragraph>
+                                </div>
+                            </div>
+                            <div style={{ height: 300 }}>
+                                <LineChart
+                                    data={balanceTrendDataFromBe}
+                                    options={balanceTrendOptionsFromBe}
+                                />
+                            </div>
+                        </Card>
+                    </Col>
+
+                    <Col
+                        xs={24}
+                        sm={24}
+                        md={24}
+                        lg={24}
+                        xl={12}
+                        className="mb-24"
+                    >
+                        <Card
+                            bordered={false}
+                            className="criclebox cardbody h-full"
+                        >
+                            <div className="linechart">
+                                <div>
+                                    <Title level={5}>Biểu đồ vùng</Title>
+                                    <Paragraph
+                                        className="lastweek"
+                                        style={{ marginBottom: 0 }}
+                                    >
+                                        Lũy kế thu - chi theo tháng
+                                    </Paragraph>
+                                </div>
+                            </div>
+                            <div style={{ height: 300 }}>
+                                <AreaChart
+                                    data={balanceTrendDataFromBe}
+                                    options={balanceTrendOptionsFromBe}
+                                />
+                            </div>
+                        </Card>
+                    </Col>
+                </Row>
+
+                {/* Recent Transactions Section */}
+                <Row gutter={[24, 0]}>
+                    <Col
+                        xs={24}
+                        sm={24}
+                        md={12}
+                        lg={12}
+                        xl={16}
+                        className="mb-24"
+                    >
+                        <Card
+                            bordered={false}
+                            className="criclebox cardbody h-full"
+                        >
+                            <div className="timeline-box">
+                                <Title level={5}>
+                                    Lịch sử giao dịch gần đây
+                                </Title>
+                                <Paragraph
+                                    className="lastweek"
+                                    style={{ marginBottom: 24 }}
+                                >
+                                    10 giao dịch mới nhất{" "}
+                                    <span className="bnb2">100%</span>
+                                </Paragraph>
+
+                                <Timeline
+                                    pending="Đang cập nhật..."
+                                    className="timelinelist"
+                                    reverse={reverse}
+                                    items={timelineList.map((t) => ({
+                                        label: t.time,
+                                        children: (
+                                            <>
+                                                <Title level={5}>
+                                                    {t.title}
+                                                </Title>
+                                            </>
+                                        ),
+                                        color: t.color,
                                     }))}
                                 />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={16}>
-                            <Form.Item
-                                name="dateRange"
-                                label="Khoảng thời gian"
-                                rules={[
-                                    {
-                                        required: true,
-                                        message:
-                                            "Vui lòng chọn khoảng thời gian",
-                                    },
-                                ]}
-                            >
-                                <RangePicker
+                                <Button
+                                    type="primary"
                                     style={{ width: "100%" }}
-                                    format="DD/MM/YYYY"
-                                    disabledDate={(current) =>
-                                        current &&
-                                        current > dayjs().endOf("day")
-                                    }
-                                />
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                </Form>
-
-                {statementReport && (
-                    <div id="statement-report" style={{ marginTop: 24 }}>
-                        <Divider orientation="left">Tổng hợp</Divider>
-                        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                            <Col xs={24} md={6}>
-                                <Card size="small">
-                                    <Statistic
-                                        title="Số dư đầu kỳ"
-                                        value={statementReport.startBalance}
-                                        precision={0}
-                                        valueStyle={{ color: "#1890ff" }}
-                                        prefix="₫"
-                                        formatter={(value) =>
-                                            formatCurrency(Number(value))
-                                        }
-                                    />
-                                </Card>
-                            </Col>
-                            <Col xs={24} md={6}>
-                                <Card size="small">
-                                    <Statistic
-                                        title="Tổng thu"
-                                        value={statementReport.totalIncome}
-                                        precision={0}
-                                        valueStyle={{ color: "#52c41a" }}
-                                        prefix="+ "
-                                        suffix="đ"
-                                        formatter={(value) =>
-                                            formatCurrency(Number(value))
-                                        }
-                                    />
-                                </Card>
-                            </Col>
-                            <Col xs={24} md={6}>
-                                <Card size="small">
-                                    <Statistic
-                                        title="Tổng chi"
-                                        value={statementReport.totalExpense}
-                                        precision={0}
-                                        valueStyle={{ color: "#f5222d" }}
-                                        prefix="- "
-                                        suffix="đ"
-                                        formatter={(value) =>
-                                            formatCurrency(Number(value))
-                                        }
-                                    />
-                                </Card>
-                            </Col>
-                            <Col xs={24} md={6}>
-                                <Card size="small">
-                                    <Statistic
-                                        title="Số dư cuối kỳ"
-                                        value={statementReport.endBalance}
-                                        precision={0}
-                                        valueStyle={{
-                                            color:
-                                                statementReport.endBalance >=
-                                                statementReport.startBalance
-                                                    ? "#52c41a"
-                                                    : "#f5222d",
-                                        }}
-                                        prefix={
-                                            statementReport.endBalance >=
-                                            statementReport.startBalance
-                                                ? "+"
-                                                : ""
-                                        }
-                                        suffix="đ"
-                                        formatter={(value) =>
-                                            formatCurrency(Number(value))
-                                        }
-                                    />
-                                </Card>
-                            </Col>
-                        </Row>
-
-                        <Divider orientation="left">Chi tiết giao dịch</Divider>
-                        <div style={{ textAlign: "right", marginBottom: 16 }}>
-                            <Button
-                                type="primary"
-                                icon={<FilePdfOutlined />}
-                                onClick={() =>
-                                    exportToPdf(
-                                        "statement-report",
-                                        "bao-cao-sao-ke"
-                                    )
-                                }
-                                style={{ marginRight: 8 }}
-                            >
-                                Xuất PDF
-                            </Button>
-                            <Button
-                                type="default"
-                                icon={<FileExcelOutlined />}
-                                onClick={() =>
-                                    exportToExcel(
-                                        statementReport.transactions,
-                                        "sao-ke-chi-tiet"
-                                    )
-                                }
-                            >
-                                Xuất Excel
-                            </Button>
-                        </div>
-                        <Table
-                            columns={transactionColumns}
-                            dataSource={statementReport.transactions}
-                            rowKey="_id"
-                            pagination={{ pageSize: 10 }}
-                            loading={isLoadingReport}
-                            scroll={{ x: true }}
-                        />
-                    </div>
-                )}
-            </Card>
-
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col xs={24} md={12}>
-                    <Card
-                        title="Giao dịch gần đây"
-                        extra={
-                            <Button
-                                type="link"
-                                onClick={() => navigate("/transactions")}
-                                size="small"
-                            >
-                                Xem tất cả
-                            </Button>
-                        }
-                    >
-                        {recentTransactions.length > 0 ? (
-                            <List
-                                itemLayout="horizontal"
-                                dataSource={recentTransactions}
-                                renderItem={(item) => (
-                                    <List.Item
-                                        actions={[
-                                            <Tag
-                                                color={
-                                                    item.type === "INCOME"
-                                                        ? "green"
-                                                        : "red"
-                                                }
-                                                key={item._id}
-                                            >
-                                                {item.type === "INCOME"
-                                                    ? "Thu"
-                                                    : "Chi"}
-                                            </Tag>,
-                                            <div key="amount">
-                                                {item.type === "INCOME"
-                                                    ? "+"
-                                                    : "-"}{" "}
-                                                {formatCurrency(item.amount)}
-                                            </div>,
-                                        ]}
-                                    >
-                                        <List.Item.Meta
-                                            title={item.category}
-                                            description={
-                                                <div>
-                                                    <div>
-                                                        {formatDate(item.date)}
-                                                    </div>
-                                                    {item.note && (
-                                                        <Text
-                                                            type="secondary"
-                                                            style={{
-                                                                fontSize:
-                                                                    "12px",
-                                                            }}
-                                                        >
-                                                            {item.note}
-                                                        </Text>
-                                                    )}
-                                                </div>
-                                            }
-                                        />
-                                    </List.Item>
-                                )}
-                            />
-                        ) : (
-                            <Empty
-                                description="Không có giao dịch nào"
-                                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            />
-                        )}
-                    </Card>
-                </Col>
-                <Col xs={24} md={12}>
-                    <Card title="Chi tiêu theo danh mục">
-                        {expenseByCategory.length > 0 ? (
-                            <div>
-                                {expenseByCategory.map((category) => (
-                                    <div
-                                        key={category._id}
-                                        style={{ marginBottom: 16 }}
-                                    >
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                justifyContent: "space-between",
-                                                marginBottom: 4,
-                                            }}
-                                        >
-                                            <Text strong>{category.name}</Text>
-                                            <Text>
-                                                {formatCurrency(category.total)}{" "}
-                                                ({category.percentage}%)
-                                            </Text>
-                                        </div>
-                                        <Progress
-                                            percent={category.percentage}
-                                            showInfo={false}
-                                            strokeColor={category.color}
-                                        />
-                                    </div>
-                                ))}
+                                    onClick={() => setReverse(!reverse)}
+                                >
+                                    {<MenuUnfoldOutlined />} REVERSE
+                                </Button>
                             </div>
-                        ) : (
-                            <Empty
-                                description="Không có dữ liệu chi tiêu"
-                                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            />
-                        )}
-                    </Card>
-                </Col>
-            </Row>
-        </div>
-    );
-};
+                        </Card>
+                    </Col>
 
-// Wrap the Dashboard with ErrorBoundary
-const Dashboard: React.FC = () => {
-    return (
-        <ErrorBoundary
-            FallbackComponent={ErrorFallback}
-            onReset={() => window.location.reload()}
-        >
-            <DashboardContent />
-        </ErrorBoundary>
+                    {/* Wallets Section */}
+                    <Col
+                        xs={24}
+                        sm={24}
+                        md={12}
+                        lg={12}
+                        xl={8}
+                        className="mb-24"
+                    >
+                        <Card
+                            bordered={false}
+                            className="criclebox h-full"
+                            title={
+                                <h6 className="font-semibold m-0">
+                                    Các ví của bạn
+                                </h6>
+                            }
+                        >
+                            <div className="wallet-list">
+                                {wallets.length > 0 ? (
+                                    wallets.map((wallet) => (
+                                        <div
+                                            key={wallet._id}
+                                            className="wallet-item"
+                                            style={{ marginBottom: "15px" }}
+                                        >
+                                            <Row
+                                                justify="space-between"
+                                                align="middle"
+                                            >
+                                                <Col>
+                                                    <Text strong>
+                                                        {wallet.name}
+                                                    </Text>
+                                                </Col>
+                                                <Col>
+                                                    <Text
+                                                        className="text-success"
+                                                        strong
+                                                    >
+                                                        {formatCurrency(
+                                                            wallet.balance,
+                                                        )}
+                                                    </Text>
+                                                </Col>
+                                            </Row>
+                                            <Progress
+                                                percent={Math.min(
+                                                    (wallet.balance /
+                                                        totalBalance) *
+                                                        100,
+                                                    100,
+                                                )}
+                                                size="small"
+                                                status="active"
+                                            />
+                                        </div>
+                                    ))
+                                ) : (
+                                    <Text type="secondary">
+                                        Không có ví nào
+                                    </Text>
+                                )}
+                            </div>
+                        </Card>
+                    </Col>
+                </Row>
+
+                {/* Quick Action */}
+                <Row gutter={[24, 0]}>
+                    <Col
+                        xs={24}
+                        md={24}
+                        sm={24}
+                        lg={24}
+                        xl={24}
+                        className="mb-24"
+                    >
+                        <Card
+                            bordered={false}
+                            className="criclebox h-full"
+                            title={
+                                <h6 className="font-semibold m-0">
+                                    Hành động nhanh
+                                </h6>
+                            }
+                        >
+                            <Row gutter={[16, 0]}>
+                                <Col xs={24} sm={12} md={6}>
+                                    <Button
+                                        type="primary"
+                                        block
+                                        href="/wallets"
+                                    >
+                                        Quản lý ví
+                                    </Button>
+                                </Col>
+                                <Col xs={24} sm={12} md={6}>
+                                    <Button
+                                        type="primary"
+                                        block
+                                        href="/transactions"
+                                    >
+                                        Ghi giao dịch
+                                    </Button>
+                                </Col>
+                                <Col xs={24} sm={12} md={6}>
+                                    <Button type="primary" block href="/goals">
+                                        Quản lý mục tiêu
+                                    </Button>
+                                </Col>
+                                <Col xs={24} sm={12} md={6}>
+                                    <Button
+                                        type="primary"
+                                        block
+                                        href="/profile"
+                                    >
+                                        Hồ sơ cá nhân
+                                    </Button>
+                                </Col>
+                            </Row>
+                        </Card>
+                    </Col>
+                </Row>
+            </div>
+        </>
     );
 };
 

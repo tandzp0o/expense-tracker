@@ -5,13 +5,16 @@ import {
   Input,
   InputNumber,
   Button,
-  List,
-  Progress,
-  Tag,
-  message,
   Modal,
   Select,
   DatePicker,
+  Row,
+  Col,
+  Table,
+  Progress,
+  Tag,
+  Space,
+  Statistic,
 } from "antd";
 import {
   PlusOutlined,
@@ -19,7 +22,7 @@ import {
   DeleteOutlined,
   TrophyOutlined,
 } from "@ant-design/icons";
-import { Target } from "lucide-react";
+import type { ColumnsType } from "antd/es/table";
 import { formatCurrency } from "../utils/formatters";
 import { auth } from "../firebase/config";
 import { goalApi } from "../services/api";
@@ -35,9 +38,9 @@ interface Goal {
   targetAmount: number;
   currentAmount: number;
   category: string;
-  deadline?: Date;
+  deadline?: string;
   status: "active" | "completed" | "expired";
-  createdAt: Date;
+  createdAt: string;
 }
 
 const categoryOptions = [
@@ -60,26 +63,24 @@ const Goals: React.FC = () => {
   const fetchGoals = async () => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
-      message.error("Xác thực người dùng thất bại. Vui lòng tải lại trang.");
+      Modal.error({
+        title: "Xác thực thất bại",
+        content: "Vui lòng tải lại trang.",
+      });
       return;
     }
     setLoading(true);
     try {
       const token = await firebaseUser.getIdToken();
       const response = await goalApi.getGoals(token);
-      console.log("Goals response:", response); // Debug log
-
-      // Ensure proper data format
-      const formattedGoals = Array.isArray(response) ? response.map(goal => ({
-        ...goal,
-        deadline: goal.deadline ? new Date(goal.deadline) : undefined,
-        createdAt: goal.createdAt ? new Date(goal.createdAt) : new Date(),
-      })) : [];
-
+      const formattedGoals = Array.isArray(response) ? response : [];
       setGoals(formattedGoals);
     } catch (error) {
       console.error("Error fetching goals:", error);
-      message.error("Lỗi khi tải danh sách mục tiêu");
+      Modal.error({
+        title: "Lỗi",
+        content: "Không thể tải danh sách mục tiêu",
+      });
     } finally {
       setLoading(false);
     }
@@ -89,11 +90,11 @@ const Goals: React.FC = () => {
     fetchGoals();
   }, []);
 
-  const handleCreateGoal = async (values: any) => {
+  const handleCreate = async (values: any) => {
     try {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) {
-        message.error("Xác thực người dùng thất bại.");
+        Modal.error({ title: "Lỗi", content: "Xác thực người dùng thất bại" });
         return;
       }
       const token = await firebaseUser.getIdToken();
@@ -103,274 +104,240 @@ const Goals: React.FC = () => {
         targetAmount: values.targetAmount,
         currentAmount: values.currentAmount || 0,
         category: values.category,
-        deadline: values.deadline?.toDate(),
+        deadline: values.deadline ? values.deadline.toISOString() : null,
       };
-      await goalApi.createGoal(goalData, token);
-      message.success("Thêm mục tiêu thành công!");
+
+      if (editingGoal) {
+        await goalApi.updateGoal(editingGoal._id, goalData, token);
+        Modal.success({
+          title: "Thành công",
+          content: "Cập nhật mục tiêu thành công",
+        });
+      } else {
+        await goalApi.createGoal(goalData, token);
+        Modal.success({
+          title: "Thành công",
+          content: "Tạo mục tiêu mới thành công",
+        });
+      }
+
+      setIsModalVisible(false);
       form.resetFields();
-      setIsModalVisible(false);
-      fetchGoals(); // Refresh the list
-    } catch (error) {
-      message.error("Lỗi khi thêm mục tiêu");
-    }
-  };
-
-  const handleUpdateGoal = async (values: any) => {
-    if (!editingGoal) return;
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        message.error("Xác thực người dùng thất bại.");
-        return;
-      }
-      const token = await firebaseUser.getIdToken();
-      const goalData = {
-        title: values.title,
-        description: values.description,
-        targetAmount: values.targetAmount,
-        currentAmount: values.currentAmount || editingGoal.currentAmount,
-        category: values.category,
-        deadline: values.deadline?.toDate(),
-      };
-      await goalApi.updateGoal(editingGoal._id, goalData, token);
-      message.success("Cập nhật mục tiêu thành công!");
-      setIsModalVisible(false);
       setEditingGoal(null);
-      fetchGoals(); // Refresh the list
-    } catch (error) {
-      message.error("Lỗi cập nhật mục tiêu");
+      await fetchGoals();
+    } catch (error: any) {
+      Modal.error({ title: "Lỗi", content: error.message || "Có lỗi xảy ra" });
     }
   };
 
-  const handleDeleteGoal = async (goalId: string) => {
+  const handleEdit = (goal: Goal) => {
+    setEditingGoal(goal);
+    form.setFieldsValue({
+      ...goal,
+      deadline: goal.deadline ? dayjs(goal.deadline) : null,
+    });
+    setIsModalVisible(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa mục tiêu này?")) return;
+
     try {
       const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
-        message.error("Xác thực người dùng thất bại.");
-        return;
-      }
+      if (!firebaseUser) return;
       const token = await firebaseUser.getIdToken();
-      await goalApi.deleteGoal(goalId, token);
-      message.success("Xóa mục tiêu thành công!");
-      fetchGoals(); // Refresh the list
+      await goalApi.deleteGoal(id, token);
+      Modal.success({
+        title: "Thành công",
+        content: "Xóa mục tiêu thành công",
+      });
+      await fetchGoals();
     } catch (error) {
-      message.error("Lỗi xóa mục tiêu");
+      Modal.error({ title: "Lỗi", content: "Không thể xóa mục tiêu" });
     }
   };
 
-  const getProgressColor = (percentage: number) => {
-    if (percentage >= 100) return "#52c41a";
-    if (percentage >= 75) return "#1890ff";
-    if (percentage >= 50) return "#faad14";
-    return "#ff4d4f";
-  };
+  const columns: ColumnsType<Goal> = [
+    {
+      title: "TÊN MỤC TIÊU",
+      dataIndex: "title",
+      key: "title",
+      width: "20%",
+    },
+    {
+      title: "DANH MỤC",
+      dataIndex: "category",
+      key: "category",
+      render: (category: string) => {
+        const cat = categoryOptions.find((c) => c.value === category);
+        return cat?.label || category;
+      },
+    },
+    {
+      title: "TIẾN ĐỘ",
+      dataIndex: "currentAmount",
+      key: "progress",
+      render: (_, record: Goal) => (
+        <Progress
+          percent={Math.min(
+            Math.round((record.currentAmount / record.targetAmount) * 100),
+            100
+          )}
+          size="small"
+          status={record.status === "completed" ? "success" : "active"}
+        />
+      ),
+    },
+    {
+      title: "SỐ TIỀN",
+      key: "amount",
+      render: (_, record: Goal) => (
+        <span>
+          {formatCurrency(record.currentAmount)} /{" "}
+          {formatCurrency(record.targetAmount)}
+        </span>
+      ),
+    },
+    {
+      title: "TRẠNG THÁI",
+      dataIndex: "status",
+      key: "status",
+      render: (status: string) => {
+        let color = "blue";
+        let text = "Đang thực hiện";
+        if (status === "completed") {
+          color = "green";
+          text = "Hoàn thành";
+        } else if (status === "expired") {
+          color = "red";
+          text = "Hết hạn";
+        }
+        return <Tag color={color}>{text}</Tag>;
+      },
+    },
+    {
+      title: "HÀNH ĐỘNG",
+      key: "action",
+      render: (_, record: Goal) => (
+        <Space>
+          <Button
+            type="text"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          />
+          <Button
+            type="text"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record._id)}
+          />
+        </Space>
+      ),
+    },
+  ];
 
-  const getCategoryLabel = (category: string) => {
-    return (
-      categoryOptions.find((cat) => cat.value === category)?.label || category
-    );
-  };
+  const activeGoals = goals.filter((g) => g.status === "active");
+  const completedGoals = goals.filter((g) => g.status === "completed");
+  const totalTarget = goals.reduce((sum, g) => sum + g.targetAmount, 0);
+  const totalCurrent = goals.reduce((sum, g) => sum + g.currentAmount, 0);
 
   return (
-    <div style={{ padding: "24px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "24px",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "28px", fontWeight: 600 }}>
-            Mục tiêu tài chính
-          </h1>
-          <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Theo dõi và đạt được mục tiêu của bạn
-          </p>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            setEditingGoal(null);
-            form.resetFields();
-            setIsModalVisible(true);
-          }}
-          size="large"
-        >
-          Thêm mục tiêu
-        </Button>
-      </div>
+    <>
+      {/* Statistics Section */}
+      <Row gutter={[24, 0]} className="mb-24">
+        <Col xs={24} md={6}>
+          <Card bordered={false} className="widget-stat h-full">
+            <Statistic
+              title={<h6>Tổng mục tiêu</h6>}
+              value={goals.length}
+              prefix={<TrophyOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card bordered={false} className="widget-stat h-full">
+            <Statistic
+              title={<h6>Đang thực hiện</h6>}
+              value={activeGoals.length}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card bordered={false} className="widget-stat h-full">
+            <Statistic
+              title={<h6>Hoàn thành</h6>}
+              value={completedGoals.length}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card bordered={false} className="widget-stat h-full">
+            <Statistic
+              title={<h6>Tiến độ tổng</h6>}
+              value={
+                goals.length > 0
+                  ? Math.round((totalCurrent / totalTarget) * 100)
+                  : 0
+              }
+              suffix="%"
+            />
+          </Card>
+        </Col>
+      </Row>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
-          gap: "24px",
-        }}
-      >
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            Đang tải danh sách mục tiêu...
-          </div>
-        ) : goals.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px" }}>
-            <Target size={48} style={{ color: "#d9d9d9", marginBottom: "16px" }} />
-            <p style={{ color: "#666", marginBottom: "16px" }}>
-              Bạn chưa có mục tiêu nào
-            </p>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setEditingGoal(null);
-                form.resetFields();
-                setIsModalVisible(true);
-              }}
-            >
-              Tạo mục tiêu đầu tiên
-            </Button>
-          </div>
-        ) : (
-          goals.map((goal) => {
-            // console.log("Rendering goal:", goal); // Debug log
-            const percentage = Math.min(
-              (goal.currentAmount / goal.targetAmount) * 100,
-              100
-            );
-            return (
-              <Card
-                key={goal._id}
-                hoverable
-                actions={[
-                  <Button
-                    type="link"
-                    icon={<EditOutlined />}
-                    onClick={() => {
-                      setEditingGoal(goal);
-                      form.setFieldsValue({
-                        title: goal.title,
-                        description: goal.description,
-                        targetAmount: goal.targetAmount,
-                        currentAmount: goal.currentAmount,
-                        category: goal.category,
-                        deadline: goal.deadline
-                          ? dayjs(goal.deadline)
-                          : undefined,
-                      });
-                      setIsModalVisible(true);
-                    }}
-                  >
-                    Sửa
-                  </Button>,
-                  <Button
-                    type="link"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => handleDeleteGoal(goal._id)}
-                  >
-                    Xóa
-                  </Button>,
-                ]}
+      {/* Goals Table */}
+      <Row gutter={[24, 0]}>
+        <Col span={24}>
+          <Card
+            className="header-solid"
+            bordered={false}
+            title={<h6 className="font-semibold m-0">Danh sách mục tiêu</h6>}
+            extra={[
+              <Button
+                key="add"
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditingGoal(null);
+                  form.resetFields();
+                  setIsModalVisible(true);
+                }}
               >
-              <div style={{ marginBottom: "16px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
-                    {goal.title}
-                  </h3>
-                  <Tag color={goal.status === "completed" ? "green" : "blue"}>
-                    {goal.status === "completed"
-                      ? "Hoàn thành"
-                      : "Đang thực hiện"}
-                  </Tag>
-                </div>
-                <p style={{ margin: "4px 0", color: "#666" }}>
-                  {goal.description}
-                </p>
-                <Tag color="purple">{getCategoryLabel(goal.category)}</Tag>
-              </div>
+                THÊM MỤC TIÊU
+              </Button>,
+            ]}
+          >
+            <Table
+              columns={columns}
+              dataSource={goals}
+              rowKey="_id"
+              loading={loading}
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+              }}
+              scroll={{ x: "max-content" }}
+            />
+          </Card>
+        </Col>
+      </Row>
 
-              <div style={{ marginBottom: "16px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <span style={{ fontSize: "14px", color: "#666" }}>
-                    Tiến độ
-                  </span>
-                  <span style={{ fontSize: "14px", fontWeight: 500 }}>
-                    {formatCurrency(goal.currentAmount)} /{" "}
-                    {formatCurrency(goal.targetAmount)}
-                  </span>
-                </div>
-                <Progress
-                  percent={percentage}
-                  strokeColor={getProgressColor(percentage)}
-                  showInfo={false}
-                  size="small"
-                />
-                <div style={{ textAlign: "center", marginTop: "4px" }}>
-                  <span style={{ fontSize: "12px", color: "#666" }}>
-                    {percentage.toFixed(1)}% hoàn thành
-                  </span>
-                </div>
-              </div>
-
-              {goal.deadline && (
-                <div style={{ fontSize: "12px", color: "#666" }}>
-                  <Target
-                    style={{
-                      marginRight: "4px",
-                      width: "12px",
-                      height: "12px",
-                    }}
-                  />
-                  Hạn: {dayjs(goal.deadline).format("DD/MM/YYYY")}
-                </div>
-              )}
-            </Card>
-          );
-        })
-        )}
-      </div>
-
+      {/* Modal */}
       <Modal
         title={editingGoal ? "Chỉnh sửa mục tiêu" : "Thêm mục tiêu mới"}
         open={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          setEditingGoal(null);
-          form.resetFields();
-        }}
+        onCancel={() => setIsModalVisible(false)}
         footer={null}
-        width={600}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={editingGoal ? handleUpdateGoal : handleCreateGoal}
-        >
+        <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Form.Item
             name="title"
             label="Tên mục tiêu"
             rules={[{ required: true, message: "Vui lòng nhập tên mục tiêu" }]}
           >
-            <Input placeholder="Ví dụ: Tiết kiệm mua xe" />
-          </Form.Item>
-
-          <Form.Item name="description" label="Mô tả">
-            <TextArea rows={3} placeholder="Mô tả chi tiết về mục tiêu" />
+            <Input placeholder="Ví dụ: Tiết kiệm cho kỳ nghỉ" />
           </Form.Item>
 
           <Form.Item
@@ -379,9 +346,9 @@ const Goals: React.FC = () => {
             rules={[{ required: true, message: "Vui lòng chọn danh mục" }]}
           >
             <Select placeholder="Chọn danh mục">
-              {categoryOptions.map((option) => (
-                <Option key={option.value} value={option.value}>
-                  {option.label}
+              {categoryOptions.map((cat) => (
+                <Option key={cat.value} value={cat.value}>
+                  {cat.label}
                 </Option>
               ))}
             </Select>
@@ -389,7 +356,7 @@ const Goals: React.FC = () => {
 
           <Form.Item
             name="targetAmount"
-            label="Mục tiêu (VNĐ)"
+            label="Số tiền mục tiêu"
             rules={[
               { required: true, message: "Vui lòng nhập số tiền mục tiêu" },
             ]}
@@ -397,42 +364,44 @@ const Goals: React.FC = () => {
             <InputNumber
               min={0}
               style={{ width: "100%" }}
-              placeholder="Nhập số tiền mục tiêu"
               formatter={(value) =>
                 `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
+              parser={(value) =>
+                (value ? Number(value.replace(/[^0-9.-]+/g, "")) : 0) as 0
               }
             />
           </Form.Item>
 
-          <Form.Item name="currentAmount" label="Đã tiết kiệm (VNĐ)">
+          <Form.Item name="currentAmount" label="Số tiền hiện tại">
             <InputNumber
               min={0}
               style={{ width: "100%" }}
-              placeholder="Nhập số tiền đã có"
               formatter={(value) =>
                 `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+              }
+              parser={(value) =>
+                (value ? Number(value.replace(/[^0-9.-]+/g, "")) : 0) as 0
               }
             />
           </Form.Item>
 
           <Form.Item name="deadline" label="Hạn chót">
-            <DatePicker
-              style={{ width: "100%" }}
-              placeholder="Chọn ngày hết hạn"
-              disabledDate={(current) =>
-                current && current < dayjs().startOf("day")
-              }
-            />
+            <DatePicker style={{ width: "100%" }} />
+          </Form.Item>
+
+          <Form.Item name="description" label="Mô tả">
+            <TextArea rows={3} placeholder="Nhập mô tả mục tiêu (nếu có)" />
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
-              {editingGoal ? "Cập nhật" : "Thêm"} mục tiêu
+            <Button type="primary" htmlType="submit" style={{ width: "100%" }}>
+              {editingGoal ? "Cập nhật" : "Thêm mới"}
             </Button>
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </>
   );
 };
 

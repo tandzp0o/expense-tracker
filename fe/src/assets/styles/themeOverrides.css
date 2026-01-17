@@ -1,0 +1,133 @@
+body {
+    background-color: var(--bg-base, #fafafa);
+    color: var(--text-base, rgba(0, 0, 0, 0.65));
+}
+
+/* Layout / surfaces */
+.layout-dashboard,
+.layout-dashboard .ant-layout {
+    background: var(--bg-base, #fafafa) !important;
+}
+
+.layout-dashboard .ant-card,
+.layout-dashboard .header-solid.ant-card,
+.layout-dashboard .criclebox.ant-card {
+    background: var(--bg-container, #ffffff) !important;
+}
+
+/* Text */
+.layout-dashboard,
+.layout-dashboard .ant-typography,
+.layout-dashboard h1,
+.layout-dashboard h2,
+.layout-dashboard h3,
+.layout-dashboard h4,
+.layout-dashboard h5,
+.layout-dashboard h6 {
+    color: var(--text-base, #111827);
+}
+
+.layout-dashboard .text-muted,
+.layout-dashboard .ant-typography-secondary,
+.layout-dashboard .ant-card-head-title p,
+.layout-dashboard .lastweek,
+.layout-dashboard .ant-list-item-meta-description {
+    color: var(--text-muted, rgba(17, 24, 39, 0.6)) !important;
+}
+
+/* Links / accent */
+.layout-dashboard a,
+.layout-dashboard .ant-btn-link,
+.layout-dashboard .ant-typography a {
+    color: var(--accent-color, #06b6d4) !important;
+}
+
+.layout-dashboard a:hover,
+.layout-dashboard .ant-btn-link:hover,
+.layout-dashboard .ant-typography a:hover {
+    color: var(--accent-color, #06b6d4) !important;
+    opacity: 0.9;
+}
+
+/* Primary color hooks */
+.layout-dashboard
+    .ant-layout-sider.sider-primary.ant-layout-sider-primary
+    .ant-menu-item.ant-menu-item-selected
+    .active
+    .icon,
+.layout-dashboard
+    .ant-layout-sider.sider-primary.ant-layout-sider-primary
+    .ant-menu-item
+    .active
+    .icon,
+.layout-dashboard
+    .ant-layout-sider.sider-primary
+    .ant-menu-submenu.ant-menu-item-selected
+    .active
+    .icon,
+.layout-dashboard
+    .ant-layout-sider.sider-primary
+    .ant-menu-submenu
+    .active
+    .icon {
+    background-color: var(--primary-color, #1890ff) !important;
+}
+
+.layout-dashboard .ant-layout-sider.sider-primary .footer-box,
+.layout-dashboard .ant-layout-sider.sider-primary .footer-box .icon {
+    background-color: var(--primary-color, #1890ff) !important;
+}
+
+/* Make common Ant buttons follow theme */
+.ant-btn-primary {
+    background: var(--primary-color, #1890ff) !important;
+    border-color: var(--primary-color, #1890ff) !important;
+}
+
+.ant-btn-primary:hover {
+    background: var(--primary-color, #1890ff) !important;
+    border-color: var(--primary-color, #1890ff) !important;
+}
+
+/* Surface/background tokens */
+.layout-dashboard .ant-layout-header {
+    color: var(--text-base, #111827);
+}
+
+.layout-dashboard .ant-card {
+    background: var(--bg-container, #ffffff);
+}
+
+/* Borders */
+.layout-dashboard .ant-card,
+.layout-dashboard .ant-table,
+.layout-dashboard .ant-table-container,
+.layout-dashboard .ant-input,
+.layout-dashboard .ant-select-selector,
+.layout-dashboard .ant-picker,
+.layout-dashboard .ant-modal-content {
+    border-color: var(--border-color, rgba(17, 24, 39, 0.12)) !important;
+}
+
+/* Inputs focus */
+.layout-dashboard .ant-input:focus,
+.layout-dashboard .ant-input-focused,
+.layout-dashboard .ant-select-focused .ant-select-selector,
+.layout-dashboard .ant-picker-focused {
+    border-color: var(--accent-color, #06b6d4) !important;
+    box-shadow: 0 0 0 2px var(--accent-alpha, rgba(6, 182, 212, 0.18)) !important;
+}
+
+/* Menu hover/active */
+.layout-dashboard .ant-layout-sider.sider-primary .ant-menu-item:hover,
+.layout-dashboard
+    .ant-layout-sider.sider-primary
+    .ant-menu-submenu-title:hover {
+    color: var(--accent-color, #06b6d4) !important;
+}
+
+/* Progress */
+.layout-dashboard .ant-progress-bg,
+.layout-dashboard .ant-progress-success-bg {
+    background-color: var(--primary-color, #1890ff) !important;
+}

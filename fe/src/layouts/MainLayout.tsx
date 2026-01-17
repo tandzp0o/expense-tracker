@@ -1,265 +1,99 @@
-import React from "react";
-import { Layout, Menu, theme, Typography } from "antd";
-import {
-  HomeOutlined,
-  WalletOutlined,
-  TransactionOutlined,
-  UserOutlined,
-  LogoutOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  RestOutlined,
-  TrophyOutlined,
-  ProfileOutlined,
-} from "@ant-design/icons";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { useWindowSize } from "../hooks/useWindowSize"; // <-- IMPORT HOOK MỚI
-import ThemeSwitcher from "../components/ThemeSwitcher";
-import { BottomNavigation } from "../components/BottomNavigation";
+import React, { useState, useEffect } from "react";
+import { Layout, Drawer } from "antd";
+import { useLocation } from "react-router-dom";
+import Sidenav from "./Sidenav";
+import Header from "./Header";
+import Footer from "./Footer";
 
-const { Header, Sider, Content, Footer } = Layout;
-const { Text } = Typography;
+const { Sider, Content, Header: AntHeader } = Layout;
 
-const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [collapsed, setCollapsed] = React.useState(false);
-  const { width } = useWindowSize(); // <-- SỬ DỤNG HOOK
-  const isMobile = width < 768; // <-- Đặt breakpoint cho mobile (ví dụ: 768px)
+interface MainLayoutProps {
+    children: React.ReactNode;
+}
 
-  const {
-    token: { colorBgContainer },
-  } = theme.useToken();
+const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+    const [visible, setVisible] = useState(false);
+    const [sidenavColor] = useState("#1890ff");
+    const [sidenavType] = useState("transparent");
+    const [placement, setPlacement] = useState("right");
 
-  // Định nghĩa menu items (không thay đổi)
-  const menuItems = [
-    {
-      key: "/", // <-- Sửa key để khớp với location.pathname
-      icon: <HomeOutlined />,
-      label: "Trang chủ",
-      onClick: () => navigate("/"),
-    },
-    {
-      key: "/wallets", // <-- Sửa key
-      icon: <WalletOutlined />,
-      label: "Quản lý ví",
-      onClick: () => navigate("/wallets"),
-    },
-    {
-      key: "/transactions", // <-- Sửa key
-      icon: <TransactionOutlined />,
-      label: "Giao dịch",
-      onClick: () => navigate("/transactions"),
-    },
-    {
-      key: "/dishes", // <-- Thêm menu item cho dishes
-      icon: <RestOutlined />,
-      label: "Gợi ý món ăn",
-      onClick: () => navigate("/dishes"),
-    },
-    {
-      key: "/goals", // <-- Thêm menu item cho goals
-      icon: <TrophyOutlined />,
-      label: "Mục tiêu",
-      onClick: () => navigate("/goals"),
-    },
-    {
-      key: "/profile", // <-- Thêm menu item cho profile
-      icon: <ProfileOutlined />,
-      label: "Hồ sơ",
-      onClick: () => navigate("/profile"),
-    },
-  ];
+    let { pathname } = useLocation();
+    pathname = pathname.replace("/", "");
 
-  // Xác định selected key dựa trên đường dẫn hiện tại (cải tiến một chút)
-  const selectedKey = location.pathname;
+    useEffect(() => {
+        if (pathname === "rtl") {
+            setPlacement("left");
+        } else {
+            setPlacement("right");
+        }
+    }, [pathname]);
 
-  // User menu items (không thay đổi)
-  const userMenuItems = [
-    {
-      key: "profile",
-      icon: <UserOutlined />,
-      label: "Hồ sơ cá nhân",
-    },
-    {
-      key: "logout",
-      icon: <LogoutOutlined />,
-      label: "Đăng xuất",
-      onClick: logout,
-    },
-  ];
+    const openDrawer = () => setVisible(!visible);
 
-  // Giao diện cho Desktop
-  const DesktopLayout = (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Sider
-        trigger={null}
-        collapsible
-        collapsed={collapsed}
-        width={200}
-        style={{
-          background: colorBgContainer,
-          boxShadow: "2px 0 8px 0 rgba(29, 35, 41, 0.05)",
-          overflow: "auto",
-          height: "100vh",
-          position: "fixed",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 10,
-        }}
-      >
-        <div
-          style={{
-            height: 64,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderBottom: "1px solid #f0f0f0",
-          }}
+    return (
+        <Layout
+            className={`layout-dashboard ${
+                pathname === "profile" ? "layout-profile" : ""
+            } ${pathname === "rtl" ? "layout-dashboard-rtl" : ""}`}
         >
-          <h2
-            style={{
-              color: "#1890ff",
-              margin: 0,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {collapsed ? "Expense" : "Quản lý chi tiêu"}
-          </h2>
-        </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          style={{ borderRight: 0, padding: "8px 0" }}
-          items={menuItems}
-        />
-      </Sider>
-      <Layout
-        style={{ marginLeft: collapsed ? 80 : 200, transition: "all 0.2s" }}
-      >
-        <Header
-          style={{
-            padding: "0 24px",
-            background: colorBgContainer,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            position: "sticky",
-            top: 0,
-            zIndex: 1,
-            boxShadow: "0 1px 4px 0 rgba(0, 21, 41, 0.12)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {React.createElement(
-              collapsed ? MenuUnfoldOutlined : MenuFoldOutlined,
-              {
-                className: "trigger",
-                onClick: () => setCollapsed(!collapsed),
-                style: { fontSize: 18 },
-              }
-            )}
-            <div style={{ fontWeight: 600, fontSize: 16 }}>
-              {menuItems.find((item) => item.key === selectedKey)?.label ||
-                "Trang chủ"}
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <ThemeSwitcher />
-            <Menu
-              mode="horizontal"
-              selectable={false}
-              style={{ lineHeight: "64px", borderBottom: "none" }}
-              items={[
-                {
-                  key: "user",
-                  label: (
-                    <span>
-                      <UserOutlined style={{ marginRight: 8 }} />
-                      {currentUser?.email?.split("@")[0] || "Tài khoản"}
-                    </span>
-                  ),
-                  children: userMenuItems,
-                },
-              ]}
-            />
-          </div>
-        </Header>
-        <Content
-          style={{
-            margin: "24px 16px",
-            padding: 24,
-            minHeight: 280,
-            background: colorBgContainer,
-            borderRadius: 8,
-          }}
-        >
-          {children}
-        </Content>
-      </Layout>
-      {isMobile && <BottomNavigation collapsed={collapsed} />}
-    </Layout>
-  );
+            {/* Mobile Drawer */}
+            <Drawer
+                title={false}
+                placement={placement === "right" ? "left" : "right"}
+                closable={false}
+                onClose={() => setVisible(false)}
+                open={visible}
+                key={placement === "right" ? "left" : "right"}
+                width={250}
+                className={`drawer-sidebar ${
+                    pathname === "rtl" ? "drawer-sidebar-rtl" : ""
+                }`}
+            >
+                <Layout
+                    className={`layout-dashboard ${
+                        pathname === "rtl" ? "layout-dashboard-rtl" : ""
+                    }`}
+                >
+                    <Sider
+                        trigger={null}
+                        width={250}
+                        theme="light"
+                        className="sider-primary ant-layout-sider-primary"
+                        style={{ background: sidenavType }}
+                    >
+                        <Sidenav color={sidenavColor} />
+                    </Sider>
+                </Layout>
+            </Drawer>
 
-  // Giao diện cho Mobile
-  const MobileLayout = (
-    <Layout>
-      <Header
-        style={{
-          background: colorBgContainer,
-          padding: "0 16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 1,
-          boxShadow: "0 1px 4px 0 rgba(0, 21, 41, 0.12)",
-        }}
-      >
-        <div style={{ fontWeight: 600, fontSize: 16 }}>
-          {menuItems.find((item) => item.key === selectedKey)?.label ||
-            "Trang chủ"}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ThemeSwitcher />
-          <Menu
-            mode="horizontal"
-            selectable={false}
-            style={{
-              lineHeight: "64px",
-              borderBottom: "none",
-              background: "transparent",
-            }}
-            items={[
-              {
-                key: "user",
-                label: <UserOutlined style={{ fontSize: 18 }} />, // Chỉ hiển thị icon trên mobile
-                children: userMenuItems,
-              },
-            ]}
-          />
-        </div>
-      </Header>
-      <Content
-        style={{
-          margin: "16px",
-          paddingBottom: "80px" /* Thêm padding để nội dung không bị che */,
-        }}
-      >
-        {children}
-      </Content>
-      <BottomNavigation />
-    </Layout>
-  );
+            {/* Desktop Sidebar */}
+            <Sider
+                breakpoint="lg"
+                collapsedWidth="0"
+                onCollapse={(collapsed, type) => {
+                    console.log(collapsed, type);
+                }}
+                trigger={null}
+                width={250}
+                theme="light"
+                className={`sider-primary ant-layout-sider-primary ${
+                    sidenavType === "#fff" ? "active-route" : ""
+                }`}
+                style={{ background: sidenavType }}
+            >
+                <Sidenav color={sidenavColor} />
+            </Sider>
 
-  // Render layout tương ứng
-  return isMobile ? MobileLayout : DesktopLayout;
+            {/* Main Content Layout */}
+            <Layout>
+                <AntHeader className="subheader">
+                    <Header onMenuClick={openDrawer} />
+                </AntHeader>
+                <Content className="content-ant">{children}</Content>
+                <Footer />
+            </Layout>
+        </Layout>
+    );
 };
 
 export default MainLayout;

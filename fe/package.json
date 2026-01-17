@@ -23,6 +23,7 @@
     "@types/react": "^19.2.4",
     "@types/react-dom": "^19.2.3",
     "@types/react-router-dom": "^5.3.3",
+    "@types/styled-components": "^5.1.36",
     "@types/xlsx": "^0.0.35",
     "antd": "^5.28.1",
     "axios": "^1.13.2",
@@ -40,6 +41,7 @@
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.9.5",
     "react-scripts": "5.0.1",
+    "styled-components": "^6.3.8",
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
