@@ -6,7 +6,8 @@ import {
     Typography,
     Progress,
     Button,
-    Timeline,
+    List,
+    Tag,
     message,
     Spin,
 } from "antd";
@@ -17,18 +18,16 @@ import { formatCurrency, formatDate } from "../utils/formatters";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import { auth } from "../firebase/config";
+import { useTheme } from "../contexts/ThemeContext";
 
 import BarChart from "../components/charts/BarChart";
-import LineChart from "../components/charts/LineChart";
-import PieChart from "../components/charts/PieChart";
-import AreaChart from "../components/charts/AreaChart";
 
 dayjs.locale("vi");
 
 interface Transaction {
     _id: string;
     type: "INCOME" | "EXPENSE";
-    amount: number;
+    amount: number | string;
     category: string;
     date: string;
     note?: string;
@@ -46,6 +45,7 @@ interface Wallet {
 
 const Dashboard = () => {
     const { Title, Text } = Typography;
+    const { theme } = useTheme();
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
@@ -55,6 +55,16 @@ const Dashboard = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    const parseAmount = (raw: unknown) => {
+        if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
+        if (typeof raw === "string") {
+            const cleaned = raw.replace(/[^0-9.-]/g, "");
+            const v = Number(cleaned);
+            return Number.isFinite(v) ? v : 0;
+        }
+        return 0;
+    };
 
     const fetchData = async () => {
         try {
@@ -102,75 +112,82 @@ const Dashboard = () => {
         (t) => t.type === "EXPENSE",
     );
     const totalIncome = incomeTransactions.reduce(
-        (sum, t) => sum + t.amount,
+        (sum, t) => sum + parseAmount(t.amount),
         0,
     );
     const totalExpense = expenseTransactions.reduce(
-        (sum, t) => sum + t.amount,
+        (sum, t) => sum + parseAmount(t.amount),
         0,
     );
 
-    const dayLabels = useMemo(() => {
+    const weekRange = useMemo(() => {
         const now = dayjs();
-        return Array.from({ length: 30 }, (_, i) =>
-            now.subtract(29 - i, "day").format("DD/MM"),
-        );
+        const monday = now.subtract((now.day() + 6) % 7, "day").startOf("day");
+        const sunday = monday.add(6, "day").endOf("day");
+        return { monday, sunday };
     }, []);
 
-    const dailyTotals = useMemo(() => {
-        const now = dayjs();
-        const totals = Array.from({ length: 30 }, () => ({
+    const weekLabels = useMemo(() => {
+        const labels = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+        return labels;
+    }, []);
+
+    const weeklyTotals = useMemo(() => {
+        const totals = Array.from({ length: 7 }, () => ({
             income: 0,
             expense: 0,
         }));
 
         allTransactions.forEach((t) => {
             const d = dayjs(t.date);
-            const diff = d
-                .startOf("day")
-                .diff(now.subtract(29, "day").startOf("day"), "day");
-            if (diff < 0 || diff > 29) return;
+            if (d.isBefore(weekRange.monday) || d.isAfter(weekRange.sunday)) {
+                return;
+            }
+
+            const idx = (d.day() + 6) % 7;
             if (t.type === "INCOME")
-                totals[diff].income += Number(t.amount) || 0;
+                totals[idx].income += parseAmount(t.amount);
             if (t.type === "EXPENSE")
-                totals[diff].expense += Number(t.amount) || 0;
+                totals[idx].expense += parseAmount(t.amount);
         });
 
         return totals;
-    }, [allTransactions]);
+    }, [allTransactions, weekRange.monday, weekRange.sunday]);
 
     const barChartDataFromBe = useMemo(
         () => ({
-            labels: dayLabels,
+            labels: weekLabels,
             datasets: [
                 {
                     label: "Chi tiêu",
-                    data: dailyTotals.map((d) => d.expense),
-                    backgroundColor: "#f5222d",
+                    data: weeklyTotals.map((d) => d.expense),
+                    backgroundColor: "#f59e0b",
                     borderRadius: 5,
                     maxBarThickness: 22,
                 },
                 {
                     label: "Thu nhập",
-                    data: dailyTotals.map((d) => d.income),
-                    backgroundColor: "#52c41a",
+                    data: weeklyTotals.map((d) => d.income),
+                    backgroundColor: "#14b8a6",
                     borderRadius: 5,
                     maxBarThickness: 22,
                 },
             ],
         }),
-        [dayLabels, dailyTotals],
+        [weekLabels, weeklyTotals],
     );
 
     const barChartOptionsFromBe = useMemo(
         () => ({
+            color: theme === "dark" ? "#e5e7eb" : "#0f172a",
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: {
                     position: "top" as const,
                     labels: {
-                        color: "#9ca3af",
+                        color: theme === "dark" ? "#cbd5e1" : "#475569",
+                        usePointStyle: true,
                     },
                 },
                 tooltip: {
@@ -192,139 +209,83 @@ const Dashboard = () => {
                 x: {
                     grid: { display: false },
                     ticks: {
-                        color: "#9ca3af",
+                        color: theme === "dark" ? "#cbd5e1" : "#64748b",
                         maxRotation: 0,
-                        autoSkip: true,
-                        maxTicksLimit: 10,
+                        autoSkip: false,
+                        maxTicksLimit: 7,
                     },
                 },
                 y: {
                     grid: {
                         display: true,
-                        color: "#e5e7eb",
+                        color:
+                            theme === "dark"
+                                ? "rgba(148, 163, 184, 0.18)"
+                                : "rgba(15, 23, 42, 0.10)",
                         borderDash: [2, 2],
                     },
                     ticks: {
-                        color: "#9ca3af",
+                        color: theme === "dark" ? "#cbd5e1" : "#64748b",
                         callback: (value: any) =>
                             `${Number(value).toLocaleString("vi-VN")}`,
                     },
                     title: {
                         display: true,
                         text: "Số tiền (VND)",
-                        color: "#9ca3af",
+                        color: theme === "dark" ? "#cbd5e1" : "#64748b",
                     },
                 },
             },
         }),
-        [],
+        [theme],
     );
 
-    const pieChartDataFromBe = useMemo(() => {
+    const topExpenseCategories = useMemo(() => {
         const categories: Record<string, number> = {};
         allTransactions
             .filter((t) => t.type === "EXPENSE")
             .forEach((t) => {
                 const key = t.category || "Khác";
                 categories[key] =
-                    (categories[key] || 0) + (Number(t.amount) || 0);
+                    (categories[key] || 0) + parseAmount(t.amount);
             });
 
-        const entries = Object.entries(categories).sort((a, b) => b[1] - a[1]);
-        const labels = entries.map(([name]) => name);
-        const values = entries.map(([, total]) => total);
-        const palette = [
-            "#1890ff",
-            "#52c41a",
-            "#faad14",
-            "#f5222d",
-            "#722ed1",
-            "#13c2c2",
-            "#eb2f96",
-            "#2f54eb",
-        ];
+        return Object.entries(categories)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6);
+    }, [allTransactions]);
 
-        return {
-            labels,
+    const topExpenseChartData = useMemo(
+        () => ({
+            labels: topExpenseCategories.map(([name]) => name),
             datasets: [
                 {
                     label: "Chi tiêu",
-                    data: values,
-                    backgroundColor: labels.map(
-                        (_, idx) => palette[idx % palette.length],
-                    ),
-                    borderWidth: 0,
+                    data: topExpenseCategories.map(([, total]) => total),
+                    backgroundColor: "rgba(245, 158, 11, 0.9)",
+                    borderRadius: 8,
+                    maxBarThickness: 18,
                 },
             ],
-        };
-    }, [allTransactions]);
-
-    const pieChartOptionsFromBe = useMemo(
-        () => ({
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: "bottom" as const,
-                    labels: { color: "#9ca3af" },
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context: any) => {
-                            const label = context.label
-                                ? `${context.label}: `
-                                : "";
-                            const value =
-                                typeof context.parsed === "number"
-                                    ? context.parsed
-                                    : 0;
-                            return `${label}${value.toLocaleString("vi-VN")} VND`;
-                        },
-                    },
-                },
-            },
         }),
-        [],
+        [topExpenseCategories],
     );
 
-    const balanceTrendDataFromBe = useMemo(() => {
-        const dailyProfit = dailyTotals.map((d) => d.income - d.expense);
-        const cumulative: number[] = [];
-        dailyProfit.reduce((acc, v) => {
-            const next = acc + v;
-            cumulative.push(next);
-            return next;
-        }, 0);
-
-        return {
-            labels: dayLabels,
-            datasets: [
-                {
-                    label: "Số dư",
-                    data: cumulative,
-                    borderColor: "#1890ff",
-                    backgroundColor: "rgba(24, 144, 255, 0.15)",
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    borderWidth: 3,
-                },
-            ],
-        };
-    }, [dayLabels, dailyTotals]);
-
-    const balanceTrendOptionsFromBe = useMemo(
+    const topExpenseChartOptions = useMemo(
         () => ({
             responsive: true,
             maintainAspectRatio: false,
+            indexAxis: "y" as const,
             plugins: {
-                legend: { display: false },
+                legend: {
+                    display: false,
+                },
                 tooltip: {
                     callbacks: {
                         label: (context: any) => {
                             const value =
-                                typeof context.parsed?.y === "number"
-                                    ? context.parsed.y
+                                typeof context.parsed?.x === "number"
+                                    ? context.parsed.x
                                     : 0;
                             return `${value.toLocaleString("vi-VN")} VND`;
                         },
@@ -333,29 +294,29 @@ const Dashboard = () => {
             },
             scales: {
                 x: {
-                    grid: { display: false },
-                    ticks: { color: "#9ca3af" },
-                },
-                y: {
                     grid: {
                         display: true,
-                        color: "#e5e7eb",
+                        color:
+                            theme === "dark"
+                                ? "rgba(148, 163, 184, 0.18)"
+                                : "rgba(15, 23, 42, 0.10)",
                         borderDash: [2, 2],
                     },
                     ticks: {
-                        color: "#9ca3af",
+                        color: theme === "dark" ? "#cbd5e1" : "#64748b",
                         callback: (value: any) =>
                             `${Number(value).toLocaleString("vi-VN")}`,
                     },
-                    title: {
-                        display: true,
-                        text: "Số dư (VND)",
-                        color: "#9ca3af",
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: {
+                        color: theme === "dark" ? "#cbd5e1" : "#475569",
                     },
                 },
             },
         }),
-        [],
+        [theme],
     );
 
     const dollor = [
@@ -479,14 +440,6 @@ const Dashboard = () => {
         },
     ];
 
-    const timelineList = transactions.slice(0, 6).map((t) => ({
-        title: `${t.type === "INCOME" ? "+" : "-"} ${formatCurrency(t.amount)} - ${
-            t.category
-        }`,
-        time: formatDate(t.date),
-        color: t.type === "INCOME" ? "green" : "red",
-    }));
-
     if (loading) {
         return (
             <div style={{ textAlign: "center", padding: "50px" }}>
@@ -515,8 +468,16 @@ const Dashboard = () => {
                                     <Row align="middle" gutter={[24, 0]}>
                                         <Col xs={18}>
                                             <span>{c.today}</span>
-                                            <Title level={3}>
-                                                {c.title}{" "}
+                                            <Title
+                                                level={3}
+                                                className="dashboard-stat-title"
+                                            >
+                                                <span
+                                                    className="dashboard-stat-amount"
+                                                    title={c.title}
+                                                >
+                                                    {c.title}
+                                                </span>
                                                 <small className={c.bnb}>
                                                     {c.persent}
                                                 </small>
@@ -551,13 +512,13 @@ const Dashboard = () => {
                             <div className="linechart">
                                 <div>
                                     <Title level={5}>
-                                        Phân tích thu/chi theo tháng
+                                        Phân tích thu/chi theo tuần
                                     </Title>
                                     <Paragraph
                                         className="lastweek"
                                         style={{ marginBottom: 0 }}
                                     >
-                                        30 ngày gần nhất
+                                        Tuần này (T2 - CN)
                                     </Paragraph>
                                 </div>
                             </div>
@@ -580,84 +541,18 @@ const Dashboard = () => {
                     >
                         <Card bordered={false} className="criclebox h-full">
                             <Title level={5} style={{ marginBottom: 0 }}>
-                                Cơ cấu chi tiêu
+                                Top danh mục chi
                             </Title>
                             <Paragraph
                                 className="lastweek"
                                 style={{ marginBottom: 16 }}
                             >
-                                Theo danh mục (30 ngày gần nhất)
+                                6 danh mục cao nhất (30 ngày gần nhất)
                             </Paragraph>
                             <div style={{ height: 260 }}>
-                                <PieChart
-                                    data={pieChartDataFromBe}
-                                    options={pieChartOptionsFromBe}
-                                />
-                            </div>
-                        </Card>
-                    </Col>
-                </Row>
-
-                <Row gutter={[24, 0]}>
-                    <Col
-                        xs={24}
-                        sm={24}
-                        md={24}
-                        lg={24}
-                        xl={12}
-                        className="mb-24"
-                    >
-                        <Card
-                            bordered={false}
-                            className="criclebox cardbody h-full"
-                        >
-                            <div className="linechart">
-                                <div>
-                                    <Title level={5}>Xu hướng số dư</Title>
-                                    <Paragraph
-                                        className="lastweek"
-                                        style={{ marginBottom: 0 }}
-                                    >
-                                        Lũy kế thu - chi theo tháng
-                                    </Paragraph>
-                                </div>
-                            </div>
-                            <div style={{ height: 300 }}>
-                                <LineChart
-                                    data={balanceTrendDataFromBe}
-                                    options={balanceTrendOptionsFromBe}
-                                />
-                            </div>
-                        </Card>
-                    </Col>
-
-                    <Col
-                        xs={24}
-                        sm={24}
-                        md={24}
-                        lg={24}
-                        xl={12}
-                        className="mb-24"
-                    >
-                        <Card
-                            bordered={false}
-                            className="criclebox cardbody h-full"
-                        >
-                            <div className="linechart">
-                                <div>
-                                    <Title level={5}>Biểu đồ vùng</Title>
-                                    <Paragraph
-                                        className="lastweek"
-                                        style={{ marginBottom: 0 }}
-                                    >
-                                        Lũy kế thu - chi theo tháng
-                                    </Paragraph>
-                                </div>
-                            </div>
-                            <div style={{ height: 300 }}>
-                                <AreaChart
-                                    data={balanceTrendDataFromBe}
-                                    options={balanceTrendOptionsFromBe}
+                                <BarChart
+                                    data={topExpenseChartData}
+                                    options={topExpenseChartOptions}
                                 />
                             </div>
                         </Card>
@@ -677,43 +572,83 @@ const Dashboard = () => {
                         <Card
                             bordered={false}
                             className="criclebox cardbody h-full"
+                            title={
+                                <div className="dashboard-card-header">
+                                    <div>
+                                        <Title
+                                            level={5}
+                                            style={{ marginBottom: 0 }}
+                                        >
+                                            Lịch sử giao dịch gần đây
+                                        </Title>
+                                        <Paragraph
+                                            className="lastweek"
+                                            style={{ marginBottom: 0 }}
+                                        >
+                                            10 giao dịch mới nhất
+                                        </Paragraph>
+                                    </div>
+                                    <Button
+                                        type="text"
+                                        className="dashboard-sort-btn"
+                                        icon={<MenuUnfoldOutlined />}
+                                        onClick={() => setReverse(!reverse)}
+                                    />
+                                </div>
+                            }
                         >
-                            <div className="timeline-box">
-                                <Title level={5}>
-                                    Lịch sử giao dịch gần đây
-                                </Title>
-                                <Paragraph
-                                    className="lastweek"
-                                    style={{ marginBottom: 24 }}
-                                >
-                                    10 giao dịch mới nhất{" "}
-                                    <span className="bnb2">100%</span>
-                                </Paragraph>
-
-                                <Timeline
-                                    pending="Đang cập nhật..."
-                                    className="timelinelist"
-                                    reverse={reverse}
-                                    items={timelineList.map((t) => ({
-                                        label: t.time,
-                                        children: (
-                                            <>
-                                                <Title level={5}>
-                                                    {t.title}
-                                                </Title>
-                                            </>
-                                        ),
-                                        color: t.color,
-                                    }))}
-                                />
-                                <Button
-                                    type="primary"
-                                    style={{ width: "100%" }}
-                                    onClick={() => setReverse(!reverse)}
-                                >
-                                    {<MenuUnfoldOutlined />} REVERSE
-                                </Button>
-                            </div>
+                            <List
+                                className={`transactions-list ${reverse ? "ant-newest" : ""}`}
+                                itemLayout="horizontal"
+                                dataSource={[...transactions]
+                                    .sort((a, b) =>
+                                        reverse
+                                            ? dayjs(a.date).valueOf() -
+                                              dayjs(b.date).valueOf()
+                                            : dayjs(b.date).valueOf() -
+                                              dayjs(a.date).valueOf(),
+                                    )
+                                    .slice(0, 10)}
+                                renderItem={(t) => (
+                                    <List.Item>
+                                        <List.Item.Meta
+                                            title={
+                                                <div className="tx-title-row">
+                                                    <span>
+                                                        {t.category ||
+                                                            "Giao dịch"}
+                                                    </span>
+                                                    <Tag
+                                                        color={
+                                                            t.type === "INCOME"
+                                                                ? "green"
+                                                                : "red"
+                                                        }
+                                                    >
+                                                        {t.type === "INCOME"
+                                                            ? "Thu"
+                                                            : "Chi"}
+                                                    </Tag>
+                                                </div>
+                                            }
+                                            description={
+                                                t.walletId?.name
+                                                    ? `${formatDate(t.date)} • ${t.walletId.name}`
+                                                    : formatDate(t.date)
+                                            }
+                                        />
+                                        <div
+                                            className={`amount ${
+                                                t.type === "INCOME"
+                                                    ? "text-success"
+                                                    : "text-danger"
+                                            }`}
+                                        >
+                                            {`${t.type === "INCOME" ? "+" : "-"} ${formatCurrency(parseAmount(t.amount))}`}
+                                        </div>
+                                    </List.Item>
+                                )}
+                            />
                         </Card>
                     </Col>
 
@@ -764,12 +699,22 @@ const Dashboard = () => {
                                                 </Col>
                                             </Row>
                                             <Progress
-                                                percent={Math.min(
-                                                    (wallet.balance /
-                                                        totalBalance) *
-                                                        100,
-                                                    100,
-                                                )}
+                                                percent={
+                                                    totalBalance > 0
+                                                        ? Math.min(
+                                                              Math.max(
+                                                                  Math.round(
+                                                                      ((wallet.balance /
+                                                                          totalBalance) *
+                                                                          100) /
+                                                                          0.1,
+                                                                  ) * 0.1,
+                                                                  0,
+                                                              ),
+                                                              100,
+                                                          )
+                                                        : 0
+                                                }
                                                 size="small"
                                                 status="active"
                                             />
@@ -781,63 +726,6 @@ const Dashboard = () => {
                                     </Text>
                                 )}
                             </div>
-                        </Card>
-                    </Col>
-                </Row>
-
-                {/* Quick Action */}
-                <Row gutter={[24, 0]}>
-                    <Col
-                        xs={24}
-                        md={24}
-                        sm={24}
-                        lg={24}
-                        xl={24}
-                        className="mb-24"
-                    >
-                        <Card
-                            bordered={false}
-                            className="criclebox h-full"
-                            title={
-                                <h6 className="font-semibold m-0">
-                                    Hành động nhanh
-                                </h6>
-                            }
-                        >
-                            <Row gutter={[16, 0]}>
-                                <Col xs={24} sm={12} md={6}>
-                                    <Button
-                                        type="primary"
-                                        block
-                                        href="/wallets"
-                                    >
-                                        Quản lý ví
-                                    </Button>
-                                </Col>
-                                <Col xs={24} sm={12} md={6}>
-                                    <Button
-                                        type="primary"
-                                        block
-                                        href="/transactions"
-                                    >
-                                        Ghi giao dịch
-                                    </Button>
-                                </Col>
-                                <Col xs={24} sm={12} md={6}>
-                                    <Button type="primary" block href="/goals">
-                                        Quản lý mục tiêu
-                                    </Button>
-                                </Col>
-                                <Col xs={24} sm={12} md={6}>
-                                    <Button
-                                        type="primary"
-                                        block
-                                        href="/profile"
-                                    >
-                                        Hồ sơ cá nhân
-                                    </Button>
-                                </Col>
-                            </Row>
                         </Card>
                     </Col>
                 </Row>

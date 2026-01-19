@@ -1,30 +1,40 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
 export enum TransactionType {
-  INCOME = 'INCOME',
-  EXPENSE = 'EXPENSE'
+    INCOME = "INCOME",
+    EXPENSE = "EXPENSE",
+    GOAL_DEPOSIT = "GOAL_DEPOSIT",
+    GOAL_WITHDRAW = "GOAL_WITHDRAW",
 }
 
 export interface ITransaction extends Document {
-  userId: string;
-  walletId: string;
-  type: TransactionType;
-  amount: number;
-  category: string;
-  date: Date;
-  note?: string;
-  createdAt: Date;
+    userId: string;
+    walletId: string;
+    budgetId?: string;
+    goalId?: string;
+    type: TransactionType;
+    amount: number;
+    category: string;
+    date: Date;
+    note?: string;
+    createdAt: Date;
 }
 
 const TransactionSchema: Schema = new Schema({
-  userId: { type: String, required: true, index: true },
-  walletId: { type: Schema.Types.ObjectId, ref: 'Wallet', required: true },
-  type: { type: String, enum: Object.values(TransactionType), required: true },
-  amount: { type: Number, required: true, min: 0 },
-  category: { type: String, required: true },
-  date: { type: Date, required: true, default: Date.now },
-  note: { type: String },
-  createdAt: { type: Date, default: Date.now }
+    userId: { type: String, required: true, index: true },
+    walletId: { type: Schema.Types.ObjectId, ref: "Wallet", required: true },
+    budgetId: { type: Schema.Types.ObjectId, ref: "Budget" },
+    goalId: { type: Schema.Types.ObjectId, ref: "Goal" },
+    type: {
+        type: String,
+        enum: Object.values(TransactionType),
+        required: true,
+    },
+    amount: { type: Number, required: true, min: 0 },
+    category: { type: String, required: true },
+    date: { type: Date, required: true, default: Date.now },
+    note: { type: String },
+    createdAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.model<ITransaction>('Transaction', TransactionSchema);
+export default mongoose.model<ITransaction>("Transaction", TransactionSchema);

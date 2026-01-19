@@ -101,15 +101,15 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
                 : theme === "dark"
                   ? {
                         primaryColor: "#1890ff",
-                        backgroundColor: "#111827",
-                        textColor: "#ffffff",
-                        secondaryColor: "#1f2937",
+                        backgroundColor: "#0b1220",
+                        textColor: "#e5e7eb",
+                        secondaryColor: "#111a2c",
                         accentColor: "#06b6d4",
                     }
                   : {
                         primaryColor: "#1890ff",
-                        backgroundColor: "#fafafa",
-                        textColor: "#111827",
+                        backgroundColor: "#f5f7fb",
+                        textColor: "#0f172a",
                         secondaryColor: "#ffffff",
                         accentColor: "#06b6d4",
                     };
@@ -120,10 +120,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         root.style.setProperty("--text-base", base.textColor);
         root.style.setProperty("--secondary-color", base.secondaryColor);
         root.style.setProperty("--accent-color", base.accentColor);
-        root.style.setProperty("--text-muted", hexToRgba(base.textColor, 0.6));
+        root.style.setProperty("--text-muted", hexToRgba(base.textColor, 0.74));
         root.style.setProperty(
             "--border-color",
-            hexToRgba(base.textColor, 0.12),
+            hexToRgba(base.textColor, 0.16),
         );
         root.style.setProperty(
             "--accent-alpha",

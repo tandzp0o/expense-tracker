@@ -87,12 +87,19 @@ import "./App.less";
 import "./assets/styles/main.css";
 import "./assets/styles/themeOverrides.css";
 import "./assets/styles/responsive.css";
+import "./assets/styles/ekash_new.css";
 
 // Layouts
 import MainLayout from "./layouts/MainLayout";
+import MainLayout_new from "./layouts/MainLayout_new";
 
 // Pages
 import Dashboard from "./pages/Dashboard";
+import Dashboard_new from "./pages/Dashboard_new";
+import Wallets_new from "./pages/Wallets_new";
+import Budgets_new from "./pages/Budgets_new";
+import Goals_new from "./pages/Goals_new";
+import Transactions_new from "./pages/Transactions_new";
 import Transactions from "./pages/Transactions";
 import Wallets from "./pages/Wallets";
 import DishSuggestions from "./pages/DishSuggestions";
@@ -159,6 +166,40 @@ const ProtectedRoute = () => {
     );
 };
 
+const ProtectedRouteNew = () => {
+    const { currentUser, loading } = useAuth();
+    const location = useLocation();
+
+    if (loading) {
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100vh",
+                }}
+            >
+                <Spin size="large" />
+            </div>
+        );
+    }
+
+    if (!currentUser) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    if (currentUser.newUser && location.pathname !== "/wallets") {
+        return <Navigate to="/wallets" replace />;
+    }
+
+    return (
+        <MainLayout_new>
+            <Outlet />
+        </MainLayout_new>
+    );
+};
+
 function App() {
     return (
         <Router>
@@ -182,6 +223,29 @@ function App() {
                                 />
                                 <Route path="/goals" element={<Goals />} />
                                 <Route path="/profile" element={<Profile />} />
+                            </Route>
+
+                            <Route element={<ProtectedRouteNew />}>
+                                <Route
+                                    path="/new/dashboard"
+                                    element={<Dashboard_new />}
+                                />
+                                <Route
+                                    path="/new/transactions"
+                                    element={<Transactions_new />}
+                                />
+                                <Route
+                                    path="/new/wallets"
+                                    element={<Wallets_new />}
+                                />
+                                <Route
+                                    path="/new/budgets"
+                                    element={<Budgets_new />}
+                                />
+                                <Route
+                                    path="/new/goals"
+                                    element={<Goals_new />}
+                                />
                             </Route>
                         </Routes>
                     </ThemeWrapper>

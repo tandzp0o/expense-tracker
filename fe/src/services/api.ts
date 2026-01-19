@@ -43,6 +43,67 @@ const handleApiError = (error: any) => {
     }
 };
 
+// --- Budget API ---
+export const budgetApi = {
+    getBudgets: async (
+        params?: { month?: number; year?: number; category?: string },
+        token?: string,
+    ) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.get("/budgets", { params });
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    getBudgetSummary: async (
+        params?: { month?: number; year?: number },
+        token?: string,
+    ) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.get("/budgets/summary", {
+                params,
+            });
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    createBudget: async (budgetData: any, token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.post("/budgets", budgetData);
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    updateBudget: async (id: string, budgetData: any, token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.put(`/budgets/${id}`, budgetData);
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    deleteBudget: async (id: string, token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.delete(`/budgets/${id}`);
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+};
+
 // --- Wallet API ---
 export const walletApi = {
     // Get all wallets with total balance

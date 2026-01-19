@@ -1,0 +1,755 @@
+import React, { useEffect, useMemo, useState } from "react";
+import dayjs from "dayjs";
+import "dayjs/locale/vi";
+import { Input, InputNumber, Modal, message, Spin } from "antd";
+import { auth } from "../firebase/config";
+import { budgetApi, transactionApi } from "../services/api";
+import { formatCurrency } from "../utils/formatters";
+import { useTheme } from "../contexts/ThemeContext";
+import LineChart from "../components/charts/LineChart";
+import AlertNotification from "../components/AlertNotification";
+
+dayjs.locale("vi");
+
+interface Transaction {
+    _id: string;
+    type: "INCOME" | "EXPENSE" | "GOAL_DEPOSIT" | "GOAL_WITHDRAW";
+    amount: number | string;
+    category: string;
+    date: string;
+    budgetId?: string;
+    goalId?: string;
+}
+
+interface BudgetSummaryItem {
+    _id: string;
+    category: string;
+    amount: number;
+    spent: number;
+    percent: number;
+    month: number;
+    year: number;
+    note?: string;
+}
+
+interface BudgetSummaryResponse {
+    month: number;
+    year: number;
+    totalBudget: number;
+    totalSpent: number;
+    items: BudgetSummaryItem[];
+}
+
+const moneyFormatter = (value: any) =>
+    `${value ?? ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+const moneyParser = (value: any) =>
+    value ? Number(String(value).replace(/[^0-9.-]+/g, "")) : 0;
+
+const Budgets_new: React.FC = () => {
+    const { theme } = useTheme();
+    const [loading, setLoading] = useState(true);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [activeCategory, setActiveCategory] = useState<string | null>(null);
+    const [budgetSummary, setBudgetSummary] =
+        useState<BudgetSummaryResponse | null>(null);
+
+    const [createOpen, setCreateOpen] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [newCategory, setNewCategory] = useState<string>("");
+    const [newAmount, setNewAmount] = useState<number>(0);
+    const [newNote, setNewNote] = useState<string>("");
+
+    const [editOpen, setEditOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [editBudgetId, setEditBudgetId] = useState<string | null>(null);
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
+
+    const parseAmount = (raw: unknown) => {
+        if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
+        if (typeof raw === "string") {
+            const cleaned = raw.replace(/[^0-9.-]/g, "");
+            const v = Number(cleaned);
+            return Number.isFinite(v) ? v : 0;
+        }
+        return 0;
+    };
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const firebaseUser = auth.currentUser;
+                if (!firebaseUser) return;
+                const token = await firebaseUser.getIdToken();
+
+                const month = dayjs().month() + 1;
+                const year = dayjs().year();
+
+                const startDate = dayjs()
+                    .subtract(365, "day")
+                    .startOf("day")
+                    .toISOString();
+                const endDate = dayjs().endOf("day").toISOString();
+
+                const [summaryRes, txRes] = await Promise.all([
+                    budgetApi.getBudgetSummary({ month, year }, token),
+                    transactionApi.getTransactions(
+                        { startDate, endDate, type: "EXPENSE", limit: 2000 },
+                        token,
+                    ),
+                ]);
+
+                const summary = summaryRes as BudgetSummaryResponse;
+                setBudgetSummary(summary);
+
+                const tx = txRes?.data?.transactions || [];
+                setTransactions(tx);
+
+                setActiveCategory(
+                    (prev) =>
+                        prev ||
+                        (summary?.items && summary.items.length > 0
+                            ? summary.items[0].category
+                            : (tx[0]?.category ?? null)),
+                );
+            } catch (e) {
+                console.error(e);
+                message.error("Không thể tải dữ liệu ngân sách");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const refreshSummary = async (month: number, year: number) => {
+        const firebaseUser = auth.currentUser;
+        if (!firebaseUser) return;
+        const token = await firebaseUser.getIdToken();
+        const summaryRes = await budgetApi.getBudgetSummary(
+            { month, year },
+            token,
+        );
+        const summary = summaryRes as BudgetSummaryResponse;
+        setBudgetSummary(summary);
+        return summary;
+    };
+
+    const now = useMemo(() => dayjs(), []);
+    const currentMonth = useMemo(() => now.startOf("month"), [now]);
+
+    const budgetItems = useMemo(() => {
+        const colors = [
+            "#f97316",
+            "#3b82f6",
+            "#22c55e",
+            "#a855f7",
+            "#14b8a6",
+            "#eab308",
+        ];
+        const items = budgetSummary?.items || [];
+        return items
+            .map((b, idx) => ({
+                id: b._id,
+                category: b.category,
+                spent: Number(b.spent) || 0,
+                budget: Number(b.amount) || 0,
+                percent: Number(b.percent) || 0,
+                color: colors[idx % colors.length],
+            }))
+            .sort((a, b) => b.spent - a.spent);
+    }, [budgetSummary?.items]);
+
+    const selected = useMemo(() => {
+        if (!activeCategory && budgetItems.length > 0) return budgetItems[0];
+        return budgetItems.find((b) => b.category === activeCategory) || null;
+    }, [activeCategory, budgetItems]);
+
+    const analysis = useMemo(() => {
+        if (!selected) return null;
+        const month = currentMonth.month() + 1;
+        const year = currentMonth.year();
+
+        const lastMonth = currentMonth.subtract(1, "month");
+        const lastStart = lastMonth.startOf("month");
+        const lastEnd = lastMonth.endOf("month");
+        const lastMonthSpent = transactions.reduce((acc, t) => {
+            const d = dayjs(t.date);
+            if (d.isAfter(lastStart) && d.isBefore(lastEnd)) {
+                if ((t.category || "Khác") !== selected.category) return acc;
+                return acc + parseAmount(t.amount);
+            }
+            return acc;
+        }, 0);
+
+        const spent = selected.spent;
+        const budget = selected.budget;
+        const remaining = Math.max(budget - spent, 0);
+        const spentPct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+        const remainingPct = budget > 0 ? Math.max(100 - spentPct, 0) : 0;
+
+        return {
+            month,
+            year,
+            spent,
+            budget,
+            remaining,
+            spentPct,
+            remainingPct,
+            lastMonthSpent,
+        };
+    }, [currentMonth, selected, transactions]);
+
+    const handleOpenCreate = () => {
+        setNewCategory(selected?.category || "");
+        setNewAmount(selected?.budget || 0);
+        setNewNote("");
+        setCreateOpen(true);
+    };
+
+    const handleOpenEdit = () => {
+        if (!selected) return;
+        setEditBudgetId((selected as any).id || null);
+        setNewCategory(selected.category || "");
+        setNewAmount(selected.budget || 0);
+        setNewNote("");
+        setEditOpen(true);
+    };
+
+    const handleCreateBudget = async () => {
+        try {
+            const category = newCategory.trim();
+            const amount = Number(newAmount);
+            if (!category) {
+                message.error("Vui lòng nhập danh mục");
+                return;
+            }
+            if (!Number.isFinite(amount) || amount <= 0) {
+                message.error("Số tiền ngân sách không hợp lệ");
+                return;
+            }
+
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) return;
+            const token = await firebaseUser.getIdToken();
+
+            const month = dayjs().month() + 1;
+            const year = dayjs().year();
+
+            setCreating(true);
+            await budgetApi.createBudget(
+                {
+                    category,
+                    amount,
+                    month,
+                    year,
+                    note: newNote || undefined,
+                },
+                token,
+            );
+
+            const summary = await refreshSummary(month, year);
+            setActiveCategory(category);
+            if (summary?.items?.length) {
+                message.success("Tạo ngân sách thành công");
+            }
+            setCreateOpen(false);
+        } catch (e: any) {
+            console.error(e);
+            message.error(e?.message || "Không thể tạo ngân sách");
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleUpdateBudget = async () => {
+        try {
+            const category = newCategory.trim();
+            const amount = Number(newAmount);
+            if (!editBudgetId) {
+                message.error("Không tìm thấy ngân sách để cập nhật");
+                return;
+            }
+            if (!category) {
+                message.error("Vui lòng nhập danh mục");
+                return;
+            }
+            if (!Number.isFinite(amount) || amount <= 0) {
+                message.error("Số tiền ngân sách không hợp lệ");
+                return;
+            }
+
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) return;
+            const token = await firebaseUser.getIdToken();
+
+            const month = dayjs().month() + 1;
+            const year = dayjs().year();
+
+            setEditing(true);
+            await budgetApi.updateBudget(
+                editBudgetId,
+                {
+                    category,
+                    amount,
+                    month,
+                    year,
+                    note: newNote || undefined,
+                },
+                token,
+            );
+
+            await refreshSummary(month, year);
+            setActiveCategory(category);
+            message.success("Cập nhật ngân sách thành công");
+            setEditOpen(false);
+        } catch (e: any) {
+            console.error(e);
+            message.error(e?.message || "Không thể cập nhật ngân sách");
+        } finally {
+            setEditing(false);
+        }
+    };
+
+    const confirmDeleteBudget = async () => {
+        if (!budgetToDelete) return;
+
+        try {
+            setDeleting(true);
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) return;
+            const token = await firebaseUser.getIdToken();
+
+            await budgetApi.deleteBudget(budgetToDelete, token);
+            message.success("Đã xóa ngân sách thành công");
+
+            await refreshSummary(dayjs().month() + 1, dayjs().year());
+            setActiveCategory((prev) => {
+                const remaining =
+                    budgetSummary?.items?.filter(
+                        (b) => b._id !== budgetToDelete,
+                    ) || [];
+                return remaining[0]?.category || null;
+            });
+
+            setAlertVisible(false);
+            setBudgetToDelete(null);
+        } catch (e: any) {
+            console.error(e);
+            message.error(e?.message || "Không thể xóa ngân sách");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const monthlyTrend = useMemo(() => {
+        const months = Array.from({ length: 10 }, (_, i) =>
+            currentMonth.subtract(9 - i, "month").startOf("month"),
+        );
+        const labels = months.map((m) => m.format("MMM"));
+        const data = months.map((m) => {
+            const start = m.startOf("month");
+            const end = m.endOf("month");
+            return transactions.reduce((acc, t) => {
+                const d = dayjs(t.date);
+                if (d.isAfter(start) && d.isBefore(end)) {
+                    if (
+                        selected?.category &&
+                        (t.category || "Khác") !== selected.category
+                    )
+                        return acc;
+                    return acc + parseAmount(t.amount);
+                }
+                return acc;
+            }, 0);
+        });
+        return { labels, data };
+    }, [currentMonth, selected?.category, transactions]);
+
+    const lineData = useMemo(
+        () => ({
+            labels: monthlyTrend.labels,
+            datasets: [
+                {
+                    label: selected ? selected.category : "Spending",
+                    data: monthlyTrend.data,
+                    borderColor: "#4f46e5",
+                    backgroundColor: "rgba(79, 70, 229, 0.10)",
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 0,
+                    borderWidth: 3,
+                },
+            ],
+        }),
+        [monthlyTrend.data, monthlyTrend.labels, selected],
+    );
+
+    const lineOptions = useMemo(
+        () => ({
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context: any) => {
+                            const value =
+                                typeof context.parsed?.y === "number"
+                                    ? context.parsed.y
+                                    : 0;
+                            return `${value.toLocaleString("vi-VN")} VND`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color:
+                            theme === "dark"
+                                ? "rgba(229, 231, 235, 0.72)"
+                                : "#64748b",
+                        maxRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 6,
+                    },
+                },
+                y: {
+                    grid: {
+                        display: true,
+                        color:
+                            theme === "dark"
+                                ? "rgba(148, 163, 184, 0.18)"
+                                : "rgba(15, 23, 42, 0.08)",
+                        borderDash: [2, 2],
+                    },
+                    ticks: {
+                        color:
+                            theme === "dark"
+                                ? "rgba(229, 231, 235, 0.72)"
+                                : "#64748b",
+                        callback: (value: any) =>
+                            `${Number(value).toLocaleString("vi-VN")}`,
+                    },
+                },
+            },
+        }),
+        [theme],
+    );
+
+    if (loading) {
+        return (
+            <div style={{ textAlign: "center", padding: "50px" }}>
+                <Spin size="large" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="ekash_page">
+            <div className="ekash_page_header">
+                <div>
+                    <h2 className="ekash_title">Ngân sách</h2>
+                    <p className="ekash_subtitle">
+                        Theo dõi và quản lý ngân sách theo danh mục
+                    </p>
+                </div>
+            </div>
+
+            <div className="ekash_grid_main">
+                <div className="ekash_card">
+                    <div className="ekash_card_header">
+                        <p className="ekash_card_title">Danh sách ngân sách</p>
+                        <span className="ekash_card_hint">Tháng này</span>
+                    </div>
+
+                    <div className="ekash_list">
+                        {budgetItems.map((b) => (
+                            <button
+                                key={b.category}
+                                type="button"
+                                className={`ekash_list_row ${b.category === (selected?.category ?? "") ? "is_active" : ""}`}
+                                onClick={() => setActiveCategory(b.category)}
+                            >
+                                <span className="left">
+                                    <span
+                                        className="dot"
+                                        style={{ backgroundColor: b.color }}
+                                    />
+                                    <span className="name">{b.category}</span>
+                                </span>
+                                <span className="right">
+                                    <span className="amt">
+                                        {formatCurrency(b.spent)}
+                                    </span>
+                                </span>
+                            </button>
+                        ))}
+                        {budgetItems.length === 0 ? (
+                            <div className="ekash_empty">
+                                Chưa có dữ liệu chi tiêu
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <button
+                        type="button"
+                        className="ekash_add_budget"
+                        onClick={handleOpenCreate}
+                    >
+                        Thêm ngân sách mới
+                    </button>
+                </div>
+
+                <div className="ekash_card">
+                    <div className="ekash_card_header">
+                        <p className="ekash_card_title">
+                            {selected ? selected.category : "Ngân sách"}
+                        </p>
+                        <span className="ekash_card_hint">
+                            {analysis
+                                ? `${analysis.month}/${analysis.year}`
+                                : "-"}
+                        </span>
+                    </div>
+
+                    {selected ? (
+                        <>
+                            {analysis ? (
+                                <div className="ekash_budget_summary">
+                                    <div className="ekash_budget_summary_row">
+                                        <div className="left">
+                                            <div className="label">Đã chi</div>
+                                            <div className="value">
+                                                {formatCurrency(analysis.spent)}
+                                            </div>
+                                        </div>
+                                        <div className="right">
+                                            <div className="label">
+                                                Ngân sách
+                                            </div>
+                                            <div className="value">
+                                                {formatCurrency(
+                                                    analysis.budget,
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="ekash_progress ekash_progress_lg">
+                                        <span
+                                            className="bar"
+                                            style={{
+                                                width: `${Math.min(analysis.spentPct, 100)}%`,
+                                                backgroundColor: selected.color,
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="ekash_budget_summary_footer">
+                                        <span className="pct">
+                                            {Math.round(analysis.spentPct)}%
+                                        </span>
+                                        <span className="pct">
+                                            {Math.round(analysis.remainingPct)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {analysis ? (
+                                <div className="ekash_kpi_row ekash_kpi_row_3">
+                                    <div className="kpi">
+                                        <div className="label">Last Month</div>
+                                        <div className="value">
+                                            {formatCurrency(
+                                                analysis.lastMonthSpent,
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="kpi">
+                                        <div className="label">Expenses</div>
+                                        <div className="value">
+                                            {formatCurrency(analysis.spent)}
+                                        </div>
+                                    </div>
+                                    <div className="kpi">
+                                        <div className="label">Savings</div>
+                                        <div className="value">
+                                            {formatCurrency(analysis.remaining)}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            <div className="ekash_divider" />
+
+                            <div className="ekash_budget_list">
+                                <div className="ekash_budget_item">
+                                    <div className="ekash_budget_row">
+                                        <div className="left">
+                                            <span
+                                                className="circle"
+                                                style={{
+                                                    backgroundColor:
+                                                        selected.color,
+                                                }}
+                                            />
+                                            <span className="name">
+                                                {selected.category}
+                                            </span>
+                                        </div>
+                                        <div className="right">
+                                            {Math.round(selected.percent)}/{100}
+                                        </div>
+                                    </div>
+                                    <div className="ekash_progress">
+                                        <span
+                                            className="bar"
+                                            style={{
+                                                width: `${Math.min(selected.percent, 100)}%`,
+                                                backgroundColor: selected.color,
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="ekash_actions">
+                                <button
+                                    type="button"
+                                    className="ekash_btn"
+                                    onClick={handleOpenEdit}
+                                >
+                                    {selected ? "Cập nhật" : "-"}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ekash_btn danger"
+                                    onClick={() => handleDeleteBudget(selected)}
+                                    disabled={deleting}
+                                >
+                                    Xóa
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="ekash_empty">
+                            Chọn một danh mục để xem chi tiết
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <Modal
+                title="Thêm ngân sách mới"
+                open={createOpen}
+                onCancel={() => setCreateOpen(false)}
+                onOk={handleCreateBudget}
+                okText="Tạo"
+                cancelText="Hủy"
+                confirmLoading={creating}
+                destroyOnClose
+            >
+                <div className="ekash_form">
+                    <div className="ekash_form_row">
+                        <div className="label">Danh mục</div>
+                        <Input
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value)}
+                            placeholder="Ví dụ: Ăn uống"
+                        />
+                    </div>
+
+                    <div className="ekash_form_row">
+                        <div className="label">Số tiền</div>
+                        <InputNumber
+                            value={newAmount}
+                            onChange={(v) =>
+                                setNewAmount(typeof v === "number" ? v : 0)
+                            }
+                            formatter={moneyFormatter}
+                            parser={moneyParser as any}
+                            style={{ width: "100%" }}
+                            min={0}
+                            step={10000}
+                        />
+                    </div>
+
+                    <div className="ekash_form_row">
+                        <div className="label">Ghi chú</div>
+                        <Input
+                            value={newNote}
+                            onChange={(e) => setNewNote(e.target.value)}
+                            placeholder="(không bắt buộc)"
+                        />
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                title="Cập nhật ngân sách"
+                open={editOpen}
+                onCancel={() => setEditOpen(false)}
+                onOk={handleUpdateBudget}
+                okText="Lưu"
+                cancelText="Hủy"
+                confirmLoading={editing}
+                destroyOnClose
+            >
+                <div className="ekash_form">
+                    <div className="ekash_form_row">
+                        <div className="label">Danh mục</div>
+                        <Input
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value)}
+                            placeholder="Ví dụ: Ăn uống"
+                        />
+                    </div>
+
+                    <div className="ekash_form_row">
+                        <div className="label">Số tiền</div>
+                        <InputNumber
+                            value={newAmount}
+                            onChange={(v) =>
+                                setNewAmount(typeof v === "number" ? v : 0)
+                            }
+                            formatter={moneyFormatter}
+                            parser={moneyParser as any}
+                            style={{ width: "100%" }}
+                            min={0}
+                            step={10000}
+                        />
+                    </div>
+
+                    <div className="ekash_form_row">
+                        <div className="label">Ghi chú</div>
+                        <Input
+                            value={newNote}
+                            onChange={(e) => setNewNote(e.target.value)}
+                            placeholder="(không bắt buộc)"
+                        />
+                    </div>
+                </div>
+            </Modal>
+
+            <AlertNotification
+                visible={alertVisible}
+                onConfirm={confirmDeleteBudget}
+                onCancel={() => {
+                    setAlertVisible(false);
+                    setBudgetToDelete(null);
+                }}
+                title="Xác nhận xóa ngân sách"
+                content={`Bạn có chắc muốn xóa ngân sách "${budgetSummary?.items?.find((b: any) => b._id === budgetToDelete)?.category || ''}" không? Hành động này sẽ xóa toàn bộ giao dịch liên quan đến ngân sách này và không thể hoàn tác.`}
+                confirmText="Xóa"
+                cancelText="Hủy"
+                type="error"
+            />
+};
+
+export default Budgets_new;

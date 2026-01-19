@@ -191,13 +191,13 @@ const Wallets: React.FC = () => {
             )}
 
             {/* Statistics Section */}
-            <Row gutter={[24, 0]} className="mb-24">
-                <Col xs={24} md={16}>
-                    <Row gutter={[24, 0]}>
+            <Row gutter={[24, 0]} className="mb-24 wallets-stats-row">
+                <Col xs={24} md={14}>
+                    <Row gutter={[20, 0]}>
                         <Col xs={24} xl={12} className="mb-24">
                             <Card
                                 bordered={false}
-                                className="card-credit header-solid h-ful"
+                                className="card-credit header-solid h-full"
                                 title={
                                     <img
                                         src={mastercard}
@@ -272,7 +272,7 @@ const Wallets: React.FC = () => {
                     </Row>
                 </Col>
 
-                <Col span={24} md={8} className="mb-24">
+                <Col span={24} md={10} className="mb-24">
                     <Card
                         bordered={false}
                         className="header-solid h-full ant-invoice-card"
@@ -291,44 +291,46 @@ const Wallets: React.FC = () => {
                             </Button>,
                         ]}
                     >
-                        <List
-                            itemLayout="horizontal"
-                            className="invoice-list"
-                            dataSource={[...wallets]
-                                .sort(
-                                    (a, b) =>
-                                        new Date(b.createdAt).getTime() -
-                                        new Date(a.createdAt).getTime(),
-                                )
-                                .slice(0, 5)}
-                            renderItem={(wallet) => (
-                                <List.Item
-                                    actions={[
-                                        <Button
-                                            key="edit"
-                                            type="link"
-                                            onClick={() => {
-                                                setEditingWallet(wallet);
-                                                form.setFieldsValue(wallet);
-                                                setIsModalVisible(true);
-                                            }}
-                                        >
-                                            Sửa
-                                        </Button>,
-                                    ]}
-                                >
-                                    <List.Item.Meta
-                                        title={wallet.name}
-                                        description={
-                                            wallet.accountNumber || "---"
-                                        }
-                                    />
-                                    <div className="amount">
-                                        {formatCurrency(wallet.balance)}
-                                    </div>
-                                </List.Item>
-                            )}
-                        />
+                        <div className="recent-wallets-scroll">
+                            <List
+                                itemLayout="horizontal"
+                                className="invoice-list"
+                                dataSource={[...wallets]
+                                    .sort(
+                                        (a, b) =>
+                                            new Date(b.createdAt).getTime() -
+                                            new Date(a.createdAt).getTime(),
+                                    )
+                                    .slice(0, 12)}
+                                renderItem={(wallet) => (
+                                    <List.Item
+                                        actions={[
+                                            <Button
+                                                key="edit"
+                                                type="link"
+                                                onClick={() => {
+                                                    setEditingWallet(wallet);
+                                                    form.setFieldsValue(wallet);
+                                                    setIsModalVisible(true);
+                                                }}
+                                            >
+                                                Sửa
+                                            </Button>,
+                                        ]}
+                                    >
+                                        <List.Item.Meta
+                                            title={wallet.name}
+                                            description={
+                                                wallet.accountNumber || "---"
+                                            }
+                                        />
+                                        <div className="amount">
+                                            {formatCurrency(wallet.balance)}
+                                        </div>
+                                    </List.Item>
+                                )}
+                            />
+                        </div>
                     </Card>
                 </Col>
             </Row>

@@ -1,6 +1,14 @@
 body {
     background-color: var(--bg-base, #fafafa);
     color: var(--text-base, rgba(0, 0, 0, 0.65));
+    font-family:
+        Inter,
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        Arial,
+        sans-serif;
 }
 
 /* Layout / surfaces */
@@ -13,6 +21,8 @@ body {
 .layout-dashboard .header-solid.ant-card,
 .layout-dashboard .criclebox.ant-card {
     background: var(--bg-container, #ffffff) !important;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
 }
 
 /* Text */
@@ -32,7 +42,7 @@ body {
 .layout-dashboard .ant-card-head-title p,
 .layout-dashboard .lastweek,
 .layout-dashboard .ant-list-item-meta-description {
-    color: var(--text-muted, rgba(17, 24, 39, 0.6)) !important;
+    color: var(--text-muted, rgba(17, 24, 39, 0.74)) !important;
 }
 
 /* Links / accent */
@@ -109,6 +119,20 @@ body {
     border-color: var(--border-color, rgba(17, 24, 39, 0.12)) !important;
 }
 
+.layout-dashboard .ant-card {
+    border-width: 1px !important;
+    border-style: solid !important;
+    border-color: var(--border-color, rgba(17, 24, 39, 0.16)) !important;
+}
+
+.layout-dashboard .ant-card-body {
+    padding: 18px 20px;
+}
+
+.layout-dashboard .ant-card-head {
+    border-bottom-color: var(--border-color, rgba(17, 24, 39, 0.16)) !important;
+}
+
 /* Inputs focus */
 .layout-dashboard .ant-input:focus,
 .layout-dashboard .ant-input-focused,
@@ -130,4 +154,129 @@ body {
 .layout-dashboard .ant-progress-bg,
 .layout-dashboard .ant-progress-success-bg {
     background-color: var(--primary-color, #1890ff) !important;
+}
+
+/* Wallets page: recent list scroll */
+.layout-dashboard .ant-invoice-card .ant-card-body .recent-wallets-scroll {
+    height: 260px !important;
+    max-height: 260px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-right: 6px;
+}
+
+.layout-dashboard
+    .ant-invoice-card
+    .ant-card-body
+    .recent-wallets-scroll
+    .ant-list {
+    margin: 0;
+}
+
+/* Wallets page: improve contrast for Descriptions inside billing cards */
+.layout-dashboard .card-billing-info.ant-card {
+    background-color: var(--bg-container, #ffffff) !important;
+    border-color: var(--border-color, rgba(17, 24, 39, 0.12)) !important;
+}
+
+.layout-dashboard .card-billing-info .ant-descriptions-title,
+.layout-dashboard .card-billing-info .ant-descriptions-item-content,
+.layout-dashboard .card-billing-info .ant-descriptions-item-content span {
+    color: var(--text-base, #111827) !important;
+}
+
+.layout-dashboard .card-billing-info .ant-descriptions-item-label {
+    color: var(--text-muted, rgba(17, 24, 39, 0.6)) !important;
+}
+
+.layout-dashboard .card-billing-info.ant-card .darkbtn {
+    color: var(--text-muted, rgba(17, 24, 39, 0.6)) !important;
+}
+
+/* Dashboard: stat cards - keep amount + small on one line */
+.layout-dashboard .dashboard-stat-title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+.layout-dashboard .dashboard-stat-title .dashboard-stat-amount {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.layout-dashboard .dashboard-stat-title small {
+    white-space: nowrap;
+}
+
+/* Dashboard: transactions header */
+.layout-dashboard .dashboard-card-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.layout-dashboard .dashboard-sort-btn {
+    border: 1px solid var(--border-color, rgba(17, 24, 39, 0.12)) !important;
+    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Dashboard: transaction list item */
+.layout-dashboard .tx-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+/* Dashboard: quick actions */
+.layout-dashboard .dashboard-quick-actions .quick-action-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    width: 100%;
+    border-radius: 10px;
+    background: var(--primary-color, #1890ff);
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--primary-color, #1890ff);
+}
+
+.layout-dashboard .dashboard-quick-actions .quick-action-card:hover {
+    opacity: 0.95;
+    color: #fff;
+}
+
+/* Wallets page: make top stats cards equal height */
+.layout-dashboard .wallets-stats-row > .ant-col,
+.layout-dashboard .wallets-stats-row .ant-col.mb-24 {
+    display: flex;
+}
+
+.layout-dashboard .wallets-stats-row .ant-card {
+    width: 100%;
+    flex: 1;
+}
+
+/* Wallets page: prevent long currency values from breaking layout */
+.layout-dashboard .wallets-stats-row .ant-statistic-content-value,
+.layout-dashboard .wallets-stats-row .card-footer h6 {
+    display: block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
