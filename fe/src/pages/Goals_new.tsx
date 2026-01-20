@@ -164,33 +164,38 @@ const Goals_new: React.FC = () => {
     };
 
     const handleDelete = async (g: Goal) => {
-        Modal.confirm({
-            title: "Xóa mục tiêu",
-            content: "Bạn có chắc muốn xóa mục tiêu này không?",
-            okText: "Xóa",
-            cancelText: "Hủy",
-            okButtonProps: { danger: true },
-            onOk: async () => {
-                try {
-                    setDeleting(true);
-                    const token = await getToken();
-                    if (!token) return;
-                    await goalApi.deleteGoal(g._id, token);
-                    message.success("Đã xóa mục tiêu");
-                    setActiveGoalId((prev) => {
-                        if (prev !== g._id) return prev;
-                        const rest = goals.filter((x) => x._id !== g._id);
-                        return rest[0]?._id ?? null;
-                    });
-                    await fetchData();
-                } catch (e: any) {
-                    console.error(e);
-                    message.error(e?.message || "Không thể xóa mục tiêu");
-                } finally {
-                    setDeleting(false);
-                }
-            },
-        });
+        setGoalToDelete(g._id);
+        setAlertVisible(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!goalToDelete) return;
+
+        try {
+            setDeleting(true);
+            const token = await getToken();
+            if (!token) return;
+            await goalApi.deleteGoal(goalToDelete, token);
+            message.success("Đã xóa mục tiêu");
+            setActiveGoalId((prev) => {
+                if (prev !== goalToDelete) return prev;
+                const rest = goals.filter((x) => x._id !== goalToDelete);
+                return rest[0]?._id ?? null;
+            });
+            setAlertVisible(false);
+            setGoalToDelete(null);
+            await fetchData();
+        } catch (e: any) {
+            console.error(e);
+            message.error(e?.message || "Không thể xóa mục tiêu");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const cancelDelete = () => {
+        setAlertVisible(false);
+        setGoalToDelete(null);
     };
 
     const fetchData = async () => {
@@ -663,6 +668,17 @@ const Goals_new: React.FC = () => {
                     </div>
                 </div>
             </Modal>
+
+            <AlertNotification
+                visible={alertVisible}
+                onConfirm={confirmDelete}
+                onCancel={cancelDelete}
+                title="Xóa mục tiêu"
+                content="Bạn có chắc muốn xóa mục tiêu này không?"
+                confirmText="Xóa"
+                cancelText="Hủy"
+                type="warning"
+            />
         </div>
     );
 };

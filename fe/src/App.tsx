@@ -246,6 +246,14 @@ function App() {
                                     path="/new/goals"
                                     element={<Goals_new />}
                                 />
+                                <Route
+                                    path="/profile"
+                                    element={<Profile />}
+                                />
+                                <Route
+                                    path="/dishes"
+                                    element={<DishSuggestions />}
+                                />
                             </Route>
                         </Routes>
                     </ThemeWrapper>

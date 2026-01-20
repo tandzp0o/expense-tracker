@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import { message, Spin } from "antd";
 import { auth } from "../firebase/config";
-import { walletApi, transactionApi, goalApi } from "../services/api";
+import { walletApi, transactionApi, goalApi, budgetApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { useTheme } from "../contexts/ThemeContext";
 import LineChart from "../components/charts/LineChart";
@@ -43,6 +43,7 @@ const Dashboard_new: React.FC = () => {
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [goals, setGoals] = useState<Goal[]>([]);
+    const [budgets, setBudgets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     const parseAmount = (raw: unknown) => {
@@ -82,18 +83,31 @@ const Dashboard_new: React.FC = () => {
                     .toISOString();
                 const endDate = now.endOf("day").toISOString();
 
-                const [walletsRes, txRes, goalRes] = await Promise.all([
-                    walletApi.getWallets(token),
-                    transactionApi.getTransactions(
-                        { startDate, endDate },
-                        token,
-                    ),
-                    goalApi.getGoals(token),
-                ]);
+                const [walletsRes, txRes, goalRes, budgetRes] =
+                    await Promise.all([
+                        walletApi.getWallets(token),
+                        transactionApi.getTransactions(
+                            { startDate, endDate },
+                            token,
+                        ),
+                        goalApi.getGoals(token),
+                        budgetApi.getBudgetSummary(
+                            {
+                                month: dayjs().month() + 1,
+                                year: dayjs().year(),
+                            },
+                            token,
+                        ),
+                    ]);
 
                 setWallets(walletsRes?.wallets || []);
                 setTransactions(txRes?.data?.transactions || []);
                 setGoals(Array.isArray(goalRes) ? goalRes : []);
+                setBudgets(
+                    Array.isArray(budgetRes)
+                        ? budgetRes
+                        : budgetRes?.items || [],
+                );
             } catch (e) {
                 console.error(e);
                 message.error("Không thể tải dữ liệu dashboard");
@@ -205,40 +219,34 @@ const Dashboard_new: React.FC = () => {
     const statCards = useMemo(
         () => [
             {
-                label: "Tổng tài sản",
-                value: formatCurrency(totalAssets),
-                pillType: "up" as const,
-                pill: `${(totalAssets !== 0 ? 3.12 : 0).toFixed(2)}%`,
-            },
-            {
                 label: "Số dư khả dụng",
                 value: formatCurrency(availableBalance),
                 pillType: availableBalance >= 0 ? "up" : "down",
                 pill: `${(availableBalance >= 0 ? 0 : -2.5).toFixed(2)}%`,
             },
             {
-                label: "Total Period Change",
+                label: "Thay đổi kỳ này",
                 value: formatCurrency(periodChange.currentNet),
                 pillType:
                     periodChange.delta >= 0
                         ? ("up" as const)
                         : ("down" as const),
                 pill: `${Math.abs(periodChange.percent).toFixed(2)}%`,
-                note: "Last month",
+                note: "Tháng trước",
             },
             {
-                label: "Total Period Expenses",
+                label: "Tổng chi tiêu kỳ này",
                 value: formatCurrency(totalExpense),
                 pillType: "down" as const,
                 pill: `${(prevExpense !== 0 ? (Math.abs(totalExpense - prevExpense) / Math.abs(prevExpense)) * 100 : 0).toFixed(2)}%`,
-                note: "Last month",
+                note: "Tháng trước",
             },
             {
-                label: "Total Period Income",
+                label: "Tổng thu nhập kỳ này",
                 value: formatCurrency(totalIncome),
                 pillType: "up" as const,
                 pill: `${(prevIncome !== 0 ? (Math.abs(totalIncome - prevIncome) / Math.abs(prevIncome)) * 100 : 0).toFixed(2)}%`,
-                note: "Last month",
+                note: "Tháng trước",
             },
         ],
         [
@@ -293,7 +301,7 @@ const Dashboard_new: React.FC = () => {
             labels: dailyTrend.labels,
             datasets: [
                 {
-                    label: "Balance Trends",
+                    label: "Xu hướng số dư",
                     data: dailyTrend.values,
                     borderColor: "#4f46e5",
                     backgroundColor: "rgba(79, 70, 229, 0.10)",
@@ -428,54 +436,54 @@ const Dashboard_new: React.FC = () => {
             labels: monthlyIncomeExpense.labels,
             datasets: [
                 {
-                    label: "Income",
+                    label: "Thu nhập",
                     data: monthlyIncomeExpense.income,
                     backgroundColor: (context: any) => {
                         const chart = context.chart;
                         const area = chart?.chartArea;
-                        if (!area) return "rgba(79, 70, 229, 0.9)";
+                        if (!area) return "rgba(70, 229, 91, 0.95)";
                         return makeBarGradient(
                             chart.ctx,
                             area,
-                            "rgba(79, 70, 229, 0.35)",
-                            "rgba(79, 70, 229, 0.98)",
+                            "rgba(70, 229, 91, 0.75)",
+                            "rgba(70, 229, 91, 1)",
                         );
                     },
-                    hoverBackgroundColor: "rgba(79, 70, 229, 1)",
-                    borderColor: "rgba(79, 70, 229, 1)",
+                    hoverBackgroundColor: "rgba(70, 229, 91, 1)",
+                    borderColor: "rgba(70, 229, 91, 1)",
                     borderWidth: 0,
                     borderRadius: 6,
                     maxBarThickness: 18,
                 },
                 {
-                    label: "Expense",
+                    label: "Chi tiêu",
                     data: monthlyIncomeExpense.expense,
                     backgroundColor: (context: any) => {
                         const chart = context.chart;
                         const area = chart?.chartArea;
                         if (!area)
                             return theme === "dark"
-                                ? "rgba(244, 63, 94, 0.55)"
-                                : "rgba(244, 63, 94, 0.65)";
+                                ? "rgba(248, 213, 56, 0.95)"
+                                : "rgba(248, 213, 56, 0.9)";
                         return makeBarGradient(
                             chart.ctx,
                             area,
                             theme === "dark"
-                                ? "rgba(244, 63, 94, 0.22)"
-                                : "rgba(244, 63, 94, 0.28)",
+                                ? "rgba(248, 213, 56, 0.85)"
+                                : "rgba(248, 213, 56, 0.8)",
                             theme === "dark"
-                                ? "rgba(244, 63, 94, 0.88)"
-                                : "rgba(244, 63, 94, 0.92)",
+                                ? "rgba(248, 213, 56, 1)"
+                                : "rgba(248, 213, 56, 0.95)",
                         );
                     },
                     hoverBackgroundColor:
                         theme === "dark"
-                            ? "rgba(244, 63, 94, 0.98)"
-                            : "rgba(244, 63, 94, 1)",
+                            ? "rgba(248, 213, 56, 1)"
+                            : "rgba(248, 213, 56, 1)",
                     borderColor:
                         theme === "dark"
-                            ? "rgba(244, 63, 94, 1)"
-                            : "rgba(244, 63, 94, 1)",
+                            ? "rgba(248, 213, 56, 1)"
+                            : "rgba(248, 213, 56, 1)",
                     borderWidth: 0,
                     borderRadius: 6,
                     maxBarThickness: 18,
@@ -496,7 +504,7 @@ const Dashboard_new: React.FC = () => {
                         color:
                             theme === "dark"
                                 ? "rgba(229, 231, 235, 0.72)"
-                                : "#64748b",
+                                : "#fff",
                         boxWidth: 10,
                         boxHeight: 10,
                     },
@@ -533,8 +541,8 @@ const Dashboard_new: React.FC = () => {
                     ticks: {
                         color:
                             theme === "dark"
-                                ? "rgba(229, 231, 235, 0.72)"
-                                : "#64748b",
+                                ? "rgba(255, 255, 255, 0.72)"
+                                : "#fff",
                     },
                 },
                 y: {
@@ -542,15 +550,15 @@ const Dashboard_new: React.FC = () => {
                         display: true,
                         color:
                             theme === "dark"
-                                ? "rgba(148, 163, 184, 0.18)"
-                                : "rgba(15, 23, 42, 0.08)",
+                                ? "rgba(255, 255, 255, 0.18)"
+                                : "rgba(255, 255, 255, 0.08)",
                         borderDash: [2, 2],
                     },
                     ticks: {
                         color:
                             theme === "dark"
-                                ? "rgba(229, 231, 235, 0.72)"
-                                : "#64748b",
+                                ? "rgba(255, 255, 255, 0.72)"
+                                : "#fff",
                         callback: (value: any) =>
                             `${Number(value).toLocaleString("vi-VN")}`,
                     },
@@ -586,30 +594,30 @@ const Dashboard_new: React.FC = () => {
             labels,
             datasets: [
                 {
-                    label: "Weekly Expenses",
+                    label: "Chi tiêu hàng tuần",
                     data,
                     backgroundColor: (context: any) => {
                         const chart = context.chart;
                         const area = chart?.chartArea;
                         if (!area)
                             return theme === "dark"
-                                ? "rgba(56, 189, 248, 0.55)"
-                                : "rgba(56, 189, 248, 0.7)";
+                                ? "rgba(248, 213, 56, 0.95)"
+                                : "rgba(248, 213, 56, 0.9)";
                         return makeBarGradient(
                             chart.ctx,
                             area,
                             theme === "dark"
-                                ? "rgba(56, 189, 248, 0.22)"
-                                : "rgba(56, 189, 248, 0.30)",
+                                ? "rgba(248, 213, 56, 0.85)"
+                                : "rgba(248, 213, 56, 0.8)",
                             theme === "dark"
-                                ? "rgba(56, 189, 248, 0.92)"
-                                : "rgba(56, 189, 248, 0.98)",
+                                ? "rgba(248, 213, 56, 1)"
+                                : "rgba(248, 213, 56, 0.95)",
                         );
                     },
                     hoverBackgroundColor:
                         theme === "dark"
-                            ? "rgba(56, 189, 248, 1)"
-                            : "rgba(56, 189, 248, 1)",
+                            ? "rgba(248, 213, 56, 1)"
+                            : "rgba(248, 213, 56, 1)",
                     borderRadius: 6,
                     maxBarThickness: 18,
                 },
@@ -623,26 +631,36 @@ const Dashboard_new: React.FC = () => {
             .slice(0, 6)
             .map((t) => ({
                 id: t._id,
-                title: t.category || "Payment",
+                title: t.category || "Giao dịch",
                 date: formatDate(t.date),
                 amount: `${t.type === "INCOME" ? "+" : "-"}${formatCurrency(parseAmount(t.amount))}`,
-                status: t.type === "INCOME" ? "Paid" : "Due",
+                status: t.type === "INCOME" ? "Đã nhận" : "Đã thanh toán",
                 statusType: t.type === "INCOME" ? "paid" : "due",
             }));
     }, [txCurrent]);
 
-    const budgets = useMemo(() => {
-        const items = expenseBreakdown.map((e) => {
-            const budget = Math.max(e.value * 1.3, 1);
-            return {
-                name: e.name,
-                spent: e.value,
-                budget,
-                color: e.color,
-            };
-        });
-        return items.slice(0, 5);
-    }, [expenseBreakdown]);
+    const budgetItems = useMemo(() => {
+        if (budgets.length === 0) {
+            return expenseBreakdown.slice(0, 5).map((e) => {
+                const budget = Math.max(e.value * 1.3, 1);
+                return {
+                    name: e.name,
+                    spent: e.value,
+                    budget,
+                    color: e.color,
+                };
+            });
+        }
+
+        return budgets.slice(0, 5).map((b: any) => ({
+            name: b.category,
+            spent: b.spent || 0,
+            budget: b.amount,
+            color:
+                expenseBreakdown.find((e) => e.name === b.category)?.color ||
+                "#f97316",
+        }));
+    }, [budgets, expenseBreakdown]);
 
     if (loading) {
         return (
@@ -658,7 +676,7 @@ const Dashboard_new: React.FC = () => {
                 <div>
                     <h2 className="ekash_title">Dashboard</h2>
                     <p className="ekash_subtitle">
-                        Welcome Ekash Finance Management
+                        Chào mừng đến với Ekash Finance Management
                     </p>
                 </div>
                 <div className="ekash_breadcrumb">
@@ -685,7 +703,7 @@ const Dashboard_new: React.FC = () => {
                 <div className="ekash_card ekash_chart_card">
                     <div className="ekash_card_header">
                         <div>
-                            <p className="ekash_card_title">Balance Trends</p>
+                            <p className="ekash_card_title">Xu hướng số dư</p>
                             <div className="ekash_big_value">
                                 {formatCurrency(
                                     dailyTrend.values[
@@ -695,7 +713,7 @@ const Dashboard_new: React.FC = () => {
                             </div>
                         </div>
                         <div className="ekash_card_hint">
-                            Last Month <span className="sep">•</span>
+                            Tháng trước <span className="sep">•</span>
                             <span
                                 className={`ekash_pill ${periodChange.delta >= 0 ? "up" : "down"}`}
                             >
@@ -711,7 +729,7 @@ const Dashboard_new: React.FC = () => {
                 <div className="ekash_card">
                     <div className="ekash_card_header">
                         <p className="ekash_card_title">
-                            Monthly Expenses Breakdown
+                            Phân tích chi tiêu hàng tháng
                         </p>
                     </div>
 
@@ -755,11 +773,11 @@ const Dashboard_new: React.FC = () => {
             <div className="ekash_grid_2">
                 <div className="ekash_card">
                     <div className="ekash_card_header">
-                        <p className="ekash_card_title">Monthly Budgets</p>
-                        <span className="ekash_card_hint">This month</span>
+                        <p className="ekash_card_title">Ngân sách hàng tháng</p>
+                        <span className="ekash_card_hint">Tháng này</span>
                     </div>
                     <div className="ekash_budget_list">
-                        {budgets.map((b) => {
+                        {budgetItems.map((b) => {
                             const percent =
                                 b.budget > 0
                                     ? Math.min((b.spent / b.budget) * 100, 100)
@@ -800,9 +818,9 @@ const Dashboard_new: React.FC = () => {
                 <div className="ekash_card ekash_chart_card">
                     <div className="ekash_card_header">
                         <p className="ekash_card_title">
-                            Monthly Income vs Expenses
+                            Thu nhập so với chi tiêu hàng tháng
                         </p>
-                        <span className="ekash_card_hint">10 months</span>
+                        <span className="ekash_card_hint">10 tháng</span>
                     </div>
                     <div className="ekash_chart" style={{ height: 240 }}>
                         <div
@@ -821,8 +839,8 @@ const Dashboard_new: React.FC = () => {
             <div className="ekash_grid_2">
                 <div className="ekash_card ekash_chart_card">
                     <div className="ekash_card_header">
-                        <p className="ekash_card_title">Weekly Expenses</p>
-                        <span className="ekash_card_hint">Last 8 weeks</span>
+                        <p className="ekash_card_title">Chi tiêu hàng tuần</p>
+                        <span className="ekash_card_hint">8 tuần qua</span>
                     </div>
                     <div className="ekash_chart" style={{ height: 220 }}>
                         <div
@@ -839,11 +857,39 @@ const Dashboard_new: React.FC = () => {
 
                 <div className="ekash_card">
                     <div className="ekash_card_header">
-                        <p className="ekash_card_title">Payments History</p>
-                        <span className="ekash_link">See more</span>
+                        <p className="ekash_card_title">Lịch sử giao dịch</p>
+                        <span
+                            className="ekash_link"
+                            style={{
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                            }}
+                        >
+                            Cuộn để xem thêm
+                            <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 12 12"
+                                fill="currentColor"
+                            >
+                                <path
+                                    d="M4.5 3L7.5 6L4.5 9"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    fill="none"
+                                />
+                            </svg>
+                        </span>
                     </div>
 
-                    <div className="ekash_payments">
+                    <div
+                        className="ekash_payments"
+                        style={{ maxHeight: "300px", overflowY: "auto" }}
+                    >
                         {payments.map((p) => (
                             <div key={p.id} className="ekash_payment_row">
                                 <div className="left">

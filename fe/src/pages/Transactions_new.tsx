@@ -13,6 +13,7 @@ import {
 import { auth } from "../firebase/config";
 import { transactionApi, walletApi, goalApi, budgetApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
+import AlertNotification from "../components/AlertNotification";
 
 dayjs.locale("vi");
 
@@ -83,6 +84,9 @@ const Transactions_new: React.FC = () => {
     const [modalSource, setModalSource] = useState<
         "regular" | "savings" | "edit"
     >("regular"); // Track modal source
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [transactionToDelete, setTransactionToDelete] =
+        useState<Transaction | null>(null);
 
     const parseAmount = (raw: unknown) => {
         if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
@@ -330,35 +334,43 @@ const Transactions_new: React.FC = () => {
     };
 
     const handleDelete = async (tx: Transaction) => {
-        Modal.confirm({
-            title: "Xóa giao dịch",
-            content: "Bạn có chắc muốn xóa giao dịch này không?",
-            okText: "Xóa",
-            cancelText: "Hủy",
-            okButtonProps: { danger: true },
-            onOk: async () => {
-                try {
-                    setDeleting(true);
-                    const token = await getToken();
-                    if (!token) return;
-                    await transactionApi.deleteTransaction(tx._id, token);
-                    message.success("Đã xóa giao dịch");
-                    setActiveId((prev) => {
-                        if (prev !== tx._id) return prev;
-                        const rest = transactions.filter(
-                            (t) => t._id !== tx._id,
-                        );
-                        return rest[0]?._id ?? null;
-                    });
-                    await fetchAll();
-                } catch (e: any) {
-                    console.error(e);
-                    message.error(e?.message || "Không thể xóa giao dịch");
-                } finally {
-                    setDeleting(false);
-                }
-            },
-        });
+        setTransactionToDelete(tx);
+        setAlertVisible(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!transactionToDelete) return;
+
+        try {
+            setDeleting(true);
+            const token = await getToken();
+            if (!token) return;
+            await transactionApi.deleteTransaction(
+                transactionToDelete._id,
+                token,
+            );
+            message.success("Đã xóa giao dịch");
+            setActiveId((prev) => {
+                if (prev !== transactionToDelete._id) return prev;
+                const rest = transactions.filter(
+                    (t) => t._id !== transactionToDelete._id,
+                );
+                return rest[0]?._id ?? null;
+            });
+            setAlertVisible(false);
+            setTransactionToDelete(null);
+            await fetchAll();
+        } catch (e: any) {
+            console.error(e);
+            message.error(e?.message || "Không thể xóa giao dịch");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const cancelDelete = () => {
+        setAlertVisible(false);
+        setTransactionToDelete(null);
     };
 
     const availableCategories = useMemo(() => {
@@ -752,6 +764,17 @@ const Transactions_new: React.FC = () => {
                     </div>
                 </div>
             </Modal>
+
+            <AlertNotification
+                visible={alertVisible}
+                onConfirm={confirmDelete}
+                onCancel={cancelDelete}
+                title="Xóa giao dịch"
+                content="Bạn có chắc muốn xóa giao dịch này không?"
+                confirmText="Xóa"
+                cancelText="Hủy"
+                type="warning"
+            />
         </div>
     );
 };

@@ -70,7 +70,19 @@ const Sidenav_new: React.FC = () => {
                         to="/new/goals"
                         title="Mục tiêu"
                         subtitle="Tiết kiệm"
-                        color="#14b8a6"
+                        color="#1f14b8ff"
+                    />
+                    <Item
+                        to="/profile"
+                        title="Thông tin"
+                        subtitle=" Cá nhân"
+                        color="#0ea5e9"
+                    />
+                    <Item
+                        to="/dishes"
+                        title="Gợi ý"
+                        subtitle="Dishes"
+                        color="#fdb312ff"
                     />
                 </div>
 

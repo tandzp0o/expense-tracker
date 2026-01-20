@@ -30,7 +30,16 @@ const AlertNotification: React.FC<AlertNotificationProps> = ({
                 <button
                     key="cancel"
                     onClick={onCancel}
-                    style={{ marginRight: 8 }}
+                    style={{
+                        backgroundColor:
+                            type === "error" ? "#cfceceff" : "#faad14",
+                        color: "black",
+                        border: "none",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        marginRight: "10px",
+                    }}
                 >
                     {cancelText}
                 </button>,

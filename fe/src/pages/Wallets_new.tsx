@@ -19,8 +19,14 @@ dayjs.locale("vi");
 
 interface Wallet {
     _id: string;
+    userId: string;
     name: string;
+    accountNumber?: string;
+    description?: string;
     balance: number;
+    initialBalance: number;
+    createdAt: string;
+    updatedAt: string;
 }
 
 interface Transaction {
@@ -47,7 +53,10 @@ const Wallets_new: React.FC = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Wallet | null>(null);
     const [formName, setFormName] = useState<string>("");
-    const [formBalance, setFormBalance] = useState<number>(0);
+    const [formBalance, setFormBalance] = useState<number>(0); // số tiền hiện tại
+    const [formBalanceInitial, setFormBalanceInitial] = useState<number>(0); // số tiền ban đầu
+    const [formAccountNumber, setFormAccountNumber] = useState<string>("");
+    const [formDescription, setFormDescription] = useState<string>("");
     const [alertVisible, setAlertVisible] = useState(false);
     const [walletToDelete, setWalletToDelete] = useState<string | null>(null);
 
@@ -109,6 +118,9 @@ const Wallets_new: React.FC = () => {
     const resetForm = () => {
         setFormName("");
         setFormBalance(0);
+        setFormBalanceInitial(0);
+        setFormAccountNumber("");
+        setFormDescription("");
     };
 
     const openCreate = () => {
@@ -121,6 +133,9 @@ const Wallets_new: React.FC = () => {
         setEditing(w);
         setFormName(w.name);
         setFormBalance(Number(w.balance) || 0);
+        setFormBalanceInitial(Number(w.initialBalance) || 0);
+        setFormAccountNumber(w.accountNumber || "");
+        setFormDescription(w.description || "");
         setModalOpen(true);
     };
 
@@ -137,7 +152,13 @@ const Wallets_new: React.FC = () => {
             setSaving(true);
             const token = await getToken();
             if (!token) return;
-            const payload = { name: formName.trim(), balance: formBalance };
+            const payload = {
+                name: formName.trim(),
+                balance: formBalance,
+                initialBalance: formBalanceInitial,
+                accountNumber: formAccountNumber.trim() || undefined,
+                description: formDescription.trim() || undefined,
+            };
             if (editing?._id) {
                 await walletApi.updateWallet(editing._id, payload, token);
                 message.success("Cập nhật ví thành công");
@@ -276,7 +297,7 @@ const Wallets_new: React.FC = () => {
                 title: t.category || "Giao dịch",
                 date: formatDate(t.date),
                 amount: `${t.type === "INCOME" ? "+" : "-"}${formatCurrency(parseAmount(t.amount))}`,
-                status: t.type === "INCOME" ? "Paid" : "Due",
+                status: t.type === "INCOME" ? "Thu" : "Chi",
                 statusType: t.type === "INCOME" ? "paid" : "due",
                 note: t.note,
             })),
@@ -298,15 +319,55 @@ const Wallets_new: React.FC = () => {
                     <h2 className="ekash_title">Ví</h2>
                     <p className="ekash_subtitle">Quản lý tài khoản và số dư</p>
                 </div>
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "20px",
+                    }}
+                >
+                    <div style={{ textAlign: "right" }}>
+                        <div
+                            style={{
+                                fontSize: "12px",
+                                color: "var(--text-secondary)",
+                                marginBottom: "4px",
+                            }}
+                        >
+                            Tổng số dư
+                        </div>
+                        <div
+                            style={{
+                                fontSize: "24px",
+                                fontWeight: "bold",
+                                color: "var(--text-primary)",
+                            }}
+                        >
+                            {formatCurrency(totalBalance)}
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        className="ekash_btn"
+                        onClick={openCreate}
+                        style={{
+                            backgroundColor: "#4f46e5",
+                            color: "white",
+                            border: "none",
+                            padding: "10px 20px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                        }}
+                    >
+                        Thêm ví mới
+                    </button>
+                </div>
             </div>
 
             <div className="ekash_grid_main">
                 <div className="ekash_card">
                     <div className="ekash_card_header">
                         <p className="ekash_card_title">Danh sách ví</p>
-                        <span className="ekash_card_hint">
-                            {formatCurrency(totalBalance)}
-                        </span>
                     </div>
 
                     <div className="ekash_list">
@@ -340,14 +401,6 @@ const Wallets_new: React.FC = () => {
                             <div className="ekash_empty">Chưa có ví</div>
                         ) : null}
                     </div>
-
-                    <button
-                        type="button"
-                        className="ekash_add_budget"
-                        onClick={openCreate}
-                    >
-                        Thêm ví mới
-                    </button>
                 </div>
 
                 <div className="ekash_card">
@@ -359,8 +412,20 @@ const Wallets_new: React.FC = () => {
                     </div>
 
                     <div className="ekash_payments">
-                        {recentTx.map((p) => (
-                            <div key={p.id} className="ekash_payment_row">
+                        {recentTx.map((p, index) => (
+                            <div
+                                key={p.id}
+                                className={`ekash_payment_row ${index % 2 === 0 ? "even" : "odd"}`}
+                                style={{
+                                    backgroundColor:
+                                        index % 2 === 0
+                                            ? "var(--card-background)"
+                                            : "var(--background-secondary)",
+                                    padding: "12px 16px",
+                                    borderRadius: "8px",
+                                    marginBottom: "8px",
+                                }}
+                            >
                                 <div className="left">
                                     <div className="title">{p.title}</div>
                                     <div className="date">
@@ -441,12 +506,44 @@ const Wallets_new: React.FC = () => {
                     <div className="ekash_form_row">
                         <div className="label">Số dư ban đầu</div>
                         <InputNumber
+                            value={formBalanceInitial}
+                            onChange={(v) =>
+                                setFormBalanceInitial(Number(v || 0))
+                            }
+                            style={{ width: "100%" }}
+                            min={0}
+                            formatter={moneyFormatter}
+                            parser={moneyParser}
+                        />
+                    </div>
+                    <div className="ekash_form_row">
+                        <div className="label">Số dư hiện tại</div>
+                        <InputNumber
                             value={formBalance}
                             onChange={(v) => setFormBalance(Number(v || 0))}
                             style={{ width: "100%" }}
                             min={0}
                             formatter={moneyFormatter}
                             parser={moneyParser}
+                        />
+                    </div>
+                    <div className="ekash_form_row">
+                        <div className="label">Số tài khoản (tùy chọn)</div>
+                        <Input
+                            value={formAccountNumber}
+                            onChange={(e) =>
+                                setFormAccountNumber(e.target.value)
+                            }
+                            placeholder="Ví dụ: 1234567890"
+                        />
+                    </div>
+                    <div className="ekash_form_row">
+                        <div className="label">Mô tả (tùy chọn)</div>
+                        <Input.TextArea
+                            value={formDescription}
+                            onChange={(e) => setFormDescription(e.target.value)}
+                            placeholder="Mô tả về ví này..."
+                            rows={3}
                         />
                     </div>
                 </div>
