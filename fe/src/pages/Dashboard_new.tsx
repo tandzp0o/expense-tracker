@@ -77,9 +77,10 @@ const Dashboard_new: React.FC = () => {
                 const token = await firebaseUser.getIdToken();
 
                 const now = dayjs();
+                // Lấy dữ liệu từ đầu tháng trước đến cuối tháng hiện tại
                 const startDate = now
-                    .subtract(59, "day")
-                    .startOf("day")
+                    .subtract(1, "month")
+                    .startOf("month")
                     .toISOString();
                 const endDate = now.endOf("day").toISOString();
 
@@ -120,37 +121,36 @@ const Dashboard_new: React.FC = () => {
     }, []);
 
     const now = dayjs();
-    const currentRange = useMemo(() => {
-        const end = now.endOf("day");
-        const start = now.subtract(29, "day").startOf("day");
-        return { start, end };
-    }, [now]);
-
-    const prevRange = useMemo(() => {
-        const end = currentRange.start.subtract(1, "day").endOf("day");
-        const start = end.subtract(29, "day").startOf("day");
-        return { start, end };
-    }, [currentRange.start]);
 
     const txCurrent = useMemo(
         () =>
             transactions.filter((t) => {
                 const d = dayjs(t.date);
+                const monthStart = now.startOf("month");
+                const monthEnd = now.endOf("month");
                 return (
-                    d.isAfter(currentRange.start) &&
-                    d.isBefore(currentRange.end)
+                    d.isAfter(monthStart.subtract(1, "day")) &&
+                    d.isBefore(monthEnd.add(1, "day"))
                 );
             }),
-        [transactions, currentRange.end, currentRange.start],
+        [transactions, now],
     );
 
+    // Lọc giao dịch tháng trước
     const txPrev = useMemo(
         () =>
             transactions.filter((t) => {
                 const d = dayjs(t.date);
-                return d.isAfter(prevRange.start) && d.isBefore(prevRange.end);
+                const prevMonthStart = now
+                    .subtract(1, "month")
+                    .startOf("month");
+                const prevMonthEnd = now.subtract(1, "month").endOf("month");
+                return (
+                    d.isAfter(prevMonthStart.subtract(1, "day")) &&
+                    d.isBefore(prevMonthEnd.add(1, "day"))
+                );
             }),
-        [transactions, prevRange.end, prevRange.start],
+        [transactions, now],
     );
 
     const totalBalance = useMemo(
@@ -186,6 +186,7 @@ const Dashboard_new: React.FC = () => {
         [txCurrent],
     );
 
+    // Tính toán thu nhập và chi tiêu tháng trước
     const prevIncome = useMemo(
         () =>
             txPrev
@@ -205,14 +206,21 @@ const Dashboard_new: React.FC = () => {
     const periodChange = useMemo(() => {
         const currentNet = totalIncome - totalExpense;
         const prevNet = prevIncome - prevExpense;
+
+        // Tính toán phần trăm thay đổi
+        let percent = 0;
+        if (prevNet !== 0) {
+            percent = ((currentNet - prevNet) / Math.abs(prevNet)) * 100;
+        } else if (currentNet !== 0) {
+            // Nếu tháng trước là 0 và tháng hiện tại khác 0, coi như tăng 100%
+            percent = currentNet > 0 ? 100 : -100;
+        }
+
         return {
             currentNet,
             prevNet,
             delta: currentNet - prevNet,
-            percent:
-                prevNet !== 0
-                    ? ((currentNet - prevNet) / Math.abs(prevNet)) * 100
-                    : 0,
+            percent,
         };
     }, [prevExpense, prevIncome, totalExpense, totalIncome]);
 
@@ -222,7 +230,7 @@ const Dashboard_new: React.FC = () => {
                 label: "Số dư khả dụng",
                 value: formatCurrency(availableBalance),
                 pillType: availableBalance >= 0 ? "up" : "down",
-                pill: `${(availableBalance >= 0 ? 0 : -2.5).toFixed(2)}%`,
+                pill: `${availableBalance >= 0 ? "↑ " : "↓ "}${(availableBalance >= 0 ? 0 : -2.5).toFixed(2)}%`,
             },
             {
                 label: "Thay đổi kỳ này",
@@ -231,21 +239,21 @@ const Dashboard_new: React.FC = () => {
                     periodChange.delta >= 0
                         ? ("up" as const)
                         : ("down" as const),
-                pill: `${Math.abs(periodChange.percent).toFixed(2)}%`,
+                pill: `${periodChange.delta >= 0 ? "↑ " : "↓ "}${Math.abs(periodChange.percent).toFixed(2)}%`,
                 note: "Tháng trước",
             },
             {
                 label: "Tổng chi tiêu kỳ này",
                 value: formatCurrency(totalExpense),
-                pillType: "down" as const,
-                pill: `${(prevExpense !== 0 ? (Math.abs(totalExpense - prevExpense) / Math.abs(prevExpense)) * 100 : 0).toFixed(2)}%`,
+                pillType: prevExpense > totalExpense ? "down" : "up",
+                pill: `${prevExpense > totalExpense ? "↓ " : "↑ "}${(prevExpense !== 0 ? (Math.abs(totalExpense - prevExpense) / Math.abs(prevExpense)) * 100 : 0).toFixed(2)}%`,
                 note: "Tháng trước",
             },
             {
                 label: "Tổng thu nhập kỳ này",
                 value: formatCurrency(totalIncome),
-                pillType: "up" as const,
-                pill: `${(prevIncome !== 0 ? (Math.abs(totalIncome - prevIncome) / Math.abs(prevIncome)) * 100 : 0).toFixed(2)}%`,
+                pillType: prevIncome < totalIncome ? "up" : "down",
+                pill: `${prevIncome < totalIncome ? "↑ " : "↓ "}${(prevIncome !== 0 ? (Math.abs(totalIncome - prevIncome) / Math.abs(prevIncome)) * 100 : 0).toFixed(2)}%`,
                 note: "Tháng trước",
             },
         ],
@@ -262,39 +270,67 @@ const Dashboard_new: React.FC = () => {
     const dailyTrend = useMemo(() => {
         const labels: string[] = [];
         const values: number[] = [];
-        const start = currentRange.start;
+        const start = now.startOf("month");
+        const end = now.endOf("month");
 
-        for (let i = 0; i < 12; i++) {
-            const d = start.add(Math.round((i * 29) / 11), "day");
+        // Debug: Log dữ liệu
+        // console.log("DailyTrend Debug - txCurrent:", txCurrent);
+        // console.log(
+        //     "DailyTrend Debug - txCurrent dates:",
+        //     txCurrent.map((t) => ({
+        //         date: t.date,
+        //         parsed: dayjs(t.date).format("YYYY-MM-DD"),
+        //     })),
+        // );
+        // console.log("DailyTrend Debug - start:", start.format("YYYY-MM-DD"));
+        // console.log("DailyTrend Debug - end:", end.format("YYYY-MM-DD"));
+
+        // Generate daily labels for current month only
+        const dates: dayjs.Dayjs[] = [];
+        for (
+            let d = start.clone();
+            d.isBefore(end) || d.isSame(end);
+            d = d.add(1, "day")
+        ) {
+            dates.push(d.clone());
             labels.push(d.format("D MMM"));
         }
 
-        const points = labels.map((l) => dayjs(l, "D MMM"));
-        const bucket = points.map((p) => ({
-            start: p.startOf("day"),
-            end: p.endOf("day"),
-        }));
+        // Calculate cumulative balance for current month
+        let cumulativeBalance = 0;
 
-        bucket.forEach((b, idx) => {
-            const sum = txCurrent.reduce((acc, t) => {
-                const d = dayjs(t.date);
-                if (d.isAfter(b.start) && d.isBefore(b.end)) {
-                    return (
-                        acc +
-                        (t.type === "INCOME"
-                            ? parseAmount(t.amount)
-                            : -parseAmount(t.amount))
-                    );
-                }
-                return acc;
+        dates.forEach((currentDate, idx) => {
+            const dayTransactions = txCurrent.filter((t) => {
+                const transactionDate = dayjs(t.date);
+                const isSameDay = transactionDate.isSame(currentDate, "day");
+                // if (isSameDay) {
+                //     console.log(
+                //         `Transaction on ${currentDate.format("YYYY-MM-DD")}:`,
+                //         t,
+                //     );
+                // }
+                return isSameDay;
+            });
+
+            const dayNet = dayTransactions.reduce((sum, t) => {
+                const amount = parseAmount(t.amount);
+                const net = t.type === "INCOME" ? amount : -amount;
+                // console.log(
+                //     `Day net for ${currentDate.format("YYYY-MM-DD")}: ${net} (${t.type}: ${amount})`,
+                // );
+                return sum + net;
             }, 0);
 
-            const prev = idx === 0 ? 0 : values[idx - 1];
-            values[idx] = prev + sum;
+            cumulativeBalance += dayNet;
+            values[idx] = cumulativeBalance;
+            // console.log(
+            //     `Cumulative balance for ${currentDate.format("YYYY-MM-DD")}: ${cumulativeBalance}`,
+            // );
         });
 
+        // console.log("Final dailyTrend:", { labels, values });
         return { labels, values };
-    }, [currentRange.start, txCurrent]);
+    }, [now, txCurrent]);
 
     const lineData = useMemo(
         () => ({
@@ -676,7 +712,7 @@ const Dashboard_new: React.FC = () => {
                 <div>
                     <h2 className="ekash_title">Dashboard</h2>
                     <p className="ekash_subtitle">
-                        Chào mừng đến với Ekash Finance Management
+                        Chào mừng đến với Ton Finance Management
                     </p>
                 </div>
                 <div className="ekash_breadcrumb">
@@ -713,11 +749,11 @@ const Dashboard_new: React.FC = () => {
                             </div>
                         </div>
                         <div className="ekash_card_hint">
-                            Tháng trước <span className="sep">•</span>
+                            Tháng này <span className="sep"> - </span>
                             <span
                                 className={`ekash_pill ${periodChange.delta >= 0 ? "up" : "down"}`}
                             >
-                                {`${Math.abs(periodChange.percent).toFixed(2)}%`}
+                                {`${periodChange.delta >= 0 ? "↑ " : "↓ "}${Math.abs(periodChange.percent).toFixed(2)}%`}
                             </span>
                         </div>
                     </div>
@@ -782,6 +818,8 @@ const Dashboard_new: React.FC = () => {
                                 b.budget > 0
                                     ? Math.min((b.spent / b.budget) * 100, 100)
                                     : 0;
+                            const moneySpent = formatCurrency(b.spent);
+                            const moneyInit = formatCurrency(b.budget);
                             return (
                                 <div className="ekash_budget_item" key={b.name}>
                                     <div className="ekash_budget_row">
@@ -797,7 +835,9 @@ const Dashboard_new: React.FC = () => {
                                             </span>
                                         </div>
                                         <div className="right">
-                                            {Math.round(percent)}/{100}
+                                            {/* {Math.round(percent)}/{100} */}
+                                            {/* hiển thị tiền thực tế */}
+                                            <span className="moneySpent">{moneySpent} </span>/<span className="moneyInit" style={{fontSize:14, color:"white", fontWeight:700}}> {moneyInit}</span>
                                         </div>
                                     </div>
                                     <div className="ekash_progress">
@@ -896,7 +936,10 @@ const Dashboard_new: React.FC = () => {
                                     <div className="title">{p.title}</div>
                                     <div className="date">{p.date}</div>
                                 </div>
-                                <div className="right">
+                                <div
+                                    className="right"
+                                    style={{ marginRight: "20px" }}
+                                >
                                     <div className="amount">{p.amount}</div>
                                     <span className={`status ${p.statusType}`}>
                                         {p.status}

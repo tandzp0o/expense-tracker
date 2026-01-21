@@ -11,7 +11,8 @@ const Login: React.FC = () => {
     const { currentUser, signInWithGoogle } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const from = location.state?.from || "/";
+    // const from = location.state?.from || "/";
+    const from = location.state?.from || "/new/dashboard";
     const [loading, setLoading] = useState(false);
 
     const handleGoogleSignIn = async () => {

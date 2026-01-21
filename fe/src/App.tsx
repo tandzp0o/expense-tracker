@@ -80,7 +80,7 @@ import {
     Outlet,
     useLocation,
 } from "react-router-dom"; // <-- Import useLocation
-import { ConfigProvider, Spin } from "antd";
+import { ConfigProvider, Spin, App as AntApp } from "antd";
 import viVN from "antd/locale/vi_VN";
 import "antd/dist/reset.css";
 import "./App.less";
@@ -103,9 +103,12 @@ import Transactions_new from "./pages/Transactions_new";
 import Transactions from "./pages/Transactions";
 import Wallets from "./pages/Wallets";
 import DishSuggestions from "./pages/DishSuggestions";
+import DishSuggestions_new from "./pages/DishSuggestions_new";
 import Goals from "./pages/Goals";
 import Profile from "./pages/Profile";
+import Profile_new from "./pages/Profile_new";
 import Login from "./components/Login";
+import Analytics_new from "./pages/Analytics_new";
 
 // Auth context
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -189,8 +192,8 @@ const ProtectedRouteNew = () => {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    if (currentUser.newUser && location.pathname !== "/wallets") {
-        return <Navigate to="/wallets" replace />;
+    if (currentUser.newUser && location.pathname !== "/new/wallets") {
+        return <Navigate to="/new/wallets" replace />;
     }
 
     return (
@@ -205,58 +208,78 @@ function App() {
         <Router>
             <ThemeProvider>
                 <AuthProvider>
-                    <ThemeWrapper>
-                        <Routes>
-                            <Route path="/login" element={<Login />} />
+                    <AntApp>
+                        <ThemeWrapper>
+                            <Routes>
+                                <Route path="/login" element={<Login />} />
 
-                            {/* Tất cả các route được bảo vệ giờ đây đều sử dụng logic đã được cập nhật */}
-                            <Route element={<ProtectedRoute />}>
-                                <Route path="/" element={<Dashboard />} />
+                                {/* Route redirect từ root về new dashboard */}
                                 <Route
-                                    path="/transactions"
-                                    element={<Transactions />}
+                                    path="/"
+                                    element={
+                                        <Navigate to="/new/dashboard" replace />
+                                    }
                                 />
-                                <Route path="/wallets" element={<Wallets />} />
-                                <Route
-                                    path="/dishes"
-                                    element={<DishSuggestions />}
-                                />
-                                <Route path="/goals" element={<Goals />} />
-                                <Route path="/profile" element={<Profile />} />
-                            </Route>
 
-                            <Route element={<ProtectedRouteNew />}>
-                                <Route
-                                    path="/new/dashboard"
-                                    element={<Dashboard_new />}
-                                />
-                                <Route
-                                    path="/new/transactions"
-                                    element={<Transactions_new />}
-                                />
-                                <Route
-                                    path="/new/wallets"
-                                    element={<Wallets_new />}
-                                />
-                                <Route
-                                    path="/new/budgets"
-                                    element={<Budgets_new />}
-                                />
-                                <Route
-                                    path="/new/goals"
-                                    element={<Goals_new />}
-                                />
-                                <Route
-                                    path="/profile"
-                                    element={<Profile />}
-                                />
-                                <Route
-                                    path="/dishes"
-                                    element={<DishSuggestions />}
-                                />
-                            </Route>
-                        </Routes>
-                    </ThemeWrapper>
+                                {/* Tất cả các route được bảo vệ giờ đây đều sử dụng logic đã được cập nhật */}
+                                <Route element={<ProtectedRoute />}>
+                                    <Route path="/" element={<Dashboard />} />
+                                    <Route
+                                        path="/transactions"
+                                        element={<Transactions />}
+                                    />
+                                    <Route
+                                        path="/wallets"
+                                        element={<Wallets />}
+                                    />
+                                    <Route
+                                        path="/dishes"
+                                        element={<DishSuggestions />}
+                                    />
+                                    <Route path="/goals" element={<Goals />} />
+                                    <Route
+                                        path="/profile"
+                                        element={<Profile />}
+                                    />
+                                </Route>
+
+                                <Route element={<ProtectedRouteNew />}>
+                                    <Route
+                                        path="/new/dashboard"
+                                        element={<Dashboard_new />}
+                                    />
+                                    <Route
+                                        path="/new/transactions"
+                                        element={<Transactions_new />}
+                                    />
+                                    <Route
+                                        path="/new/wallets"
+                                        element={<Wallets_new />}
+                                    />
+                                    <Route
+                                        path="/new/budgets"
+                                        element={<Budgets_new />}
+                                    />
+                                    <Route
+                                        path="/new/goals"
+                                        element={<Goals_new />}
+                                    />
+                                    <Route
+                                        path="/new/dishes"
+                                        element={<DishSuggestions_new />}
+                                    />
+                                    <Route
+                                        path="/new/profile"
+                                        element={<Profile_new />}
+                                    />
+                                    <Route
+                                        path="/new/analytics"
+                                        element={<Analytics_new />}
+                                    />
+                                </Route>
+                            </Routes>
+                        </ThemeWrapper>
+                    </AntApp>
                 </AuthProvider>
             </ThemeProvider>
         </Router>

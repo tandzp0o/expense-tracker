@@ -18,6 +18,7 @@ const MainLayout_new: React.FC<MainLayoutNewProps> = ({ children }) => {
     const [sidenavColor] = useState("#1890ff");
     const [sidenavType] = useState("transparent");
     const [placement, setPlacement] = useState("right");
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
     let { pathname } = useLocation();
     pathname = pathname.replace("/", "");
@@ -30,6 +31,15 @@ const MainLayout_new: React.FC<MainLayoutNewProps> = ({ children }) => {
         }
     }, [pathname]);
 
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
     const openDrawer = () => setVisible(!visible);
 
     return (
@@ -38,53 +48,63 @@ const MainLayout_new: React.FC<MainLayoutNewProps> = ({ children }) => {
                 theme === "dark" ? "dark" : ""
             } ${
                 pathname === "profile" ? "layout-profile" : ""
-            } ${pathname === "rtl" ? "layout-dashboard-rtl" : ""}`}
+            } ${pathname === "rtl" ? "layout-dashboard-rtl" : ""} ${
+                isMobile ? "mobile" : ""
+            }`}
         >
-            <Drawer
-                title={false}
-                placement={placement === "right" ? "left" : "right"}
-                closable={false}
-                onClose={() => setVisible(false)}
-                open={visible}
-                key={placement === "right" ? "left" : "right"}
-                width={250}
-                className={`drawer-sidebar ${
-                    pathname === "rtl" ? "drawer-sidebar-rtl" : ""
-                }`}
-            >
-                <Layout
-                    className={`layout-dashboard layout_dashboard_new ${
-                        pathname === "rtl" ? "layout-dashboard-rtl" : ""
+            {/* Mobile Drawer */}
+            {isMobile && (
+                <Drawer
+                    title={false}
+                    placement={placement === "right" ? "left" : "right"}
+                    closable={false}
+                    onClose={() => setVisible(false)}
+                    open={visible}
+                    key={placement === "right" ? "left" : "right"}
+                    width={280}
+                    className={`drawer-sidebar ${
+                        pathname === "rtl" ? "drawer-sidebar-rtl" : ""
                     }`}
                 >
-                    <Sider
-                        trigger={null}
-                        width={250}
-                        theme="light"
-                        className="sider-primary ant-layout-sider-primary"
-                        style={{ background: sidenavType }}
+                    <Layout
+                        className={`layout-dashboard layout_dashboard_new ${
+                            pathname === "rtl" ? "layout-dashboard-rtl" : ""
+                        }`}
                     >
-                        <Sidenav_new />
-                    </Sider>
-                </Layout>
-            </Drawer>
+                        <Sider
+                            trigger={null}
+                            width={250}
+                            theme="light"
+                            className="sider-primary ant-layout-sider-primary"
+                            style={{ background: sidenavType }}
+                        >
+                            <Sidenav_new
+                                onCloseMenu={() => setVisible(false)}
+                            />
+                        </Sider>
+                    </Layout>
+                </Drawer>
+            )}
 
-            <Sider
-                breakpoint="lg"
-                collapsedWidth="0"
-                onCollapse={(collapsed, type) => {
-                    console.log(collapsed, type);
-                }}
-                trigger={null}
-                width={250}
-                theme="light"
-                className={`sider-primary ant-layout-sider-primary ${
-                    sidenavType === "#fff" ? "active-route" : ""
-                }`}
-                style={{ background: sidenavType }}
-            >
-                <Sidenav_new />
-            </Sider>
+            {/* Desktop Sidebar */}
+            {!isMobile && (
+                <Sider
+                    breakpoint="lg"
+                    collapsedWidth="0"
+                    onCollapse={(collapsed, type) => {
+                        console.log(collapsed, type);
+                    }}
+                    trigger={null}
+                    width={250}
+                    theme="light"
+                    className={`sider-primary ant-layout-sider-primary ${
+                        sidenavType === "#fff" ? "active-route" : ""
+                    }`}
+                    style={{ background: sidenavType }}
+                >
+                    <Sidenav_new onCloseMenu={() => setVisible(false)} />
+                </Sider>
+            )}
 
             <Layout>
                 <AntHeader className="subheader">

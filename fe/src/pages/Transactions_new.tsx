@@ -10,6 +10,7 @@ import {
     Spin,
     message,
 } from "antd";
+import { RangePickerProps } from "antd/es/date-picker";
 import { auth } from "../firebase/config";
 import { transactionApi, walletApi, goalApi, budgetApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
@@ -67,6 +68,14 @@ const Transactions_new: React.FC = () => {
     const [goals, setGoals] = useState<any[]>([]);
 
     const [activeId, setActiveId] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const transactionsPerPage = 10;
+    const [dateRange, setDateRange] = useState<
+        [dayjs.Dayjs, dayjs.Dayjs] | null
+    >(null);
+    const [selectedPeriod, setSelectedPeriod] =
+        useState<string>("current_month");
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Transaction | null>(null);
@@ -98,14 +107,57 @@ const Transactions_new: React.FC = () => {
         return 0;
     };
 
-    const getToken = async () => {
+    const getToken = useCallback(async () => {
         const firebaseUser = auth.currentUser;
         if (!firebaseUser) {
             message.error("Người dùng chưa được xác thực");
             return null;
         }
         return firebaseUser.getIdToken();
-    };
+    }, []);
+
+    const getDateRange = useCallback(() => {
+        const now = dayjs();
+
+        switch (selectedPeriod) {
+            case "current_month":
+                return {
+                    start: now.startOf("month"),
+                    end: now.endOf("month"),
+                };
+            case "last_month":
+                return {
+                    start: now.subtract(1, "month").startOf("month"),
+                    end: now.subtract(1, "month").endOf("month"),
+                };
+            case "current_week":
+                return {
+                    start: now.startOf("week"),
+                    end: now.endOf("week"),
+                };
+            case "last_week":
+                return {
+                    start: now.subtract(1, "week").startOf("week"),
+                    end: now.subtract(1, "week").endOf("week"),
+                };
+            case "custom":
+                if (dateRange) {
+                    return {
+                        start: dateRange[0].startOf("day"),
+                        end: dateRange[1].endOf("day"),
+                    };
+                }
+                return {
+                    start: now.startOf("month"),
+                    end: now.endOf("month"),
+                };
+            default:
+                return {
+                    start: now.startOf("month"),
+                    end: now.endOf("month"),
+                };
+        }
+    }, [selectedPeriod, dateRange]);
 
     const fetchAll = useCallback(async () => {
         try {
@@ -113,16 +165,19 @@ const Transactions_new: React.FC = () => {
             const token = await getToken();
             if (!token) return;
 
-            const endDate = dayjs().endOf("day").toISOString();
-            const startDate = dayjs()
-                .subtract(60, "day")
-                .startOf("day")
-                .toISOString();
+            const range = getDateRange();
+            const startDate = range.start.toISOString();
+            const endDate = range.end.toISOString();
 
             const [walletRes, txRes, budgetRes, goalRes] = await Promise.all([
                 walletApi.getWallets(token),
                 transactionApi.getTransactions(
-                    { startDate, endDate, sort: "-date", limit: 2000 },
+                    {
+                        startDate,
+                        endDate,
+                        sort: "-date",
+                        limit: 500,
+                    },
                     token,
                 ),
                 budgetApi.getBudgetSummary(
@@ -137,26 +192,66 @@ const Transactions_new: React.FC = () => {
 
             const tx = txRes?.data?.transactions ?? [];
             setTransactions(tx);
-
-            // Use budget summary which includes spent amounts
-            const budgetData = Array.isArray(budgetRes)
-                ? budgetRes
-                : budgetRes?.items || [];
-            setBudgets(budgetData);
-            setGoals(Array.isArray(goalRes) ? goalRes : []);
-
             setActiveId((prev) => prev || (tx[0]?._id ?? null));
-        } catch (e: any) {
+            setBudgets(
+                Array.isArray(budgetRes) ? budgetRes : budgetRes?.items || [],
+            );
+            setGoals(Array.isArray(goalRes) ? goalRes : []);
+        } catch (e) {
             console.error(e);
-            message.error(e?.message || "Không thể tải dữ liệu giao dịch");
+            message.error("Không thể tải dữ liệu giao dịch");
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [getToken, getDateRange]);
 
     useEffect(() => {
         fetchAll();
-    }, [fetchAll]);
+    }, [fetchAll]); // Giờ an toàn vì fetchAll stable
+
+    // Reset trang khi thay đổi khoảng thời gian
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedPeriod, dateRange]);
+
+    const handlePeriodChange = (value: string) => {
+        setSelectedPeriod(value);
+        if (value !== "custom") {
+            setDateRange(null);
+        }
+    };
+
+    const handleDateRangeChange = (dates: any) => {
+        if (dates && dates.length === 2) {
+            setDateRange([dates[0], dates[1]]);
+            setSelectedPeriod("custom");
+        }
+    };
+
+    const handleBackToCurrent = () => {
+        setSelectedPeriod("current_month");
+        setDateRange(null);
+    };
+
+    const getPeriodDisplayText = () => {
+        const range = getDateRange();
+        return `${range.start.format("DD/MM/YYYY")} - ${range.end.format("DD/MM/YYYY")}`;
+    };
+
+    // Logic phân trang
+    const paginatedTransactions = useMemo(() => {
+        const startIndex = (currentPage - 1) * transactionsPerPage;
+        const endIndex = startIndex + transactionsPerPage;
+        return transactions.slice(startIndex, endIndex);
+    }, [transactions, currentPage]);
+
+    useEffect(() => {
+        const total = Math.ceil(transactions.length / transactionsPerPage);
+        setTotalPages(total);
+        if (currentPage > total && total > 0) {
+            setCurrentPage(1);
+        }
+    }, [transactions.length, currentPage]);
 
     const selected = useMemo(
         () => transactions.find((t) => t._id === activeId) || null,
@@ -401,7 +496,49 @@ const Transactions_new: React.FC = () => {
                         Tạo và quản lý thu nhập/chi tiêu
                     </p>
                 </div>
-                <div style={{ display: "flex", gap: "10px" }}>
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <Select
+                        value={selectedPeriod}
+                        onChange={handlePeriodChange}
+                        style={{ width: 150 }}
+                        options={[
+                            { value: "current_month", label: "Tháng này" },
+                            { value: "last_month", label: "Tháng trước" },
+                            { value: "current_week", label: "Tuần này" },
+                            { value: "last_week", label: "Tuần trước" },
+                            { value: "custom", label: "Tùy chỉnh" },
+                        ]}
+                    />
+                    {selectedPeriod === "custom" && (
+                        <DatePicker.RangePicker
+                            value={dateRange}
+                            onChange={handleDateRangeChange}
+                            format="DD/MM/YYYY"
+                            placeholder={["Từ ngày", "Đến ngày"]}
+                        />
+                    )}
+                    <button
+                        className="ekash_btn"
+                        onClick={handleBackToCurrent}
+                        style={{
+                            backgroundColor: "#4f46e5",
+                            color: "white",
+                            border: "none",
+                            padding: "8px 16px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                        }}
+                    >
+                        Về hiện tại
+                    </button>
                     <button
                         type="button"
                         className="ekash_btn"
@@ -424,12 +561,20 @@ const Transactions_new: React.FC = () => {
                     <div className="ekash_card_header">
                         <p className="ekash_card_title">Danh sách giao dịch</p>
                         <span className="ekash_card_hint">
-                            60 ngày gần nhất
+                            {getPeriodDisplayText()} • Trang {currentPage}/
+                            {totalPages}
                         </span>
                     </div>
 
-                    <div className="ekash_list">
-                        {transactions.map((t) => {
+                    <div
+                        className="ekash_list"
+                        style={{
+                            maxHeight: "400px",
+                            overflowY: "auto",
+                            padding: "16px",
+                        }}
+                    >
+                        {paginatedTransactions.map((t) => {
                             const amt = parseAmount(t.amount);
                             const isActive = t._id === activeId;
                             return (
@@ -461,10 +606,89 @@ const Transactions_new: React.FC = () => {
                                 </button>
                             );
                         })}
-                        {transactions.length === 0 ? (
-                            <div className="ekash_empty">Chưa có giao dịch</div>
+                        {paginatedTransactions.length === 0 ? (
+                            <div className="ekash_empty">
+                                Không có giao dịch trong khoảng thời gian đã
+                                chọn
+                            </div>
                         ) : null}
                     </div>
+
+                    {/* Phân trang */}
+                    {totalPages > 1 && (
+                        <div
+                            style={{
+                                padding: "16px",
+                                borderTop: "1px solid var(--border-color)",
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                gap: "8px",
+                            }}
+                        >
+                            <button
+                                onClick={() =>
+                                    setCurrentPage((prev) =>
+                                        Math.max(1, prev - 1),
+                                    )
+                                }
+                                disabled={currentPage === 1}
+                                style={{
+                                    padding: "8px 12px",
+                                    border: "1px solid var(--border-color)",
+                                    borderRadius: "6px",
+                                    backgroundColor:
+                                        currentPage === 1
+                                            ? "var(--background-secondary)"
+                                            : "var(--card-background)",
+                                    color: "var(--text-primary)",
+                                    cursor:
+                                        currentPage === 1
+                                            ? "not-allowed"
+                                            : "pointer",
+                                    fontSize: "14px",
+                                }}
+                            >
+                                Trước
+                            </button>
+
+                            <span
+                                style={{
+                                    margin: "0 12px",
+                                    fontSize: "14px",
+                                    color: "var(--text-secondary)",
+                                }}
+                            >
+                                Trang {currentPage} / {totalPages}
+                            </span>
+
+                            <button
+                                onClick={() =>
+                                    setCurrentPage((prev) =>
+                                        Math.min(totalPages, prev + 1),
+                                    )
+                                }
+                                disabled={currentPage === totalPages}
+                                style={{
+                                    padding: "8px 12px",
+                                    border: "1px solid var(--border-color)",
+                                    borderRadius: "6px",
+                                    backgroundColor:
+                                        currentPage === totalPages
+                                            ? "var(--background-secondary)"
+                                            : "var(--card-background)",
+                                    color: "var(--text-primary)",
+                                    cursor:
+                                        currentPage === totalPages
+                                            ? "not-allowed"
+                                            : "pointer",
+                                    fontSize: "14px",
+                                }}
+                            >
+                                Sau
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="ekash_card">

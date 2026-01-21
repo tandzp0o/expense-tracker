@@ -13,6 +13,7 @@ import {
 import { auth } from "../firebase/config";
 import { transactionApi, walletApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
+import { useTheme } from "../contexts/ThemeContext";
 import AlertNotification from "../components/AlertNotification";
 
 dayjs.locale("vi");
@@ -43,12 +44,17 @@ interface Transaction {
 }
 
 const Wallets_new: React.FC = () => {
+    const { theme } = useTheme();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [activeWalletId, setActiveWalletId] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const transactionsPerPage = 10;
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Wallet | null>(null);
@@ -215,16 +221,19 @@ const Wallets_new: React.FC = () => {
             if (!firebaseUser) return;
             const token = await firebaseUser.getIdToken();
 
-            const startDate = dayjs()
-                .subtract(90, "day")
-                .startOf("day")
-                .toISOString();
-            const endDate = dayjs().endOf("day").toISOString();
+            // Chỉ lấy giao dịch trong tuần hiện tại (từ đầu tuần đến hôm nay)
+            const weekStart = dayjs().startOf("week").toISOString();
+            const weekEnd = dayjs().endOf("day").toISOString();
 
             const [walletsRes, txRes] = await Promise.all([
                 walletApi.getWallets(token),
                 transactionApi.getTransactions(
-                    { startDate, endDate, sort: "-date", limit: 200 },
+                    {
+                        startDate: weekStart,
+                        endDate: weekEnd,
+                        sort: "-date",
+                        limit: 100,
+                    },
                     token,
                 ),
             ]);
@@ -255,44 +264,46 @@ const Wallets_new: React.FC = () => {
         [activeWalletId, wallets],
     );
 
-    const monthStart = useMemo(() => dayjs().startOf("month"), []);
-    const monthEnd = useMemo(() => dayjs().endOf("month"), []);
+    const weekStart = useMemo(() => dayjs().startOf("week"), []);
+    const weekEnd = useMemo(() => dayjs().endOf("week"), []);
 
-    const monthlyTx = useMemo(
+    const weeklyTx = useMemo(
         () =>
             transactions.filter((t) => {
                 const d = dayjs(t.date);
-                return d.isAfter(monthStart) && d.isBefore(monthEnd);
+                return (
+                    d.isAfter(weekStart.subtract(1, "day")) &&
+                    d.isBefore(weekEnd.add(1, "day"))
+                );
             }),
-        [monthEnd, monthStart, transactions],
-    );
-
-    const monthlyIncome = useMemo(
-        () =>
-            monthlyTx
-                .filter((t) => t.type === "INCOME")
-                .reduce((sum, t) => sum + parseAmount(t.amount), 0),
-        [monthlyTx],
-    );
-
-    const monthlyExpense = useMemo(
-        () =>
-            monthlyTx
-                .filter((t) => t.type === "EXPENSE")
-                .reduce((sum, t) => sum + parseAmount(t.amount), 0),
-        [monthlyTx],
+        [weekEnd, weekStart, transactions],
     );
 
     const walletTx = useMemo(() => {
         if (!activeWalletId) return [];
-        return transactions
+        return weeklyTx
             .filter((t) => t.walletId?._id === activeWalletId)
             .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf());
-    }, [activeWalletId, transactions]);
+    }, [activeWalletId, weeklyTx]);
+
+    // Tính toán phân trang
+    const paginatedTx = useMemo(() => {
+        const startIndex = (currentPage - 1) * transactionsPerPage;
+        const endIndex = startIndex + transactionsPerPage;
+        return walletTx.slice(startIndex, endIndex);
+    }, [walletTx, currentPage]);
+
+    useEffect(() => {
+        const total = Math.ceil(walletTx.length / transactionsPerPage);
+        setTotalPages(total);
+        if (currentPage > total && total > 0) {
+            setCurrentPage(1);
+        }
+    }, [walletTx.length, currentPage]);
 
     const recentTx = useMemo(
         () =>
-            walletTx.slice(0, 12).map((t) => ({
+            paginatedTx.map((t) => ({
                 id: t._id,
                 title: t.category || "Giao dịch",
                 date: formatDate(t.date),
@@ -301,7 +312,7 @@ const Wallets_new: React.FC = () => {
                 statusType: t.type === "INCOME" ? "paid" : "due",
                 note: t.note,
             })),
-        [walletTx],
+        [paginatedTx],
     );
 
     if (loading) {
@@ -319,45 +330,19 @@ const Wallets_new: React.FC = () => {
                     <h2 className="ekash_title">Ví</h2>
                     <p className="ekash_subtitle">Quản lý tài khoản và số dư</p>
                 </div>
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "20px",
-                    }}
-                >
-                    <div style={{ textAlign: "right" }}>
-                        <div
-                            style={{
-                                fontSize: "12px",
-                                color: "var(--text-secondary)",
-                                marginBottom: "4px",
-                            }}
-                        >
+                <div className="ekash_wallet_header_actions">
+                    <div className="ekash_wallet_balance">
+                        <div className="ekash_wallet_balance_label">
                             Tổng số dư
                         </div>
-                        <div
-                            style={{
-                                fontSize: "24px",
-                                fontWeight: "bold",
-                                color: "var(--text-primary)",
-                            }}
-                        >
+                        <div className="ekash_wallet_balance_value">
                             {formatCurrency(totalBalance)}
                         </div>
                     </div>
                     <button
                         type="button"
-                        className="ekash_btn"
+                        className="ekash_btn primary"
                         onClick={openCreate}
-                        style={{
-                            backgroundColor: "#4f46e5",
-                            color: "white",
-                            border: "none",
-                            padding: "10px 20px",
-                            borderRadius: "6px",
-                            cursor: "pointer",
-                        }}
                     >
                         Thêm ví mới
                     </button>
@@ -407,11 +392,18 @@ const Wallets_new: React.FC = () => {
                     <div className="ekash_card_header">
                         <p className="ekash_card_title">Lịch sử giao dịch</p>
                         <span className="ekash_card_hint">
-                            {activeWallet ? activeWallet.name : "-"}
+                            {activeWallet ? activeWallet.name : "-"} • Tuần này
                         </span>
                     </div>
 
-                    <div className="ekash_payments">
+                    <div
+                        className="ekash_payments"
+                        style={{
+                            maxHeight: "400px",
+                            overflowY: "auto",
+                            padding: "16px",
+                        }}
+                    >
                         {recentTx.map((p, index) => (
                             <div
                                 key={p.id}
@@ -445,9 +437,44 @@ const Wallets_new: React.FC = () => {
                             </div>
                         ))}
                         {recentTx.length === 0 ? (
-                            <div className="ekash_empty">Chưa có giao dịch</div>
+                            <div className="ekash_empty">
+                                Chưa có giao dịch trong tuần này
+                            </div>
                         ) : null}
                     </div>
+
+                    {/* Phân trang */}
+                    {totalPages > 1 && (
+                        <div className="ekash_pagination">
+                            <button
+                                className="ekash_pagination_btn"
+                                onClick={() =>
+                                    setCurrentPage((prev) =>
+                                        Math.max(1, prev - 1),
+                                    )
+                                }
+                                disabled={currentPage === 1}
+                            >
+                                Trước
+                            </button>
+
+                            <span className="ekash_pagination_info">
+                                Trang {currentPage} / {totalPages}
+                            </span>
+
+                            <button
+                                className="ekash_pagination_btn"
+                                onClick={() =>
+                                    setCurrentPage((prev) =>
+                                        Math.min(totalPages, prev + 1),
+                                    )
+                                }
+                                disabled={currentPage === totalPages}
+                            >
+                                Sau
+                            </button>
+                        </div>
+                    )}
 
                     {activeWallet && (
                         <div className="ekash_actions">

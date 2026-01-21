@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
     Row,
     Col,
@@ -14,6 +14,7 @@ import {
     MenuOutlined,
     LogoutOutlined,
     UserOutlined,
+    CloseOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -46,6 +47,16 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { logout } = useAuth();
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     // Generate breadcrumb items based on current route
     const getBreadcrumbs = () => {
@@ -89,29 +100,41 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     ];
 
     return (
-        <div className="header-with-breadcrumb">
+        <div className={`header-with-breadcrumb ${isMobile ? "mobile" : ""}`}>
             <Row
                 justify="space-between"
                 align="middle"
                 className="header-row"
                 style={{
                     width: "100%",
-                    padding: "0 24px",
+                    padding: isMobile ? "0 16px" : "0 24px",
                     height: "100%",
                 }}
             >
                 <Col>
-                    <Button
-                        type="text"
-                        className="sidebar-toggler"
-                        icon={<MenuOutlined />}
-                        onClick={onMenuClick}
-                        style={{ color: "inherit" }}
-                    />
-                    <Breadcrumb items={getBreadcrumbs()} />
+                    <Row align="middle" gutter={isMobile ? 8 : 16}>
+                        <Col>
+                            <Button
+                                type="text"
+                                className="sidebar-toggler"
+                                icon={<MenuOutlined />}
+                                onClick={onMenuClick}
+                                style={{ color: "inherit" }}
+                            />
+                        </Col>
+                        {!isMobile && (
+                            <Col>
+                                <Breadcrumb items={getBreadcrumbs()} />
+                            </Col>
+                        )}
+                    </Row>
                 </Col>
                 <Col>
-                    <Row gutter={16} align="middle" className="header-actions">
+                    <Row
+                        gutter={isMobile ? 8 : 16}
+                        align="middle"
+                        className="header-actions"
+                    >
                         <Col>
                             <Input
                                 className="header-search-input"
@@ -151,6 +174,19 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                     </Row>
                 </Col>
             </Row>
+
+            {/* Mobile Search Bar */}
+            {isMobile && showMobileSearch && (
+                <div className="mobile-search-bar">
+                    <Input
+                        placeholder="Tìm kiếm..."
+                        prefix={<SearchOutlined />}
+                        style={{ width: "100%" }}
+                        allowClear
+                        autoFocus
+                    />
+                </div>
+            )}
         </div>
     );
 };

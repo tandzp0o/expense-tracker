@@ -1,9 +1,19 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-const Sidenav_new: React.FC = () => {
+interface SidenavNewProps {
+    onCloseMenu?: () => void;
+}
+
+const Sidenav_new: React.FC<SidenavNewProps> = ({ onCloseMenu }) => {
     const { pathname } = useLocation();
     const isActive = (path: string) => pathname === path;
+
+    const handleItemClick = () => {
+        if (onCloseMenu) {
+            onCloseMenu();
+        }
+    };
 
     const Item = ({
         to,
@@ -19,6 +29,7 @@ const Sidenav_new: React.FC = () => {
         <NavLink
             to={to}
             className={`ekash_nav_item ${isActive(to) ? "is_active" : ""}`}
+            onClick={handleItemClick}
         >
             <span
                 className="ekash_nav_icon"
@@ -73,20 +84,26 @@ const Sidenav_new: React.FC = () => {
                         color="#1f14b8ff"
                     />
                     <Item
-                        to="/profile"
+                        to="/new/profile"
                         title="Thông tin"
                         subtitle=" Cá nhân"
                         color="#0ea5e9"
                     />
                     <Item
-                        to="/dishes"
+                        to="/new/dishes"
                         title="Gợi ý"
                         subtitle="Dishes"
                         color="#fdb312ff"
                     />
+                    <Item
+                        to="/new/analytics"
+                        title="Thống kê"
+                        subtitle="Analytics"
+                        color="#9312fdff"
+                    />
                 </div>
 
-                <div className="ekash_nav_footer">
+                <div className="ekash_nav_footer" style={{ display: "none" }}>
                     <NavLink to="/" className="ekash_back_old">
                         Về giao diện cũ
                     </NavLink>

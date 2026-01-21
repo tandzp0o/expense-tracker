@@ -290,10 +290,10 @@ const Goals_new: React.FC = () => {
                         Number(activeGoal.targetAmount) || 0,
                     ],
                     backgroundColor: [
-                        "rgba(79, 70, 229, 0.92)",
+                        "rgba(70, 229, 91, 0.92)",
                         theme === "dark"
-                            ? "rgba(148, 163, 184, 0.35)"
-                            : "rgba(148, 163, 184, 0.45)",
+                            ? "rgba(248, 213, 56, 0.85)"
+                            : "rgba(248, 213, 56, 0.8)",
                     ],
                     borderRadius: 8,
                     maxBarThickness: 34,
@@ -417,6 +417,8 @@ const Goals_new: React.FC = () => {
                                     <span className="name">{g.title}</span>
                                 </span>
                                 <span className="right">
+                                    {" "}
+                                    Đã tích được:
                                     <span className="amt">
                                         {formatCurrency(
                                             Number(g.currentAmount) || 0,
@@ -442,7 +444,7 @@ const Goals_new: React.FC = () => {
                 <div className="ekash_card">
                     <div className="ekash_card_header">
                         <p className="ekash_card_title">Chi tiết mục tiêu</p>
-                        <span className="ekash_card_hint">
+                        <span className="ekash_card_hint"  style={{display:"none"}}>
                             {activeGoal ? activeGoal.category : "-"}
                         </span>
                     </div>
@@ -509,8 +511,7 @@ const Goals_new: React.FC = () => {
                                             </span>
                                         </div>
                                         <div className="right">
-                                            {Math.round(goalProgressPercent)}/
-                                            {100}
+                                            {Math.round(goalProgressPercent)}%
                                         </div>
                                     </div>
                                     <div className="ekash_progress">
@@ -526,8 +527,8 @@ const Goals_new: React.FC = () => {
                             </div>
 
                             <div className="ekash_goal_meta">
-                                <div className="row">
-                                    <span className="label">Hạn chót</span>
+                                <div className="row" style={{marginTop:10}}>
+                                    <span className="label">Hạn chót </span>
                                     <span className="value">
                                         {activeGoal.deadline
                                             ? formatDate(activeGoal.deadline)
@@ -535,7 +536,7 @@ const Goals_new: React.FC = () => {
                                     </span>
                                 </div>
                                 <div className="row">
-                                    <span className="label">Ngày tạo</span>
+                                    <span className="label">Ngày tạo </span>
                                     <span className="value">
                                         {activeGoal.createdAt
                                             ? formatDate(activeGoal.createdAt)

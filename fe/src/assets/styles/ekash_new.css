@@ -82,6 +82,10 @@
     border-color: rgba(79, 70, 229, 0.25);
 }
 
+.layout_dashboard_new .ekash_nav_item.is_active span {
+    color: black !important;
+}
+
 .layout_dashboard_new .ekash_nav_icon {
     width: 40px;
     height: 40px;
@@ -190,7 +194,7 @@
     padding: 3px 8px;
     border-radius: 999px;
     font-weight: 700;
-    font-size: 11px;
+    font-size: 13px;
 }
 
 .layout_dashboard_new .ekash_pill.up {
@@ -205,7 +209,7 @@
 
 .layout_dashboard_new .ekash_grid_main {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     gap: 14px;
     margin-top: 14px;
 }
@@ -727,4 +731,740 @@
     --ekash_muted: rgba(229, 231, 235, 0.72);
     --ekash_border: rgba(148, 163, 184, 0.18);
     --ekash_shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* DishSuggestions_new Styles */
+.layout_dashboard_new .ekash_grid_3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.layout_dashboard_new .ekash_card_actions {
+    display: flex;
+    gap: 8px;
+}
+
+.layout_dashboard_new .ekash_card_image {
+    margin: 16px 0;
+}
+
+.layout_dashboard_new .ekash_price {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ekash_text);
+    margin: 12px 0;
+}
+
+.layout_dashboard_new .ekash_description {
+    color: var(--ekash_muted);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.layout_dashboard_new .ekash_preferences {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.layout_dashboard_new .ekash_tag {
+    background: rgba(79, 70, 229, 0.1);
+    color: #4f46e5;
+    border: none;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.layout_dashboard_new .ekash_address {
+    color: var(--ekash_muted);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.layout_dashboard_new .ekash_page_actions {
+    margin: 16px 0;
+}
+
+/* Profile_new Styles */
+.layout_dashboard_new .ekash_profile_header {
+    position: relative;
+    margin-bottom: 24px;
+    border-radius: 12px;
+    overflow: hidden;
+    height: 280px;
+}
+
+.layout_dashboard_new .ekash_profile_bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.layout_dashboard_new .ekash_profile_content {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    padding: 24px;
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.8) 0%,
+        rgba(0, 0, 0, 0.4) 50%,
+        transparent 100%
+    );
+}
+
+.layout_dashboard_new .ekash_profile_avatar {
+    margin-right: 24px;
+    text-align: center;
+}
+
+.layout_dashboard_new .ekash_avatar {
+    border: 4px solid white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.layout_dashboard_new .ekash_avatar_upload {
+    margin-top: 12px;
+}
+
+.layout_dashboard_new .ekash_profile_info {
+    flex: 1;
+    color: white;
+}
+
+.layout_dashboard_new .ekash_profile_name {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: white;
+}
+
+.layout_dashboard_new .ekash_profile_email {
+    font-size: 16px;
+    margin: 0 0 8px 0;
+    opacity: 0.9;
+}
+
+.layout_dashboard_new .ekash_profile_phone {
+    font-size: 14px;
+    margin: 0 0 8px 0;
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.layout_dashboard_new .ekash_profile_bio {
+    font-size: 14px;
+    margin: 0;
+    opacity: 0.8;
+    line-height: 1.5;
+}
+
+.layout_dashboard_new .ekash_profile_actions {
+    margin-left: 24px;
+}
+
+.layout_dashboard_new .ekash_stats_grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+    padding: 24px;
+}
+
+.layout_dashboard_new .ekash_stat_item {
+    text-align: center;
+}
+
+.layout_dashboard_new .ekash_stat_value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--ekash_text);
+    margin-bottom: 8px;
+}
+
+.layout_dashboard_new .ekash_stat_label {
+    font-size: 14px;
+    color: var(--ekash_muted);
+}
+
+.layout_dashboard_new .ekash_goals_section {
+    padding: 24px;
+}
+
+.layout_dashboard_new .ekash_goal_item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.layout_dashboard_new .ekash_goal_info {
+    text-align: center;
+}
+
+.layout_dashboard_new .ekash_goal_label {
+    display: block;
+    font-size: 14px;
+    color: var(--ekash_muted);
+    margin-bottom: 8px;
+}
+
+.layout_dashboard_new .ekash_goal_count {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--ekash_text);
+}
+
+.layout_dashboard_new .ekash_progress_section {
+    margin-top: 24px;
+}
+
+.layout_dashboard_new .ekash_progress_label {
+    font-size: 14px;
+    color: var(--ekash_muted);
+    margin-bottom: 12px;
+}
+
+.layout_dashboard_new .ekash_form {
+    padding: 24px;
+}
+
+.layout_dashboard_new .ekash_btn_small {
+    padding: 4px 12px;
+    font-size: 12px;
+    height: auto;
+}
+
+.layout_dashboard_new .ekash_carousel_nav {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 4px 8px;
+    border-radius: 16px;
+}
+
+.layout_dashboard_new .ekash_carousel_btn {
+    background: rgba(255, 255, 255, 0.8);
+    border: none;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.layout_dashboard_new .ekash_carousel_btn:hover {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.layout_dashboard_new .ekash_carousel_btn:disabled {
+    background: rgba(255, 255, 255, 0.3);
+    cursor: not-allowed;
+}
+
+.layout_dashboard_new .ekash_carousel_counter {
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.layout_dashboard_new .ekash_card_image_clickable {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.layout_dashboard_new .ekash_card_image_clickable:hover {
+    transform: scale(1.02);
+}
+
+/* Wallets_new Responsive */
+.layout_dashboard_new .ekash_wallet_header_actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.layout_dashboard_new .ekash_wallet_balance {
+    text-align: right;
+}
+
+.layout_dashboard_new .ekash_wallet_balance_label {
+    font-size: 12px;
+    color: var(--ekash_muted);
+    margin-bottom: 4px;
+}
+
+.layout_dashboard_new .ekash_wallet_balance_value {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--ekash_text);
+}
+
+.layout_dashboard_new .ekash_pagination {
+    padding: 16px;
+    border-top: 1px solid var(--ekash_border);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.layout_dashboard_new .ekash_pagination_btn {
+    padding: 8px 12px;
+    border: 1px solid var(--ekash_border);
+    border-radius: 6px;
+    background: var(--ekash_card_bg);
+    color: var(--ekash_text);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.layout_dashboard_new .ekash_pagination_btn:hover:not(:disabled) {
+    background: var(--ekash_primary);
+    color: white;
+    border-color: var(--ekash_primary);
+}
+
+.layout_dashboard_new .ekash_pagination_btn:disabled {
+    background: var(--ekash_background);
+    color: var(--ekash_muted);
+    cursor: not-allowed;
+}
+
+.layout_dashboard_new .ekash_pagination_info {
+    margin: 0 12px;
+    font-size: 14px;
+    color: var(--ekash_muted);
+}
+
+/* Header Mobile Responsive */
+.header-with-breadcrumb.mobile {
+    padding: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--ekash_card_bg);
+    border-bottom: 1px solid var(--ekash_border);
+}
+
+.header-with-breadcrumb.mobile .header-row {
+    min-height: 60px;
+}
+
+.header-with-breadcrumb.mobile .header-actions {
+    gap: 4px;
+}
+
+.header-with-breadcrumb.mobile .mobile-search-bar {
+    padding: 12px 16px;
+    border-top: 1px solid #f0f0f0;
+    background: #fff;
+}
+
+.header-with-breadcrumb.mobile .ant-breadcrumb {
+    display: none;
+}
+
+.header-with-breadcrumb.mobile .ant-avatar {
+    width: 32px;
+    height: 32px;
+}
+
+.header-with-breadcrumb.mobile .ant-btn {
+    padding: 4px 8px;
+}
+
+/* Add padding to content when header is fixed */
+.layout_dashboard_new.mobile .content-ant {
+    padding-top: 60px;
+}
+
+/* MainLayout_new Responsive */
+.layout_dashboard_new.mobile .drawer-sidebar {
+    width: 280px !important;
+}
+
+.layout_dashboard_new.mobile .sider-primary {
+    display: none !important;
+}
+
+.layout_dashboard_new.mobile .content-ant {
+    margin-left: 0 !important;
+}
+
+.layout_dashboard_new.mobile .subheader {
+    padding: 0 16px;
+}
+
+@media (max-width: 1200px) {
+    .layout_dashboard_new .drawer-sidebar {
+        width: 260px !important;
+    }
+
+    .layout_dashboard_new .sider-primary {
+        width: 220px !important;
+    }
+
+    .layout_dashboard_new .ekash_wallet_header_actions {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .layout_dashboard_new .ekash_wallet_balance {
+        text-align: center;
+    }
+
+    .layout_dashboard_new .ekash_wallet_balance_value {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 992px) {
+    .layout_dashboard_new .drawer-sidebar {
+        width: 240px !important;
+    }
+
+    .layout_dashboard_new .sider-primary {
+        width: 200px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .layout_dashboard_new.mobile .drawer-sidebar {
+        width: 280px !important;
+    }
+
+    .layout_dashboard_new.mobile .sider-primary {
+        display: none !important;
+    }
+
+    .layout_dashboard_new.mobile .content-ant {
+        margin-left: 0 !important;
+    }
+
+    .layout_dashboard_new.mobile .subheader {
+        padding: 20px 16px;
+    }
+
+    .layout_dashboard_new .ekash_wallet_header_actions {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .layout_dashboard_new .ekash_wallet_balance {
+        text-align: center;
+    }
+
+    .layout_dashboard_new .ekash_wallet_balance_value {
+        font-size: 18px;
+    }
+
+    .layout_dashboard_new .ekash_pagination {
+        padding: 12px;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .layout_dashboard_new .ekash_pagination_btn {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+
+    .layout_dashboard_new .ekash_pagination_info {
+        font-size: 13px;
+        margin: 0 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .layout_dashboard_new .drawer-sidebar {
+        width: 100% !important;
+    }
+
+    .layout_dashboard_new .ekash_wallet_header_actions {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .layout_dashboard_new .ekash_wallet_balance_value {
+        font-size: 16px;
+    }
+
+    .layout_dashboard_new .ekash_pagination {
+        padding: 8px;
+        gap: 4px;
+    }
+
+    .layout_dashboard_new .ekash_pagination_btn {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+
+    .layout_dashboard_new .ekash_pagination_info {
+        font-size: 12px;
+        margin: 0 4px;
+    }
+}
+
+/* Responsive for new pages */
+@media (max-width: 1400px) {
+    .layout_dashboard_new .ekash_grid_3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .layout_dashboard_new .ekash_grid_4 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1200px) {
+    .layout_dashboard_new .ekash_grid_3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .layout_dashboard_new .ekash_grid_4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .layout_dashboard_new .ekash_grid_main {
+        grid-template-columns: 1fr;
+    }
+
+    .layout_dashboard_new .ekash_grid_2 {
+        grid-template-columns: 1fr;
+    }
+
+    .layout_dashboard_new .ekash_stats_grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .layout_dashboard_new .ekash_page_actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .layout_dashboard_new .ekash_carousel_nav {
+        bottom: 4px;
+        padding: 2px 6px;
+    }
+}
+
+@media (max-width: 992px) {
+    .layout_dashboard_new .ekash_grid_3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .layout_dashboard_new .ekash_grid_4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .layout_dashboard_new .ekash_grid_main {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .layout_dashboard_new .ekash_grid_2 {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .layout_dashboard_new .ekash_profile_header {
+        height: 220px;
+    }
+
+    .layout_dashboard_new .ekash_profile_name {
+        font-size: 24px;
+    }
+
+    .layout_dashboard_new .ekash_stats_grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .layout_dashboard_new .ekash_form {
+        padding: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .layout_dashboard_new .ekash_grid_3 {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .layout_dashboard_new .ekash_grid_4 {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .layout_dashboard_new .ekash_grid_main {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .layout_dashboard_new .ekash_grid_2 {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .layout_dashboard_new .ekash_profile_header {
+        height: 180px;
+    }
+
+    .layout_dashboard_new .ekash_profile_content {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 16px;
+    }
+
+    .layout_dashboard_new .ekash_profile_avatar {
+        margin-right: 0;
+        margin-bottom: 16px;
+    }
+
+    .layout_dashboard_new .ekash_profile_actions {
+        margin-left: 0;
+        margin-top: 16px;
+    }
+
+    .layout_dashboard_new .ekash_goal_item {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .layout_dashboard_new .ekash_stats_grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .layout_dashboard_new .ekash_form {
+        padding: 16px;
+    }
+
+    .layout_dashboard_new .ekash_page_header {
+        padding: 16px;
+    }
+
+    .layout_dashboard_new .ekash_page_actions {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .layout_dashboard_new .ekash_card {
+        margin-bottom: 8px;
+    }
+
+    .layout_dashboard_new .ekash_carousel_nav {
+        bottom: 4px;
+        padding: 2px 4px;
+    }
+
+    .layout_dashboard_new .ekash_modal_actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .layout_dashboard_new .ekash_page_header {
+        padding: 12px;
+    }
+
+    .layout_dashboard_new .ekash_title {
+        font-size: 20px;
+    }
+
+    .layout_dashboard_new .ekash_subtitle {
+        font-size: 14px;
+    }
+
+    .layout_dashboard_new .ekash_card {
+        margin-bottom: 6px;
+    }
+
+    .layout_dashboard_new .ekash_card_header {
+        padding: 12px;
+    }
+
+    .layout_dashboard_new .ekash_card_title {
+        font-size: 16px;
+    }
+
+    .layout_dashboard_new .ekash_card_content {
+        padding: 12px;
+    }
+
+    .layout_dashboard_new .ekash_price {
+        font-size: 16px;
+    }
+
+    .layout_dashboard_new .ekash_description {
+        font-size: 13px;
+    }
+
+    .layout_dashboard_new .ekash_preferences {
+        gap: 4px;
+    }
+
+    .layout_dashboard_new .ekash_tag {
+        font-size: 11px;
+        padding: 1px 6px;
+    }
+
+    .layout_dashboard_new .ekash_address {
+        font-size: 13px;
+    }
+
+    .layout_dashboard_new .ekash_profile_header {
+        height: 160px;
+    }
+
+    .layout_dashboard_new .ekash_profile_name {
+        font-size: 20px;
+    }
+
+    .layout_dashboard_new .ekash_profile_email {
+        font-size: 14px;
+    }
+
+    .layout_dashboard_new .ekash_profile_phone {
+        font-size: 13px;
+    }
+
+    .layout_dashboard_new .ekash_profile_bio {
+        font-size: 13px;
+    }
 }

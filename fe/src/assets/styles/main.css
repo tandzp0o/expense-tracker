@@ -33,6 +33,10 @@ body {
     overflow: auto;
   }
 }
+
+.layout-dashboard .ant-layout-content {
+  margin: 0 !important;
+}
 .layout-dashboard .ant-layout-sider.sider-primary {
   width: 250px;
   position: fixed;
@@ -1343,7 +1347,7 @@ span.ismobile {
   }
 
   .ant-row {
-    margin-left: -12px;
+    /* margin-left: -12px; */
     margin-right: -12px;
   }
   span.ismobile {
