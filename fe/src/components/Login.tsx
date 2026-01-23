@@ -8,29 +8,23 @@ import googleLogo from "../assets/images/Google__G__Logo.svg.png";
 const { Title } = Typography;
 
 const Login: React.FC = () => {
-    const { currentUser, signInWithGoogle } = useAuth();
+    const { currentUser, signInWithGoogle, loading } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    // const from = location.state?.from || "/";
-    const from = location.state?.from || "/new/dashboard";
-    const [loading, setLoading] = useState(false);
+    const [signingIn, setSigningIn] = useState(false);
 
     const handleGoogleSignIn = async () => {
-        setLoading(true);
+        setSigningIn(true);
         try {
             await signInWithGoogle();
-            navigate(from, { replace: true });
+            // AuthContext sẽ tự động redirect khi currentUser được cập nhật
         } catch (error) {
             console.error("Lỗi chi tiết khi đăng nhập:", error);
             message.error("Đăng nhập thất bại. Vui lòng thử lại.");
         } finally {
-            setLoading(false);
+            setSigningIn(false);
         }
     };
-
-    if (currentUser) {
-        return null;
-    }
 
     return (
         <>
@@ -85,7 +79,7 @@ const Login: React.FC = () => {
                                         size="large"
                                         block
                                         onClick={handleGoogleSignIn}
-                                        loading={loading}
+                                        loading={signingIn}
                                         icon={
                                             <img
                                                 src={googleLogo}
@@ -98,9 +92,7 @@ const Login: React.FC = () => {
                                             />
                                         }
                                     >
-                                        {loading
-                                            ? "Đang xử lý..."
-                                            : "Đăng nhập với Google"}
+                                        Đăng nhập với Google
                                     </Button>
                                 </Form.Item>
 

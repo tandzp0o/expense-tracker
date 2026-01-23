@@ -203,6 +203,58 @@ const ProtectedRouteNew = () => {
     );
 };
 
+// Debug component to check if routing works
+const DebugRoute = () => {
+    console.log("🔍 DebugRoute - Component rendered!");
+    return (
+        <div style={{ padding: 20, background: "red", color: "white" }}>
+            DEBUG: Route matched!
+        </div>
+    );
+};
+
+// Login route wrapper - redirect if already authenticated
+const LoginRoute = () => {
+    console.log("🔍 LoginRoute - Component START rendering!");
+
+    const { currentUser, loading } = useAuth();
+
+    console.log("🔍 LoginRoute - Auth state:", {
+        loading,
+        currentUser: !!currentUser,
+    });
+    console.log("🔍 LoginRoute - currentUser:", currentUser);
+
+    if (loading) {
+        console.log("⏳ LoginRoute - Still loading auth state...");
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100vh",
+                    flexDirection: "column",
+                    gap: 20,
+                }}
+            >
+                <Spin size="large" />
+                <div>Loading auth state...</div>
+            </div>
+        );
+    }
+
+    if (currentUser) {
+        console.log(
+            "✅ LoginRoute - User authenticated, redirecting to dashboard...",
+        );
+        return <Navigate to="/new/dashboard" replace />;
+    }
+
+    console.log("❌ LoginRoute - User not authenticated, showing login form");
+    return <Login />;
+};
+
 function App() {
     return (
         <Router>
@@ -211,7 +263,7 @@ function App() {
                     <AntApp>
                         <ThemeWrapper>
                             <Routes>
-                                <Route path="/login" element={<Login />} />
+                                <Route path="/login" element={<LoginRoute />} />
 
                                 {/* Route redirect từ root về new dashboard */}
                                 <Route
@@ -243,6 +295,7 @@ function App() {
                                     />
                                 </Route>
 
+                                {/* New routes với ProtectedRouteNew */}
                                 <Route element={<ProtectedRouteNew />}>
                                     <Route
                                         path="/new/dashboard"
@@ -253,28 +306,24 @@ function App() {
                                         element={<Transactions_new />}
                                     />
                                     <Route
+                                        path="/new/analytics"
+                                        element={<Analytics_new />}
+                                    />
+                                    <Route
                                         path="/new/wallets"
                                         element={<Wallets_new />}
-                                    />
-                                    <Route
-                                        path="/new/budgets"
-                                        element={<Budgets_new />}
-                                    />
-                                    <Route
-                                        path="/new/goals"
-                                        element={<Goals_new />}
                                     />
                                     <Route
                                         path="/new/dishes"
                                         element={<DishSuggestions_new />}
                                     />
                                     <Route
-                                        path="/new/profile"
-                                        element={<Profile_new />}
+                                        path="/new/goals"
+                                        element={<Goals_new />}
                                     />
                                     <Route
-                                        path="/new/analytics"
-                                        element={<Analytics_new />}
+                                        path="/new/profile"
+                                        element={<Profile_new />}
                                     />
                                 </Route>
                             </Routes>

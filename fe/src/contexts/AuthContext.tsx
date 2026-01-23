@@ -46,8 +46,11 @@ const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
     // Sử dụng dấu backtick để template literal hoạt động
     // Nếu biến REACT_APP_API_URL trống, nó sẽ mặc định dùng localhost
     const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
-    
-    console.log("Verifying token with backend at:", `${baseUrl}/api/auth/verify`);
+
+    console.log(
+        "Verifying token with backend at:",
+        `${baseUrl}/api/auth/verify`,
+    );
     const response = await fetch(`${baseUrl}/api/auth/verify`, {
         method: "GET",
         headers: {
@@ -59,7 +62,9 @@ const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
     if (!response.ok) {
         try {
             const errorData = await response.json();
-            throw new Error(errorData.message || `Server responded with ${response.status}`);
+            throw new Error(
+                errorData.message || `Server responded with ${response.status}`,
+            );
         } catch (e) {
             throw new Error(`Server error on verification: ${response.status}`);
         }
@@ -74,29 +79,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const isAuthenticated = !!currentUser;
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-            if (firebaseUser) {
-                try {
-                    const token = await firebaseUser.getIdToken(true); // Lấy token mới nhất
-                    const appUserData = await verifyTokenWithBackend(token);
-                    setCurrentUser(appUserData);
-                } catch (error) {
-                    console.error("Lỗi nghiêm trọng khi đồng bộ người dùng, đăng xuất:", error);
-                    // Chỉ đăng xuất khi có lỗi nghiêm trọng không thể phục hồi
-                    await firebaseSignOut(auth);
+        console.log("🔍 AuthContext - Setting up auth state listener...");
+
+        const unsubscribe = onAuthStateChanged(
+            auth,
+            async (firebaseUser: FirebaseUser | null) => {
+                console.log(
+                    "🔍 AuthContext - Auth state changed:",
+                    firebaseUser?.email || "null",
+                );
+
+                if (firebaseUser) {
+                    try {
+                        console.log("🔍 AuthContext - Getting ID token...");
+                        const token = await firebaseUser.getIdToken(true); // Lấy token mới nhất
+                        console.log(
+                            "🔍 AuthContext - Token received, verifying with backend...",
+                        );
+
+                        const appUserData = await verifyTokenWithBackend(token);
+                        console.log(
+                            "✅ AuthContext - Backend verification successful:",
+                            appUserData,
+                        );
+
+                        setCurrentUser(appUserData);
+                    } catch (error) {
+                        console.error(
+                            "❌ AuthContext - Lỗi nghiêm trọng khi đồng bộ người dùng, đăng xuất:",
+                            error,
+                        );
+                        // Chỉ đăng xuất khi có lỗi nghiêm trọng không thể phục hồi
+                        await firebaseSignOut(auth);
+                        setCurrentUser(null);
+                    }
+                } else {
+                    console.log(
+                        "❌ AuthContext - No firebase user, setting currentUser to null",
+                    );
                     setCurrentUser(null);
                 }
-            } else {
-                setCurrentUser(null);
-            }
-            setLoading(false);
-        });
+                setLoading(false);
+            },
+        );
 
-        return () => unsubscribe();
+        return () => {
+            console.log("🔍 AuthContext - Cleaning up auth state listener...");
+            unsubscribe();
+        };
     }, []);
 
     const handleGoogleSignIn = async (): Promise<void> => {
-        // Hàm này giờ chỉ cần kích hoạt popup. 
+        // Hàm này giờ chỉ cần kích hoạt popup.
         // onAuthStateChanged sẽ tự động xử lý phần còn lại.
         try {
             setLoading(true);
@@ -105,7 +139,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
             console.error("Lỗi trong quá trình mở popup Google:", error);
             // Ném lỗi ra để component Login có thể xử lý (hiển thị alert)
-            throw error; 
+            throw error;
         } finally {
             // Không set loading về false ở đây, để `useEffect` kiểm soát
         }
