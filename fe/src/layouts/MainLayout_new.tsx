@@ -5,7 +5,6 @@ import Sidenav_new from "./Sidenav_new";
 import Header from "./Header";
 import Footer from "./Footer";
 import { useTheme } from "../contexts/ThemeContext";
-import { PWAInstallButton } from "../components/PWAInstallButton";
 
 const { Sider, Content, Header: AntHeader } = Layout;
 
@@ -111,7 +110,6 @@ const MainLayout_new: React.FC<MainLayoutNewProps> = ({ children }) => {
                 <AntHeader className="subheader">
                     <Header onMenuClick={openDrawer} />
                 </AntHeader>
-                <PWAInstallButton />
                 <Content className="content-ant">{children}</Content>
                 <Footer />
             </Layout>

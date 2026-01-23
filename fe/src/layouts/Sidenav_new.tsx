@@ -1,5 +1,6 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { PWAInstallButton } from "../components/PWAInstallButton";
 
 interface SidenavNewProps {
     onCloseMenu?: () => void;
@@ -103,8 +104,9 @@ const Sidenav_new: React.FC<SidenavNewProps> = ({ onCloseMenu }) => {
                     />
                 </div>
 
-                <div className="ekash_nav_footer" style={{ display: "none" }}>
-                    <NavLink to="/" className="ekash_back_old">
+                <div className="ekash_nav_footer">
+                    <PWAInstallButton />
+                    <NavLink style={{ color: "#fff", display:"none" }} to="/" className="ekash_back_old">
                         Về giao diện cũ
                     </NavLink>
                 </div>

@@ -6,23 +6,43 @@ import { usePWAInstall } from "../hooks/usePWAInstall";
 export const PWAInstallButton = () => {
     const { isInstallable, installApp } = usePWAInstall();
 
-    // Only show when PWA is actually installable
-    if (!isInstallable) return null;
+    // Debug logs
+    console.log("🔍 PWAInstallButton - isInstallable:", isInstallable);
+
+    // Tạm thởi luôn hiển thị để test
+    const showForTest = true; // Đổi thành false khi production
+
+    if (!isInstallable && !showForTest) {
+        console.log("❌ PWAInstallButton - Not installable, hiding button");
+        return null;
+    }
 
     return (
         <Button
-            className="PWAInstallButton"
-            type="primary"
+            className="ekash_nav_item pwa_install_button"
+            type={isInstallable ? "default" : "dashed"}
             icon={<DownloadOutlined />}
             onClick={installApp}
+            disabled={!isInstallable}
             style={{
-                position: "fixed",
-                bottom: 20,
-                right: 20,
-                zIndex: 1000,
+                width: "100%",
+                marginBottom: 8,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                height: 48,
+                padding: "0 16px",
+                border: isInstallable
+                    ? "1px solid #e5e7eb"
+                    : "1px dashed #d9d9d9",
+                borderRadius: 8,
+                color: "black",
+                backgroundColor: !isInstallable ? "#f5f5f5" : "transparent",
             }}
         >
-            Cài đặt ứng dụng
+            <span style={{ marginLeft: 8 }}>
+                {isInstallable ? "Cài đặt ứng dụng" : "PWA không khả dụng"}
+            </span>
         </Button>
     );
 };
