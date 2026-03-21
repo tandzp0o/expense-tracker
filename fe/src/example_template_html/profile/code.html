@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#4137cd",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#14131f",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .premium-gradient {
+            background: linear-gradient(135deg, #4137cd 0%, #6366f1 50%, #818cf8 100%);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar Navigation - Synchronized with SCREEN_18 -->
+<aside class="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+<div class="p-6 flex items-center gap-3">
+<div class="bg-primary size-10 rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<div>
+<h1 class="font-bold text-lg leading-tight">FinTrack</h1>
+<p class="text-xs text-slate-500">Quản lý Tài chính</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-1 mt-4">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Tổng quan</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">swap_horiz</span>
+<span>Giao dịch</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+<span>Ví của tôi</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">pie_chart</span>
+<span>Báo cáo</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Ngân sách</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-medium" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Cài đặt</span>
+</a>
+</nav>
+<div class="p-4">
+<button class="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all">
+<span class="material-symbols-outlined">logout</span>
+<span>Đăng xuất</span>
+</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-hidden">
+<!-- Top Header - Synchronized with SCREEN_18 -->
+<header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 shrink-0 relative z-20">
+<h2 class="text-xl font-bold">Thông tin cá nhân</h2>
+<div class="flex items-center gap-6">
+<div class="relative max-w-xs hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary w-64" placeholder="Tìm kiếm..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="relative text-slate-500 hover:text-slate-900 dark:hover:text-white">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 size-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+</button>
+<div class="flex items-center gap-3 border-l border-slate-200 dark:border-slate-800 pl-4">
+<div class="text-right hidden sm:block">
+<p class="text-sm font-semibold">Nguyễn Văn A</p>
+<p class="text-xs text-slate-500">Gói Premium</p>
+</div>
+<div class="size-10 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden bg-center bg-cover" data-alt="User profile avatar image" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBccG_IVAhWmIKerhvzCnsUmt-VZRv0CCoz6I_-FPXaTIY2xuhqcxxP2Qxz7wQq-IB3yAK47IDQsBShM4ia6y7UqrmnGLfqGIu8jxJ669Mrmg40z6N-XD-gTmaLE3c6LTjFzdETQ6rL83pauee4Khe49nsnjvpBY0C8uRypKonFuiyDwAFEHzUezzRaBpBF5FFNxExyfrpv8yLXprcE7N1W05EHISEHBPBHaYxoj3Cq277y_lIkPFQfRxQPPuSCVeo8uPCmBi5lrME')"></div>
+</div>
+</div>
+</div>
+</header>
+<!-- Scrollable Area -->
+<div class="flex-1 overflow-y-auto">
+<!-- Premium Header -->
+<div class="h-64 premium-gradient relative overflow-hidden">
+<div class="absolute inset-0 opacity-20" data-alt="Abstract white dot pattern on blue gradient background" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 32px 32px;"></div>
+<div class="max-w-6xl mx-auto px-8 pt-12 text-white">
+<h1 class="text-3xl font-black mb-2">Hồ sơ người dùng</h1>
+<p class="text-white/80">Chào mừng trở lại, quản lý tài chính của bạn thật dễ dàng.</p>
+</div>
+</div>
+<!-- Profile Content Area -->
+<div class="max-w-6xl mx-auto px-8 -mt-24 pb-20 relative z-10">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column: User Card -->
+<div class="lg:col-span-1 space-y-6">
+<div class="bg-white dark:bg-slate-900 rounded-xl p-8 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-800 text-center">
+<div class="relative inline-block group">
+<div class="size-32 rounded-full border-4 border-white dark:border-slate-800 shadow-lg bg-center bg-cover" data-alt="Professional portrait of a male user with smiling expression" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBccG_IVAhWmIKerhvzCnsUmt-VZRv0CCoz6I_-FPXaTIY2xuhqcxxP2Qxz7wQq-IB3yAK47IDQsBShM4ia6y7UqrmnGLfqGIu8jxJ669Mrmg40z6N-XD-gTmaLE3c6LTjFzdETQ6rL83pauee4Khe49nsnjvpBY0C8uRypKonFuiyDwAFEHzUezzRaBpBF5FFNxExyfrpv8yLXprcE7N1W05EHISEHBPBHaYxoj3Cq277y_lIkPFQfRxQPPuSCVeo8uPCmBi5lrME')"></div>
+<button class="absolute bottom-1 right-1 size-10 bg-primary text-white rounded-full border-4 border-white dark:border-slate-800 flex items-center justify-center hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-sm">edit</span>
+</button>
+</div>
+<h2 class="mt-6 text-2xl font-bold">Nguyễn Văn A</h2>
+<p class="text-slate-500 dark:text-slate-400 mb-6">Thành viên Premium từ 2023</p>
+<div class="space-y-4 text-left border-t border-slate-100 dark:border-slate-800 pt-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400">mail</span>
+<div>
+<p class="text-xs text-slate-400 uppercase font-bold tracking-wider">Email</p>
+<p class="text-sm font-medium">nguyen.vana@email.com</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400">phone_iphone</span>
+<div>
+<p class="text-xs text-slate-400 uppercase font-bold tracking-wider">Số điện thoại</p>
+<p class="text-sm font-medium">090 123 4567</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400">location_on</span>
+<div>
+<p class="text-xs text-slate-400 uppercase font-bold tracking-wider">Địa chỉ</p>
+<p class="text-sm font-medium">TP. Hồ Chí Minh, Việt Nam</p>
+</div>
+</div>
+</div>
+<button class="w-full mt-8 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                Chỉnh sửa hồ sơ
+                            </button>
+</div>
+<!-- Mini Goal Progress -->
+<div class="bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
+<h3 class="font-bold mb-4">Mục tiêu hiện tại</h3>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium">Mua căn hộ</span>
+<span class="text-sm text-primary font-bold">75%</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 75%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium">Tiết kiệm hưu trí</span>
+<span class="text-sm text-primary font-bold">40%</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 40%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Financial Stats & More Details -->
+<div class="lg:col-span-2 space-y-6">
+<!-- Financial Summary Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex justify-between items-start mb-4">
+<div class="size-12 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<span class="text-emerald-500 text-xs font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_up</span> +12%
+                                    </span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Tổng tài sản</p>
+<h3 class="text-3xl font-black mt-1">2.450.000.000 đ</h3>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex justify-between items-start mb-4">
+<div class="size-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined">savings</span>
+</div>
+<span class="text-primary text-xs font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">event</span> Tháng này
+                                    </span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Tiết kiệm tháng này</p>
+<h3 class="text-3xl font-black mt-1">15.200.000 đ</h3>
+</div>
+</div>
+<!-- Progress Chart Area -->
+<div class="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="flex items-center justify-between mb-8">
+<h3 class="font-bold text-xl">Phân tích tăng trưởng</h3>
+<div class="flex gap-2">
+<button class="px-4 py-1.5 rounded-lg text-sm bg-slate-100 dark:bg-slate-800 font-medium">6 Tháng</button>
+<button class="px-4 py-1.5 rounded-lg text-sm bg-primary text-white font-medium">1 Năm</button>
+</div>
+</div>
+<!-- Mockup Chart -->
+<div class="h-64 flex items-end justify-between gap-2 px-4">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg h-[40%] relative group">
+<div class="absolute inset-0 bg-primary/20 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg h-[55%] relative group">
+<div class="absolute inset-0 bg-primary/20 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg h-[45%] relative group">
+<div class="absolute inset-0 bg-primary/20 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg h-[70%] relative group">
+<div class="absolute inset-0 bg-primary/20 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-t-lg h-[65%] relative group">
+<div class="absolute inset-0 bg-primary/20 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="w-full bg-primary rounded-t-lg h-[90%] relative group">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">2.45B</div>
+</div>
+</div>
+<div class="flex justify-between mt-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+<span>Th1</span>
+<span>Th3</span>
+<span>Th5</span>
+<span>Th7</span>
+<span>Th9</span>
+<span>Th11</span>
+</div>
+</div>
+<!-- Activity Table -->
+<div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+<div class="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+<h3 class="font-bold text-xl">Giao dịch gần đây</h3>
+<button class="text-primary text-sm font-bold hover:underline">Xem tất cả</button>
+</div>
+<div class="divide-y divide-slate-100 dark:divide-slate-800">
+<div class="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">shopping_cart</span>
+</div>
+<div>
+<p class="font-bold">Apple Store Vietnam</p>
+<p class="text-xs text-slate-500">22 Tháng 10, 2023</p>
+</div>
+</div>
+<span class="font-bold text-red-500">- 45.000.000 đ</span>
+</div>
+<div class="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">work</span>
+</div>
+<div>
+<p class="font-bold">Nhận lương tháng 10</p>
+<p class="text-xs text-slate-500">20 Tháng 10, 2023</p>
+</div>
+</div>
+<span class="font-bold text-emerald-500">+ 85.000.000 đ</span>
+</div>
+<div class="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">restaurant</span>
+</div>
+<div>
+<p class="font-bold">Dinner with Client</p>
+<p class="text-xs text-slate-500">18 Tháng 10, 2023</p>
+</div>
+</div>
+<span class="font-bold text-red-500">- 1.250.000 đ</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

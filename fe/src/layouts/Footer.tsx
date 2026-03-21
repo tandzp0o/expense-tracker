@@ -1,211 +1,28 @@
 import React from "react";
-import { Layout, Row, Col, Typography } from "antd";
-
-const { Text } = Typography;
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="footer-main">
-      <Layout.Footer
-        style={{ background: "transparent", border: "none", padding: "0" }}
-      >
-        <Row
-          gutter={[40, 40]}
-          justify="space-between"
-          align="top"
-          style={{ marginBottom: "30px" }}
-        >
-          <Col xs={24} sm={12} md={6}>
-            <div style={{ marginBottom: "20px" }}>
-              <h4 style={{ fontWeight: 600, marginBottom: "10px" }}>
-                Expense Tracker
-              </h4>
-              <Text type="secondary" style={{ fontSize: "12px" }}>
-                Ứng dụng quản lý chi tiêu cá nhân toàn diện
-              </Text>
+    <footer className="mt-12 py-8 border-t border-slate-100 dark:border-slate-800/50">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400">
+            <div className="flex items-center gap-2">
+                <span className="text-primary font-bold">FinTrack</span>
+                <span className="opacity-60">© {currentYear}</span>
             </div>
-          </Col>
+            
+            <div className="flex items-center gap-6">
+                <a href="#" className="hover:text-primary transition-colors">Chính sách</a>
+                <a href="#" className="hover:text-primary transition-colors">Điều khoản</a>
+                <a href="#" className="size-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center hover:bg-primary hover:text-white transition-all">
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>support_agent</span>
+                </a>
+            </div>
 
-          <Col xs={24} sm={12} md={6}>
-            <h4 style={{ fontWeight: 600, marginBottom: "15px" }}>Tính năng</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  Quản lý ví
-                </button>
-              </li>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  Theo dõi giao dịch
-                </button>
-              </li>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  Đặt mục tiêu
-                </button>
-              </li>
-            </ul>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <h4 style={{ fontWeight: 600, marginBottom: "15px" }}>Hỗ trợ</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  Hướng dẫn sử dụng
-                </button>
-              </li>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  Liên hệ chúng tôi
-                </button>
-              </li>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  FAQ
-                </button>
-              </li>
-            </ul>
-          </Col>
-
-          <Col xs={24} sm={12} md={6}>
-            <h4 style={{ fontWeight: 600, marginBottom: "15px" }}>Pháp lý</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  Điều khoản sử dụng
-                </button>
-              </li>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  Chính sách bảo mật
-                </button>
-              </li>
-              <li style={{ marginBottom: "8px" }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#666",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                >
-                  Chính sách cookie
-                </button>
-              </li>
-            </ul>
-          </Col>
-        </Row>
-
-        <Row
-          justify="space-between"
-          align="middle"
-          style={{ paddingTop: "20px", borderTop: "1px solid #e8e8e8" }}
-        >
-          <Col xs={24} md={12}>
-            <Text type="secondary" style={{ fontSize: "12px" }}>
-              © {currentYear} Expense Tracker. All rights reserved.
-            </Text>
-          </Col>
-          <Col
-            xs={24}
-            md={12}
-            style={{
-              textAlign: "right" as any,
-              marginTop: "10px",
-            }}
-          >
-            <Text type="secondary" style={{ fontSize: "12px" }}>
-              Made with ❤️ by Expense Tracker Team
-            </Text>
-          </Col>
-        </Row>
-      </Layout.Footer>
+            <div className="text-slate-400">
+                Developed by <span className="text-primary font-medium">FinTrack Team</span>
+            </div>
+        </div>
     </footer>
   );
 };

@@ -82,26 +82,26 @@ import {
 } from "react-router-dom"; // <-- Import useLocation
 import { ConfigProvider, Spin, App as AntApp } from "antd";
 import viVN from "antd/locale/vi_VN";
-import "antd/dist/reset.css";
-import "./App.less";
-import "./assets/styles/main.css";
-import "./assets/styles/themeOverrides.css";
-import "./assets/styles/responsive.css";
-import "./assets/styles/ekash_new.css";
+// import "antd/dist/reset.css";
+// import "./App.less";
+// import "./assets/styles/main.css";
+// import "./assets/styles/themeOverrides.css";
+// import "./assets/styles/responsive.css";
+// import "./assets/styles/ekash_new.css";
 
 // Layouts
-import MainLayout_new from "./layouts/MainLayout_new";
+import MainLayout from "./layouts/MainLayout";
 
 // Pages
-import Dashboard_new from "./pages/Dashboard_new";
-import Wallets_new from "./pages/Wallets_new";
-import Budgets_new from "./pages/Budgets_new";
-import Goals_new from "./pages/Goals_new";
-import Transactions_new from "./pages/Transactions_new";
-import DishSuggestions_new from "./pages/DishSuggestions_new";
-import Profile_new from "./pages/Profile_new";
+import Dashboard from "./pages/Dashboard";
+import Wallets from "./pages/Wallets";
+import Budgets from "./pages/Budgets";
+import Goals from "./pages/Goals";
+import Transactions from "./pages/Transactions";
+import DishSuggestions from "./pages/DishSuggestions";
+import Profile from "./pages/Profile";
 import Login from "./components/Login";
-import Analytics_new from "./pages/Analytics_new";
+import Analytics from "./pages/Analytics";
 
 // Auth context
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -122,7 +122,7 @@ const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({
     );
 };
 
-const ProtectedRouteNew = () => {
+const ProtectedRoute = () => {
     const { currentUser, loading } = useAuth();
     const location = useLocation();
 
@@ -145,14 +145,14 @@ const ProtectedRouteNew = () => {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    if (currentUser.newUser && location.pathname !== "/new/wallets") {
-        return <Navigate to="/new/wallets" replace />;
+    if (currentUser.newUser && location.pathname !== "/wallets") {
+        return <Navigate to="/wallets" replace />;
     }
 
     return (
-        <MainLayout_new>
+        <MainLayout>
             <Outlet />
-        </MainLayout_new>
+        </MainLayout>
     );
 };
 
@@ -201,7 +201,7 @@ const LoginRoute = () => {
         console.log(
             "✅ LoginRoute - User authenticated, redirecting to dashboard...",
         );
-        return <Navigate to="/new/dashboard" replace />;
+        return <Navigate to="/dashboard" replace />;
     }
 
     console.log("❌ LoginRoute - User not authenticated, showing login form");
@@ -218,43 +218,47 @@ function App() {
                             <Routes>
                                 <Route path="/login" element={<LoginRoute />} />
 
-                                {/* Route redirect từ root về new dashboard */}
+                                {/* Route redirect từ root về dashboard */}
                                 <Route
                                     path="/"
                                     element={
-                                        <Navigate to="/new/dashboard" replace />
+                                        <Navigate to="/dashboard" replace />
                                     }
                                 />
 
-                                {/* New routes với ProtectedRouteNew */}
-                                <Route element={<ProtectedRouteNew />}>
+                                {/* Main routes */}
+                                <Route element={<ProtectedRoute />}>
                                     <Route
-                                        path="/new/dashboard"
-                                        element={<Dashboard_new />}
+                                        path="/dashboard"
+                                        element={<Dashboard />}
                                     />
                                     <Route
-                                        path="/new/transactions"
-                                        element={<Transactions_new />}
+                                        path="/transactions"
+                                        element={<Transactions />}
                                     />
                                     <Route
-                                        path="/new/analytics"
-                                        element={<Analytics_new />}
+                                        path="/budgets"
+                                        element={<Budgets />}
                                     />
                                     <Route
-                                        path="/new/wallets"
-                                        element={<Wallets_new />}
+                                        path="/goals"
+                                        element={<Goals />}
                                     />
                                     <Route
-                                        path="/new/dishes"
-                                        element={<DishSuggestions_new />}
+                                        path="/analytics"
+                                        element={<Analytics />}
                                     />
                                     <Route
-                                        path="/new/goals"
-                                        element={<Goals_new />}
+                                        path="/wallets"
+                                        element={<Wallets />}
                                     />
                                     <Route
-                                        path="/new/profile"
-                                        element={<Profile_new />}
+                                        path="/dishes"
+                                        element={<DishSuggestions />}
+                                    />
+                                    <Route
+                                        path="/profile"
+                                        element={<Profile />}
                                     />
                                 </Route>
                             </Routes>

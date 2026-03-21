@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#4137cd",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#14131f",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<title>Quản lý Tài chính - Mục tiêu</title>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+<div class="p-6 flex items-center gap-3">
+<div class="bg-primary size-10 rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<div>
+<h1 class="font-bold text-lg leading-tight">FinTrack</h1>
+<p class="text-xs text-slate-500">Quản lý Tài chính</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-1 mt-4">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Tổng quan</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">swap_horiz</span>
+<span>Giao dịch</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+<span>Ví của tôi</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary font-medium" href="#">
+<span class="material-symbols-outlined">track_changes</span>
+<span>Mục tiêu</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Ngân sách</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Cài đặt</span>
+</a>
+</nav>
+<div class="p-4">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined">add_circle</span>
+<span>Thêm mục tiêu</span>
+</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-hidden">
+<!-- Top Header -->
+<header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 shrink-0">
+<h2 class="text-xl font-bold">Mục tiêu tài chính</h2>
+<div class="flex items-center gap-6">
+<div class="relative max-w-xs hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary w-64" placeholder="Tìm kiếm mục tiêu..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="relative text-slate-500 hover:text-slate-900 dark:hover:text-white">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 size-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+</button>
+<div class="flex items-center gap-3 border-l border-slate-200 dark:border-slate-800 pl-4">
+<div class="text-right hidden sm:block">
+<p class="text-sm font-semibold">Nguyễn Văn A</p>
+<p class="text-xs text-slate-500">Gói Premium</p>
+</div>
+<div class="size-10 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden" data-alt="User profile avatar image" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBg1Rr8zen485odDXafPvthiaUfZ9E9tNlcWCulT-v9mbbmJO-EWwg9R88St8NsQc8gtaCXg8kfEeSIjvzI26eR5pQ3yjE9Xt8VTLspzum5ke_-t-YF7pcCvBnQT5x18pMfBnkrkwIgc9dX6EM4c0AGqjelxsF-hE3KW188o985UlxwbSZ_mfHv_AiKCwzAhg_G9Fa4X_Ak8sKscQ-_k129fBV_u4yI-srvmI5i5VV192MsoCtx9xPGaZrWtscWeP6fYfpzOxvqJIU'); background-size: cover; background-position: center;"></div>
+</div>
+</div>
+</div>
+</header>
+<!-- Goals Content -->
+<div class="flex-1 overflow-y-auto p-8 space-y-8">
+<!-- Page Title and CTA -->
+<div class="flex justify-between items-end">
+<div>
+<h1 class="text-4xl font-black tracking-tight mb-2">Mục tiêu tài chính</h1>
+<p class="text-slate-500 dark:text-slate-400 text-lg font-normal leading-normal">Theo dõi và quản lý các mục tiêu tiết kiệm của bạn</p>
+</div>
+<button class="flex items-center gap-2 px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined">add</span>
+                    Thêm mục tiêu mới
+                </button>
+</div>
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-slate-500 dark:text-slate-400 font-medium mb-2">Tổng số tiền đã tiết kiệm</p>
+<div class="flex items-baseline gap-2">
+<h3 class="text-3xl font-bold">1.550.000.000 ₫</h3>
+<span class="text-emerald-500 text-sm font-bold flex items-center">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                            12%
+                        </span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-slate-500 dark:text-slate-400 font-medium mb-2">Mục tiêu hoàn thành</p>
+<div class="flex items-baseline gap-2">
+<h3 class="text-3xl font-bold">2/5</h3>
+<span class="text-slate-400 text-sm font-medium">Tháng này: +0</span>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-slate-500 dark:text-slate-400 font-medium mb-2">Tiến độ trung bình</p>
+<div class="flex items-baseline gap-2">
+<h3 class="text-3xl font-bold">65%</h3>
+<span class="text-emerald-500 text-sm font-bold flex items-center">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                            5%
+                        </span>
+</div>
+</div>
+</div>
+<!-- Goals Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<!-- Goal Card 1 -->
+<div class="group bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-xl transition-shadow">
+<div class="h-48 w-full bg-cover bg-center" data-alt="Modern minimalist luxury house in nature" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAO8SaH183l8SP6cZLFs_XHh9e5xaB16H9ReXMYrIVa19HYGVEhpn2Bm88PLwAafu2yx_a5rNj5JfO6UVcYHubY3RQSzJTGJ5UnxOpsclYp5Zj_r-vZ5JKwbihAkJs7eTp83VeEuCcThtVfoo0Oaw7wR2p0V0hXpEaUfP9pU_PFm1-Qv0EjZN9lheqhJyKgAghk650Doy8dTP6-E_Y7TNu9zCzU5nhAuhjETiVhynF1xEcqnB86kKRVIcZ2owULxtVXenNA1Wl7t24')"></div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h4 class="text-xl font-bold mb-1">Mua Nhà Mơ Ước</h4>
+<p class="text-sm text-slate-500 dark:text-slate-400">Tiết kiệm cho căn hộ đầu tiên</p>
+</div>
+<div class="relative flex items-center justify-center">
+<svg class="w-14 h-14">
+<circle class="text-slate-100 dark:text-slate-800" cx="28" cy="28" fill="transparent" r="24" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-primary" cx="28" cy="28" fill="transparent" r="24" stroke="currentColor" stroke-dasharray="150.7" stroke-dashoffset="60.3" stroke-linecap="round" stroke-width="4"></circle>
+</svg>
+<span class="absolute text-xs font-bold text-primary">60%</span>
+</div>
+</div>
+<div class="space-y-3 mb-6">
+<div class="flex justify-between text-sm">
+<span class="text-slate-500 dark:text-slate-400">Đã lưu:</span>
+<span class="font-bold">1.200.000.000 ₫</span>
+</div>
+<div class="flex justify-between text-sm">
+<span class="text-slate-500 dark:text-slate-400">Mục tiêu:</span>
+<span class="font-bold">2.000.000.000 ₫</span>
+</div>
+<div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 60%"></div>
+</div>
+</div>
+<div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-4">
+<span class="material-symbols-outlined text-sm">event</span>
+                            Dự kiến: 12/2026
+                        </div>
+</div>
+</div>
+<!-- Goal Card 2 -->
+<div class="group bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-xl transition-shadow">
+<div class="h-48 w-full bg-cover bg-center" data-alt="Electric sports car parked at sunset" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCA0QVb6abJwj4E7iYOuBWHEjcoinhxspPb-dG28eWHl2yzpe-VquM__dNRfjxR4Z9vq2-P1rcDSbbB-lWaE879Tx_h3uicYU6hVHlyc0gHFnq4fjlKcmrr6Vnjg4GQmgJug-SMIMhgYTz988U7Qr6Q1R9MwXQ-m6wfp6D3WAm22CMJ-F8U0Jb7Cy4zlFSPEgzsm2aXcVHxZuf9TTr2B589WKOVQZ-C_p3c98dePNRLxvReAcaS2P5tGxG6KOLpM2xGEzE1jOudXkI')"></div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h4 class="text-xl font-bold mb-1">Mua Xe Ô Tô</h4>
+<p class="text-sm text-slate-500 dark:text-slate-400">Ngân sách cho xe điện mới</p>
+</div>
+<div class="relative flex items-center justify-center">
+<svg class="w-14 h-14">
+<circle class="text-slate-100 dark:text-slate-800" cx="28" cy="28" fill="transparent" r="24" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-primary" cx="28" cy="28" fill="transparent" r="24" stroke="currentColor" stroke-dasharray="150.7" stroke-dashoffset="94.2" stroke-linecap="round" stroke-width="4"></circle>
+</svg>
+<span class="absolute text-xs font-bold text-primary">37%</span>
+</div>
+</div>
+<div class="space-y-3 mb-6">
+<div class="flex justify-between text-sm">
+<span class="text-slate-500 dark:text-slate-400">Đã lưu:</span>
+<span class="font-bold">300.000.000 ₫</span>
+</div>
+<div class="flex justify-between text-sm">
+<span class="text-slate-500 dark:text-slate-400">Mục tiêu:</span>
+<span class="font-bold">800.000.000 ₫</span>
+</div>
+<div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 37.5%"></div>
+</div>
+</div>
+<div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-4">
+<span class="material-symbols-outlined text-sm">event</span>
+                            Dự kiến: 06/2025
+                        </div>
+</div>
+</div>
+<!-- Goal Card 3 -->
+<div class="group bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-xl transition-shadow">
+<div class="h-48 w-full bg-cover bg-center" data-alt="Turquoise alpine lake with mountain background" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAm315mW3cgslX3b2LCU_Ym0lcBJuMa9q882wqUzwb8nr7v7GdIpJpXHsZ_wR7wgoYdjW-rULGmPCaWy5obxwH1A8g999rH7Wa37a4uVnCcmi5ixX5BAkOg1ZphZkrjstBYT5YDRdFuVCXkID2oavrGJesaiXs7bVnRrK2YGERiHeA2PBbhOAC6lEWaG37EuWIJj__ooHzNNX_HI2HUNr_tCavuyRERBGNmDF5TDsW8rChBedaTnwxHuKsTkpbL6NO7oFOR-L79OoI')"></div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h4 class="text-xl font-bold mb-1">Du Lịch Thế Giới</h4>
+<p class="text-sm text-slate-500 dark:text-slate-400">Chuyến đi xuyên Châu Âu</p>
+</div>
+<div class="relative flex items-center justify-center">
+<svg class="w-14 h-14">
+<circle class="text-slate-100 dark:text-slate-800" cx="28" cy="28" fill="transparent" r="24" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-primary" cx="28" cy="28" fill="transparent" r="24" stroke="currentColor" stroke-dasharray="150.7" stroke-dashoffset="100.5" stroke-linecap="round" stroke-width="4"></circle>
+</svg>
+<span class="absolute text-xs font-bold text-primary">33%</span>
+</div>
+</div>
+<div class="space-y-3 mb-6">
+<div class="flex justify-between text-sm">
+<span class="text-slate-500 dark:text-slate-400">Đã lưu:</span>
+<span class="font-bold">50.000.000 ₫</span>
+</div>
+<div class="flex justify-between text-sm">
+<span class="text-slate-500 dark:text-slate-400">Mục tiêu:</span>
+<span class="font-bold">150.000.000 ₫</span>
+</div>
+<div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 33.3%"></div>
+</div>
+</div>
+<div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-4">
+<span class="material-symbols-outlined text-sm">event</span>
+                            Dự kiến: 09/2024
+                        </div>
+</div>
+</div>
+</div>
+<!-- Recent Activities Section -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8">
+<h3 class="text-xl font-bold mb-6">Lịch sử tiết kiệm gần đây</h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+<span class="material-symbols-outlined">add_circle</span>
+</div>
+<div>
+<p class="font-semibold">Tiền gửi định kỳ</p>
+<p class="text-xs text-slate-500">Cho: Mua Nhà Mơ Ước • 2 giờ trước</p>
+</div>
+</div>
+<span class="font-bold text-emerald-600">+15.000.000 ₫</span>
+</div>
+<div class="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+<span class="material-symbols-outlined">stars</span>
+</div>
+<div>
+<p class="font-semibold">Thưởng mục tiêu</p>
+<p class="text-xs text-slate-500">Cho: Du Lịch Thế Giới • Hôm qua</p>
+</div>
+</div>
+<span class="font-bold text-primary">+2.000.000 ₫</span>
+</div>
+<div class="flex items-center justify-between py-3">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+<span class="material-symbols-outlined">add_circle</span>
+</div>
+<div>
+<p class="font-semibold">Tiền gửi thủ công</p>
+<p class="text-xs text-slate-500">Cho: Mua Xe Ô Tô • 3 ngày trước</p>
+</div>
+</div>
+<span class="font-bold text-emerald-600">+10.000.000 ₫</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

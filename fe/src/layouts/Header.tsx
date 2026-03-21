@@ -1,21 +1,6 @@
 import React, { useState, useEffect } from "react";
-import {
-    Row,
-    Col,
-    Breadcrumb,
-    Badge,
-    Button,
-    Dropdown,
-    Avatar,
-    Input,
-} from "antd";
-import {
-    SearchOutlined,
-    MenuOutlined,
-    LogoutOutlined,
-    UserOutlined,
-    CloseOutlined,
-} from "@ant-design/icons";
+import { Dropdown, Avatar } from "antd";
+import { LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ThemeSwitcher from "../components/ThemeSwitcher";
@@ -24,170 +9,98 @@ interface HeaderProps {
     onMenuClick?: () => void;
 }
 
-const bellIcon = (
-    <svg
-        width="20"
-        height="20"
-        viewBox="0 0 20 20"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-    >
-        <path
-            d="M10 2C6.68632 2 4.00003 4.68629 4.00003 8V11.5858L3.29292 12.2929C3.00692 12.5789 2.92137 13.009 3.07615 13.3827C3.23093 13.7564 3.59557 14 4.00003 14H16C16.4045 14 16.7691 13.7564 16.9239 13.3827C17.0787 13.009 16.9931 12.5789 16.7071 12.2929L16 11.5858V8C16 4.68629 13.3137 2 10 2Z"
-            fill="#111827"
-        ></path>
-        <path
-            d="M10 18C8.34315 18 7 16.6569 7 15H13C13 16.6569 11.6569 18 10 18Z"
-            fill="#111827"
-        ></path>
-    </svg>
-);
-
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { logout } = useAuth();
-    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-    const [showMobileSearch, setShowMobileSearch] = useState(false);
+    const { logout, currentUser } = useAuth();
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
 
     useEffect(() => {
-        const handleResize = () => {
-            setIsMobile(window.innerWidth <= 768);
-        };
+        const handleResize = () => setIsMobile(window.innerWidth <= 1024);
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    // Generate breadcrumb items based on current route
-    const getBreadcrumbs = () => {
-        const pathnames = location.pathname.split("/").filter((x) => x);
-        const breadcrumbs = [
-            { title: "Trang chủ", onClick: () => navigate("/") },
-        ];
-
-        const breadcrumbMap: { [key: string]: string } = {
-            wallets: "Quản lý ví",
-            transactions: "Giao dịch",
-            goals: "Mục tiêu",
-            profile: "Hồ sơ cá nhân",
+    const getPageTitle = () => {
+        const path = location.pathname.split("/")[1];
+        const titles: Record<string, string> = {
+            dashboard: "Tổng quan tài chính",
+            wallets: "Quản lý nguồn tiền",
+            transactions: "Dòng tiền giao dịch",
+            goals: "Mục tiêu tích lũy",
+            profile: "Tài khoản cá nhân",
             dishes: "Gợi ý ăn uống",
+            analytics: "Báo cáo chuyên sâu",
+            budgets: "Hạn mức chi tiêu",
         };
+        return titles[path] || "FinTrack";
+    };
 
-        pathnames.forEach((name) => {
-            const label = breadcrumbMap[name] || name;
-            breadcrumbs.push({
-                title: label,
-                onClick: () => {},
-            });
-        });
-
-        return breadcrumbs;
+    const getPageIcon = () => {
+        const path = location.pathname.split("/")[1];
+        const icons: Record<string, string> = {
+            dashboard: "dashboard",
+            wallets: "account_balance",
+            transactions: "swap_horiz",
+            goals: "track_changes",
+            profile: "settings",
+            dishes: "restaurant",
+            analytics: "pie_chart",
+            budgets: "payments",
+        };
+        return icons[path] || "dashboard";
     };
 
     const userMenuItems = [
-        {
-            key: "profile",
-            icon: <UserOutlined />,
-            label: "Hồ sơ cá nhân",
-            onClick: () => navigate("/profile"),
-        },
-        {
-            key: "logout",
-            icon: <LogoutOutlined />,
-            label: "Đăng xuất",
-            onClick: logout,
-        },
+        { key: "profile", icon: <UserOutlined />, label: <span className="font-bold">Hồ sơ cá nhân</span>, onClick: () => navigate("/profile") },
+        { key: "logout", icon: <LogoutOutlined />, label: <span className="font-bold text-rose-500">Đăng xuất</span>, onClick: logout },
     ];
 
     return (
-        <div className={`header-with-breadcrumb ${isMobile ? "mobile" : ""}`}>
-            <Row
-                justify="space-between"
-                align="middle"
-                className="header-row"
-                style={{
-                    width: "100%",
-                    padding: isMobile ? "0 16px" : "0 24px",
-                    height: "100%",
-                }}
-            >
-                <Col>
-                    <Row align="middle" gutter={isMobile ? 8 : 16}>
-                        <Col>
-                            <Button
-                                type="text"
-                                className="sidebar-toggler"
-                                icon={<MenuOutlined />}
-                                onClick={onMenuClick}
-                                style={{ color: "inherit" }}
-                            />
-                        </Col>
-                        {!isMobile && (
-                            <Col>
-                                <Breadcrumb items={getBreadcrumbs()} />
-                            </Col>
-                        )}
-                    </Row>
-                </Col>
-                <Col>
-                    <Row
-                        gutter={isMobile ? 8 : 16}
-                        align="middle"
-                        className="header-actions"
-                    >
-                        <Col>
-                            <Input
-                                className="header-search-input"
-                                placeholder="Tìm kiếm..."
-                                prefix={<SearchOutlined />}
-                                style={{ width: "200px" }}
-                                allowClear
-                            />
-                        </Col>
-                        <Col>
-                            <Badge count={3} offset={[-5, 5]}>
-                                <Button
-                                    type="text"
-                                    style={{ border: "none", padding: 0 }}
-                                    icon={bellIcon}
-                                />
-                            </Badge>
-                        </Col>
-                        <Col>
-                            <ThemeSwitcher />
-                        </Col>
-                        <Col>
-                            <Dropdown
-                                menu={{ items: userMenuItems }}
-                                trigger={["click"]}
-                            >
-                                <Avatar
-                                    size={32}
-                                    icon={<UserOutlined />}
-                                    style={{
-                                        cursor: "pointer",
-                                        backgroundColor: "#1890ff",
-                                    }}
-                                />
-                            </Dropdown>
-                        </Col>
-                    </Row>
-                </Col>
-            </Row>
-
-            {/* Mobile Search Bar */}
-            {isMobile && showMobileSearch && (
-                <div className="mobile-search-bar">
-                    <Input
-                        placeholder="Tìm kiếm..."
-                        prefix={<SearchOutlined />}
-                        style={{ width: "100%" }}
-                        allowClear
-                        autoFocus
-                    />
+        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-6 md:px-8 shrink-0 sticky top-0 z-50">
+            <div className="flex items-center gap-4">
+                {isMobile && (
+                    <button onClick={onMenuClick} className="size-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-primary transition-colors">
+                        <span className="material-symbols-outlined text-xl">menu</span>
+                    </button>
+                )}
+                <div className="flex items-center gap-2 text-primary">
+                    <span className="material-symbols-outlined text-xl">{getPageIcon()}</span>
+                    <h2 className="text-lg font-bold">{getPageTitle()}</h2>
                 </div>
-            )}
-        </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+                <div className="hidden lg:block relative">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" style={{ fontSize: '16px' }}>search</span>
+                    <input className="pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary w-56 dark:text-white" placeholder="Tìm nhanh..." />
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <ThemeSwitcher />
+                    <button className="relative text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+                        <span className="material-symbols-outlined">notifications</span>
+                        <span className="absolute top-0 right-0 size-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+                    </button>
+
+                    <Dropdown menu={{ items: userMenuItems }} trigger={["click"]} placement="bottomRight">
+                        <div className="flex items-center gap-3 border-l border-slate-200 dark:border-slate-800 pl-3 cursor-pointer">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-sm font-semibold dark:text-white leading-tight">{currentUser?.displayName || "FinTracker"}</p>
+                                <p className="text-xs text-slate-500">Gói Premium</p>
+                            </div>
+                            <div className="size-9 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex items-center justify-center">
+                                {(currentUser as any)?.photoURL ? (
+                                    <img src={(currentUser as any).photoURL} className="w-full h-full object-cover" alt="Avatar" />
+                                ) : (
+                                    <span className="material-symbols-outlined text-slate-400" style={{ fontSize: '18px' }}>person</span>
+                                )}
+                            </div>
+                        </div>
+                    </Dropdown>
+                </div>
+            </div>
+        </header>
     );
 };
 

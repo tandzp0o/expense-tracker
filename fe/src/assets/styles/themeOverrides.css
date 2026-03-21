@@ -1,5 +1,5 @@
 body {
-    background-color: var(--bg-base, #fafafa);
+    background-color: var(--background-light, #f6f6f8);
     color: var(--text-base, rgba(0, 0, 0, 0.65));
     font-family:
         Inter,
@@ -14,7 +14,7 @@ body {
 /* Layout / surfaces */
 .layout-dashboard,
 .layout-dashboard .ant-layout {
-    background: var(--bg-base, #fafafa) !important;
+    background: var(--background-light, #f6f6f8) !important;
 }
 
 .layout-dashboard .ant-card,
@@ -80,23 +80,23 @@ body {
     .ant-menu-submenu
     .active
     .icon {
-    background-color: var(--primary-color, #1890ff) !important;
+    background-color: var(--primary, #4137cd) !important;
 }
 
 .layout-dashboard .ant-layout-sider.sider-primary .footer-box,
 .layout-dashboard .ant-layout-sider.sider-primary .footer-box .icon {
-    background-color: var(--primary-color, #1890ff) !important;
+    background-color: var(--primary, #4137cd) !important;
 }
 
 /* Make common Ant buttons follow theme */
 .ant-btn-primary {
-    background: var(--primary-color, #1890ff) !important;
-    border-color: var(--primary-color, #1890ff) !important;
+    background: var(--primary, #4137cd) !important;
+    border-color: var(--primary, #4137cd) !important;
 }
 
 .ant-btn-primary:hover {
-    background: var(--primary-color, #1890ff) !important;
-    border-color: var(--primary-color, #1890ff) !important;
+    background: var(--primary, #4137cd) !important;
+    border-color: var(--primary, #4137cd) !important;
 }
 
 /* Surface/background tokens */

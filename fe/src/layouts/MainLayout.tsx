@@ -1,98 +1,120 @@
 import React, { useState, useEffect } from "react";
-import { Layout, Drawer } from "antd";
-import { useLocation } from "react-router-dom";
+import { Drawer } from "antd";
+import { useLocation, NavLink } from "react-router-dom";
 import Sidenav from "./Sidenav";
 import Header from "./Header";
 import Footer from "./Footer";
-
-const { Sider, Content, Header: AntHeader } = Layout;
+import { useTheme } from "../contexts/ThemeContext";
 
 interface MainLayoutProps {
     children: React.ReactNode;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+    const { theme } = useTheme();
     const [visible, setVisible] = useState(false);
-    const [sidenavColor] = useState("#1890ff");
-    const [sidenavType] = useState("transparent");
-    const [placement, setPlacement] = useState("right");
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
 
-    let { pathname } = useLocation();
-    pathname = pathname.replace("/", "");
+    const location = useLocation();
 
     useEffect(() => {
-        if (pathname === "rtl") {
-            setPlacement("left");
-        } else {
-            setPlacement("right");
-        }
-    }, [pathname]);
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 1024);
+            if (window.innerWidth > 1024) {
+                setVisible(false);
+            }
+        };
+
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     const openDrawer = () => setVisible(!visible);
 
+    const bottomNavItems = [
+        { to: "/dashboard", icon: "home", label: "Trang chủ" },
+        { to: "/wallets", icon: "account_balance_wallet", label: "Ví" },
+        { to: "/transactions", icon: "add", label: "Thêm", isMiddle: true },
+        { to: "/analytics", icon: "pie_chart", label: "Thống kê" },
+        { to: "/profile", icon: "settings", label: "Cài đặt" },
+    ];
+
     return (
-        <Layout
-            className={`layout-dashboard ${
-                pathname === "profile" ? "layout-profile" : ""
-            } ${pathname === "rtl" ? "layout-dashboard-rtl" : ""}`}
-        >
+        <div className={`flex h-screen overflow-hidden ${theme === "dark" ? "dark" : ""}`}>
+            {/* Sidebar Navigation - Desktop */}
+            {!isMobile && (
+                <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+                    <Sidenav />
+                </aside>
+            )}
+
             {/* Mobile Drawer */}
-            <Drawer
-                title={false}
-                placement={placement === "right" ? "left" : "right"}
-                closable={false}
-                onClose={() => setVisible(false)}
-                open={visible}
-                key={placement === "right" ? "left" : "right"}
-                width={250}
-                className={`drawer-sidebar ${
-                    pathname === "rtl" ? "drawer-sidebar-rtl" : ""
-                }`}
-            >
-                <Layout
-                    className={`layout-dashboard ${
-                        pathname === "rtl" ? "layout-dashboard-rtl" : ""
-                    }`}
+            {isMobile && (
+                <Drawer
+                    title={false}
+                    placement="left"
+                    closable={false}
+                    onClose={() => setVisible(false)}
+                    open={visible}
+                    width={280}
+                    styles={{ body: { padding: 0 } }}
                 >
-                    <Sider
-                        trigger={null}
-                        width={250}
-                        theme="light"
-                        className="sider-primary ant-layout-sider-primary"
-                        style={{ background: sidenavType }}
-                    >
-                        <Sidenav color={sidenavColor} />
-                    </Sider>
-                </Layout>
-            </Drawer>
+                    <Sidenav onCloseMenu={() => setVisible(false)} />
+                </Drawer>
+            )}
 
-            {/* Desktop Sidebar */}
-            <Sider
-                breakpoint="lg"
-                collapsedWidth="0"
-                onCollapse={(collapsed, type) => {
-                    console.log(collapsed, type);
-                }}
-                trigger={null}
-                width={250}
-                theme="light"
-                className={`sider-primary ant-layout-sider-primary ${
-                    sidenavType === "#fff" ? "active-route" : ""
-                }`}
-                style={{ background: sidenavType }}
-            >
-                <Sidenav color={sidenavColor} />
-            </Sider>
+            {/* Main Content */}
+            <main className="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
+                <Header onMenuClick={openDrawer} />
+                
+                <div className={`flex-1 overflow-y-auto p-4 md:p-8 ${isMobile ? "pb-24" : "pb-8"}`}>
+                    <div className="w-full">
+                        {children}
+                        <Footer />
+                    </div>
+                </div>
 
-            {/* Main Content Layout */}
-            <Layout>
-                <AntHeader className="subheader">
-                    <Header onMenuClick={openDrawer} />
-                </AntHeader>
-                <Content className="content-ant">{children}</Content>
-                <Footer />
-            </Layout>
-        </Layout>
+                {/* Mobile Bottom Navigation */}
+                {isMobile && (
+                    <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-2 pb-6 pt-2 z-20">
+                        <div className="flex justify-around items-center">
+                            {bottomNavItems.map((item) => (
+                                item.isMiddle ? (
+                                    <div key={item.to} className="relative -top-8">
+                                        <NavLink 
+                                            to="/transactions"
+                                            className="size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/40 flex items-center justify-center transform active:scale-95 transition-transform"
+                                        >
+                                            <span className="material-symbols-outlined text-3xl font-bold">add</span>
+                                        </NavLink>
+                                    </div>
+                                ) : (
+                                    <NavLink 
+                                        key={item.to}
+                                        to={item.to}
+                                        className={({ isActive }) => 
+                                            `flex flex-col items-center gap-1 transition-colors ${isActive ? "text-primary" : "text-slate-400 dark:text-slate-500"}`
+                                        }
+                                    >
+                                        <span className={`material-symbols-outlined ${location.pathname === item.to ? 'font-variation-fill' : ''}`}>
+                                            {item.icon}
+                                        </span>
+                                        <span className="text-[10px] font-bold">{item.label}</span>
+                                    </NavLink>
+                                )
+                            ))}
+                        </div>
+                    </nav>
+                )}
+            </main>
+            <style>
+                {`
+                    .font-variation-fill {
+                        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+                    }
+                `}
+            </style>
+        </div>
     );
 };
 
