@@ -1,36 +1,68 @@
 import { Request, Response } from "express";
 import Goal from "../models/Goal";
+import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
 
-export const createGoal = async (req: any, res: Response) => {
-    try {
-        const {
-            title,
-            description,
-            targetAmount,
-            currentAmount,
-            category,
-            deadline,
-        } = req.body;
-        const userId = req.user.uid;
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-        const goal = new Goal({
-            userId,
-            title,
-            description,
-            targetAmount: parseFloat(targetAmount),
-            currentAmount: currentAmount ? parseFloat(currentAmount) : 0,
-            category,
-            deadline: deadline ? new Date(deadline) : undefined,
-            status: "active",
-        });
+// Multer for file upload
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-        await goal.save();
-        res.status(201).json(goal);
-    } catch (error) {
-        console.error("Error creating goal:", error);
-        res.status(500).json({ message: "Lỗi tạo mục tiêu" });
-    }
-};
+export const createGoal = [
+    upload.single("image"), // Allow single image upload
+    async (req: any, res: Response) => {
+        try {
+            const {
+                title,
+                description,
+                targetAmount,
+                currentAmount,
+                category,
+                deadline,
+            } = req.body;
+            const userId = req.user.uid;
+
+            let imageUrl: string | undefined;
+            if (req.file) {
+                const result = await new Promise<any>((resolve, reject) => {
+                    const stream = cloudinary.uploader.upload_stream(
+                        { folder: "goals" },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        },
+                    );
+                    stream.end(req.file.buffer);
+                });
+                imageUrl = result.secure_url;
+            }
+
+            const goal = new Goal({
+                userId,
+                title,
+                description,
+                targetAmount: parseFloat(targetAmount),
+                currentAmount: currentAmount ? parseFloat(currentAmount) : 0,
+                category,
+                deadline: deadline ? new Date(deadline) : undefined,
+                status: "active",
+                imageUrl,
+            });
+
+            await goal.save();
+            res.status(201).json(goal);
+        } catch (error) {
+            console.error("Error creating goal:", error);
+            res.status(500).json({ message: "Lỗi tạo mục tiêu" });
+        }
+    },
+];
 
 export const getGoals = async (req: any, res: Response) => {
     try {
@@ -85,53 +117,73 @@ export const getGoalById = async (req: any, res: Response) => {
     }
 };
 
-export const updateGoal = async (req: any, res: Response) => {
-    try {
-        const { id } = req.params;
-        const {
-            title,
-            description,
-            targetAmount,
-            currentAmount,
-            category,
-            deadline,
-            status,
-        } = req.body;
-        const userId = req.user.uid;
+export const updateGoal = [
+    upload.single("image"), // Allow single image upload
+    async (req: any, res: Response) => {
+        try {
+            const { id } = req.params;
+            const {
+                title,
+                description,
+                targetAmount,
+                currentAmount,
+                category,
+                deadline,
+                status,
+            } = req.body;
+            const userId = req.user.uid;
 
-        const goal = await Goal.findOne({ _id: id, userId });
-        if (!goal) {
-            return res.status(404).json({ message: "Không tìm thấy mục tiêu" });
+            const goal = await Goal.findOne({ _id: id, userId });
+            if (!goal) {
+                return res
+                    .status(404)
+                    .json({ message: "Không tìm thấy mục tiêu" });
+            }
+
+            // Handle image upload
+            if (req.file) {
+                const result = await new Promise<any>((resolve, reject) => {
+                    const stream = cloudinary.uploader.upload_stream(
+                        { folder: "goals" },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        },
+                    );
+                    stream.end(req.file.buffer);
+                });
+                goal.imageUrl = result.secure_url;
+            }
+
+            // Update fields
+            if (title !== undefined) goal.title = title;
+            if (description !== undefined) goal.description = description;
+            if (targetAmount !== undefined)
+                goal.targetAmount = parseFloat(targetAmount);
+            if (currentAmount !== undefined)
+                goal.currentAmount = parseFloat(currentAmount);
+            if (category !== undefined) goal.category = category;
+            if (deadline !== undefined)
+                goal.deadline = deadline ? new Date(deadline) : undefined;
+            if (status !== undefined) goal.status = status;
+
+            // Auto-update status based on progress
+            if (goal.deadline && new Date() > goal.deadline) {
+                goal.status = "expired";
+            } else if (goal.currentAmount >= goal.targetAmount) {
+                goal.status = "completed";
+            } else {
+                goal.status = "active";
+            }
+
+            await goal.save();
+            res.json(goal);
+        } catch (error) {
+            console.error("Error updating goal:", error);
+            res.status(500).json({ message: "Lỗi cập nhật mục tiêu" });
         }
-
-        // Update fields
-        if (title !== undefined) goal.title = title;
-        if (description !== undefined) goal.description = description;
-        if (targetAmount !== undefined)
-            goal.targetAmount = parseFloat(targetAmount);
-        if (currentAmount !== undefined)
-            goal.currentAmount = parseFloat(currentAmount);
-        if (category !== undefined) goal.category = category;
-        if (deadline !== undefined)
-            goal.deadline = deadline ? new Date(deadline) : undefined;
-        if (status !== undefined) goal.status = status;
-
-        // Auto-update status based on progress
-        if (goal.deadline && new Date() > goal.deadline) {
-            goal.status = "expired";
-        } else if (goal.currentAmount >= goal.targetAmount) {
-            goal.status = "completed";
-        } else {
-            goal.status = "active";
-        }
-
-        await goal.save();
-        res.json(goal);
-    } catch (error) {
-        console.error("Error updating goal:", error);
-        res.status(500).json({ message: "Lỗi cập nhật mục tiêu" });
-    }
-};
+    },
+];
 
 export const deleteGoal = async (req: any, res: Response) => {
     try {
@@ -142,6 +194,14 @@ export const deleteGoal = async (req: any, res: Response) => {
         if (!goal) {
             return res.status(404).json({ message: "Không tìm thấy mục tiêu" });
         }
+
+        // Nullify goal reference in transactions
+        const { Types } = await import("mongoose");
+        const Transaction = (await import("../models/Transaction")).default;
+        await Transaction.updateMany(
+            { goalId: new Types.ObjectId(id as string), userId },
+            { goalId: null },
+        );
 
         res.json({ message: "Xóa mục tiêu thành công" });
     } catch (error) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
+    App as AntdApp,
     Card,
     Form,
     Input,
@@ -13,7 +14,6 @@ import {
     Image,
     Space,
     Carousel,
-    App,
 } from "antd";
 import {
     PlusOutlined,
@@ -25,7 +25,6 @@ import {
 import { dishApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
 import { auth } from "../firebase/config";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 const { TextArea } = Input;
@@ -52,7 +51,7 @@ const preferenceOptions = [
 ];
 
 const DishSuggestions: React.FC = () => {
-    const { message: staticMessage } = App.useApp();
+    const { message: staticMessage } = AntdApp.useApp();
     const [dishes, setDishes] = useState<Dish[]>([]);
     const [filteredDishes, setFilteredDishes] = useState<Dish[]>([]);
     const [loading, setLoading] = useState(false);
@@ -60,8 +59,6 @@ const DishSuggestions: React.FC = () => {
     const [editingDish, setEditingDish] = useState<Dish | null>(null);
     const [form] = Form.useForm();
     const [imageFiles, setImageFiles] = useState<any[]>([]);
-    const [mapModalVisible, setMapModalVisible] = useState(false);
-    const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
 
     const fetchDishes = useCallback(async () => {
@@ -73,7 +70,7 @@ const DishSuggestions: React.FC = () => {
             const data = await dishApi.getDishes(undefined, token);
             setDishes(data);
             setFilteredDishes(data);
-        } catch (error) {
+        } catch (error: any) {
             staticMessage.error("Lỗi khi tải danh sách món ăn");
         } finally { setLoading(false); }
     }, []);
@@ -106,6 +103,26 @@ const DishSuggestions: React.FC = () => {
         });
     };
 
+    const handleOpenModal = (dish: Dish | null = null) => {
+        if (dish) {
+            setEditingDish(dish);
+            form.setFieldsValue(dish);
+            // Convert current imageUrls to fileList format for Upload component
+            setImageFiles((dish.imageUrls || []).map((url, i) => ({
+                uid: `existing-${i}`,
+                name: `image-${i}`,
+                status: 'done',
+                url: url,
+                originFileObj: null // Marker for existing image
+            })));
+        } else {
+            setEditingDish(null);
+            form.resetFields();
+            setImageFiles([]);
+        }
+        setModalVisible(true);
+    };
+
     const handleSubmit = async (values: any) => {
         try {
             const token = await auth.currentUser?.getIdToken();
@@ -116,24 +133,47 @@ const DishSuggestions: React.FC = () => {
             formData.append("price", values.price || "");
             formData.append("preferences", JSON.stringify(values.preferences || []));
             formData.append("address", values.address || "");
-            if (selectedLocation) formData.append("location", JSON.stringify(selectedLocation));
-            imageFiles.forEach(file => { if (file.originFileObj) formData.append("images", file.originFileObj); });
 
-            if (editingDish) await dishApi.updateDish(editingDish._id, formData, token);
-            else await dishApi.createDish(formData, token);
+            // Separate existing images from newly uploaded ones
+            const existingImages = imageFiles
+                .filter(file => !file.originFileObj && file.url)
+                .map(file => file.url);
+            
+            formData.append("existingImages", JSON.stringify(existingImages));
 
-            staticMessage.success("Thành công");
+            // Append new files
+            imageFiles.forEach(file => {
+                if (file.originFileObj) {
+                    formData.append("images", file.originFileObj);
+                }
+            });
+
+            if (editingDish) {
+                await dishApi.updateDish(editingDish._id, formData, token);
+                staticMessage.success("Cập nhật món ăn thành công");
+            } else {
+                await dishApi.createDish(formData, token);
+                staticMessage.success("Đã thêm món ăn mới");
+            }
+
             setModalVisible(false);
             fetchDishes();
-        } catch (error) { staticMessage.error("Không thể lưu"); }
+        } catch (error: any) {
+            console.error("Error saving dish:", error);
+            staticMessage.error("Không thể lưu món ăn");
+        }
     };
 
     const handleDelete = async (id: string) => {
-        const token = await auth.currentUser?.getIdToken();
-        if (!token) return;
-        await dishApi.deleteDish(id, token);
-        staticMessage.success("Đã xóa");
-        fetchDishes();
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) return;
+            await dishApi.deleteDish(id, token);
+            staticMessage.success("Đã xóa món ăn");
+            fetchDishes();
+        } catch (error: any) {
+            staticMessage.error("Lỗi khi xóa món ăn");
+        }
     };
 
     if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Spin size="large" /></div>;
@@ -148,7 +188,7 @@ const DishSuggestions: React.FC = () => {
                 </div>
                 <div className="flex gap-3">
                     <Button icon={<ReloadOutlined />} onClick={getRandomDish} className="h-11 px-6 rounded-xl font-bold uppercase text-xs tracking-wide border-2 hover:border-primary hover:text-primary transition-all">Gợi ý ngẫu nhiên</Button>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingDish(null); form.resetFields(); setModalVisible(true); }} className="h-11 px-6 rounded-xl font-bold uppercase text-xs tracking-wide shadow-lg shadow-primary/20">Thêm món mới</Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()} className="h-11 px-6 rounded-xl font-bold uppercase text-xs tracking-wide shadow-lg shadow-primary/20">Thêm món mới</Button>
                 </div>
             </div>
 
@@ -172,7 +212,7 @@ const DishSuggestions: React.FC = () => {
                                 ))}
                             </Carousel>
                             <div className="absolute top-4 right-4 flex gap-2">
-                                <button onClick={() => { setEditingDish(dish); form.setFieldsValue(dish); setModalVisible(true); }} className="size-8 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center text-slate-600 hover:text-primary transition-colors"><EditOutlined className="text-sm" /></button>
+                                <button onClick={() => handleOpenModal(dish)} className="size-8 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center text-slate-600 hover:text-primary transition-colors"><EditOutlined className="text-sm" /></button>
                                 <button onClick={() => handleDelete(dish._id)} className="size-8 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center text-slate-600 hover:text-rose-500 transition-colors"><DeleteOutlined className="text-sm" /></button>
                             </div>
                             <div className="absolute bottom-4 left-4">

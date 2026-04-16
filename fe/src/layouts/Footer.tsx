@@ -4,7 +4,7 @@ const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="mt-12 py-8 border-t border-slate-100 dark:border-slate-800/50">
+    <footer className="mx-auto py-8 border-t border-slate-100 dark:border-slate-800/50">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400">
             <div className="flex items-center gap-2">
                 <span className="text-primary font-bold">FinTrack</span>

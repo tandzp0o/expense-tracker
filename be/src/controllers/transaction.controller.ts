@@ -22,6 +22,8 @@ export const createTransaction = async (req: any, res: Response) => {
             note,
             budgetId,
             goalId,
+            isSystemGenerated,
+            isDeletable,
         } = req.body;
         const userId = req.user.uid;
 
@@ -62,7 +64,16 @@ export const createTransaction = async (req: any, res: Response) => {
         }
 
         // Handle different transaction types
-        if (type === TransactionType.GOAL_DEPOSIT) {
+        if (type === TransactionType.ADJUSTMENT) {
+            // Adjustment transactions không kiểm tra số dư
+            // Cập nhật số dư theo direction (INCOME/EXPENSE)
+            const direction = req.body.direction || "income";
+            if (direction === "income") {
+                wallet.balance += amount;
+            } else {
+                wallet.balance = Math.max(wallet.balance - amount, 0);
+            }
+        } else if (type === TransactionType.GOAL_DEPOSIT) {
             // Kiểm tra số dư ví
             if (wallet.balance < amount) {
                 await session.abortTransaction();
@@ -154,12 +165,20 @@ export const createTransaction = async (req: any, res: Response) => {
             note,
             budgetId: budgetId || undefined,
             goalId: goalId || undefined,
+            isSystemGenerated: isSystemGenerated || false,
+            isDeletable: isDeletable !== undefined ? isDeletable : true,
         });
 
         await Promise.all([
             transaction.save({ session }),
             wallet.save({ session }),
         ]);
+
+        // Set hasTransactions = true cho wallet nếu đây là giao dịch đầu tiên (không phải adjustment)
+        if (!wallet.hasTransactions && type !== TransactionType.ADJUSTMENT) {
+            wallet.hasTransactions = true;
+            await wallet.save({ session });
+        }
 
         await session.commitTransaction();
         res.status(201).json(transaction);
@@ -276,8 +295,16 @@ export const getStatementReport = async (req: Request, res: Response) => {
 export const getTransactions = async (req: any, res: Response) => {
     try {
         // 1. Thêm 'note' vào đây để lấy nó ra từ query
-        const { startDate, endDate, type, category, walletId, note } =
-            req.query;
+        const {
+            startDate,
+            endDate,
+            type,
+            category,
+            walletId,
+            note,
+            page,
+            limit,
+        } = req.query;
         const userId = req.user.uid;
 
         const query: any = { userId };
@@ -299,16 +326,19 @@ export const getTransactions = async (req: any, res: Response) => {
             if (endDate) query.date.$lte = new Date(endDate as string);
         }
 
+        const total = await Transaction.countDocuments(query);
         const transactions = await Transaction.find(query)
             .sort({ date: -1, createdAt: -1 })
+            .skip((Number(page) - 1) * Number(limit))
+            .limit(Number(limit))
             .populate("walletId", "name");
 
-        // ... phần còn lại của code không thay đổi
-        const summary = transactions.reduce(
+        const summaryData = await Transaction.find(query);
+        const summary = summaryData.reduce(
             (acc, t) => {
                 if (t.type === TransactionType.INCOME) {
                     acc.income += t.amount;
-                } else {
+                } else if (t.type === TransactionType.EXPENSE) {
                     acc.expense += t.amount;
                 }
                 return acc;
@@ -323,7 +353,13 @@ export const getTransactions = async (req: any, res: Response) => {
             data: {
                 transactions,
                 summary,
-                total: transactions.length,
+                total,
+                pagination: {
+                    total,
+                    page: Number(page),
+                    limit: Number(limit),
+                    pages: Math.ceil(total / Number(limit)),
+                },
             },
         });
     } catch (error) {
@@ -419,14 +455,18 @@ export const updateTransaction = async (req: any, res: Response) => {
         const { walletId, type, amount, category, date, note } = req.body;
         const userId = req.user.uid;
 
-        // Tìm giao dịch hiện tại
-        const currentTransaction =
-            await Transaction.findById(id).session(session);
+        // Tìm giao dịch hiện tại và kiểm tra quyền sở hữu
+        const currentTransaction = await Transaction.findOne({
+            _id: id,
+            userId,
+        }).session(session);
+
         if (!currentTransaction) {
             await session.abortTransaction();
             return res.status(404).json({
                 success: false,
-                message: "Không tìm thấy giao dịch để cập nhật",
+                message:
+                    "Không tìm thấy giao dịch hoặc bạn không có quyền chỉnh sửa",
             });
         }
 
@@ -549,14 +589,20 @@ export const deleteTransaction = async (req: any, res: Response) => {
 
         // Tìm giao dịch cần xóa
         const transaction = await Transaction.findOne({
-            _id: id,
+            _id: new Types.ObjectId(id),
             userId,
         }).session(session);
+
         if (!transaction) {
+            console.error(
+                `[DeleteTransaction] 404 Not Found: TransactionID=${id}, UserUID=${userId}`,
+            );
             await session.abortTransaction();
             return res.status(404).json({
                 success: false,
-                message: "Không tìm thấy giao dịch để xóa",
+                message:
+                    "Không tìm thấy giao dịch để xóa hoặc bạn không có quyền",
+                debug: { id, userId }, // Giúp debug cho user trong lúc phát triển
             });
         }
 
@@ -564,28 +610,21 @@ export const deleteTransaction = async (req: any, res: Response) => {
         const wallet = await Wallet.findById(transaction.walletId).session(
             session,
         );
-        if (!wallet) {
-            await session.abortTransaction();
-            return res.status(404).json({
-                success: false,
-                message: "Không tìm thấy ví liên quan",
-            });
+
+        if (wallet) {
+            // Hoàn tác số dư nếu ví tồn tại
+            if (transaction.type === TransactionType.INCOME) {
+                wallet.balance =
+                    Number(wallet.balance) - Number(transaction.amount);
+            } else {
+                wallet.balance =
+                    Number(wallet.balance) + Number(transaction.amount);
+            }
+            await wallet.save({ session });
         }
 
-        // Hoàn tác số dư
-        if (transaction.type === TransactionType.INCOME) {
-            wallet.balance =
-                Number(wallet.balance) - Number(transaction.amount);
-        } else {
-            wallet.balance =
-                Number(wallet.balance) + Number(transaction.amount);
-        }
-
-        // Xóa giao dịch và cập nhật số dư
-        await Promise.all([
-            Transaction.deleteOne({ _id: id }).session(session),
-            wallet.save({ session }),
-        ]);
+        // Xóa giao dịch
+        await Transaction.deleteOne({ _id: id }).session(session);
 
         await session.commitTransaction();
 

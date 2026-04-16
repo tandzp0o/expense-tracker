@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
-import { Input, InputNumber, Modal, message, Spin, Progress, Button } from "antd";
+import { App, Input, InputNumber, Modal, Spin, Progress, Button } from "antd";
 import { auth } from "../firebase/config";
 import { budgetApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
@@ -18,8 +18,10 @@ interface BudgetSummaryItem {
 }
 
 const Budgets: React.FC = () => {
+    const { message } = App.useApp();
     const [loading, setLoading] = useState(true);
     const [budgets, setBudgets] = useState<BudgetSummaryItem[]>([]);
+    const [growth, setGrowth] = useState(0);
     const [totalBudget, setTotalBudget] = useState(0);
     const [totalSpent, setTotalSpent] = useState(0);
     const [modalOpen, setModalOpen] = useState(false);
@@ -35,6 +37,7 @@ const Budgets: React.FC = () => {
             setBudgets(res?.items || []);
             setTotalBudget(res?.totalBudget || 0);
             setTotalSpent(res?.totalSpent || 0);
+            setGrowth(res?.growth || 0);
         } catch (e) { message.error("Lỗi tải dữ liệu"); }
         finally { setLoading(false); }
     }, []);
@@ -67,10 +70,10 @@ const Budgets: React.FC = () => {
                         <p className="text-slate-500 text-sm font-medium">Tổng ngân sách</p>
                         <span className="material-symbols-outlined text-primary">account_balance</span>
                     </div>
-                    <p className="text-2xl font-bold">{formatCurrency(totalBudget)}</p>
-                    <div className="flex items-center gap-1 text-emerald-500 text-sm font-bold">
-                        <span className="material-symbols-outlined text-sm">trending_up</span>
-                        <span>+5.2% so với tháng trước</span>
+                    <p className="text-2xl font-bold dark:text-white">{formatCurrency(totalBudget)}</p>
+                    <div className={`flex items-center gap-1 ${growth >= 0 ? 'text-emerald-500' : 'text-red-500'} text-sm font-bold`}>
+                        <span className="material-symbols-outlined text-sm">{growth >= 0 ? 'trending_up' : 'trending_down'}</span>
+                        <span>{growth > 0 ? '+' : ''}{growth}% so với tháng trước</span>
                     </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-3">
@@ -78,10 +81,10 @@ const Budgets: React.FC = () => {
                         <p className="text-slate-500 text-sm font-medium">Đã chi tiêu</p>
                         <span className="material-symbols-outlined text-primary">shopping_cart</span>
                     </div>
-                    <p className="text-2xl font-bold">{formatCurrency(totalSpent)}</p>
+                    <p className="text-2xl font-bold dark:text-white">{formatCurrency(totalSpent)}</p>
                     <div className="flex items-center gap-1 text-sm font-bold" style={{ color: spentPercent > 85 ? '#ef4444' : '#10b981' }}>
                         <span className="material-symbols-outlined text-sm">{spentPercent > 85 ? 'warning' : 'check_circle'}</span>
-                        <span>{spentPercent > 85 ? 'Sắp chạm hạn mức' : `Dưới hạn mức ${Math.round(100 - spentPercent)}%`}</span>
+                        <span>{spentPercent > 85 ? 'Sắp chạm hạn mức' : `Dưới hạn mức ${Math.max(0, Math.round(100 - spentPercent))}%`}</span>
                     </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-3">
@@ -90,8 +93,8 @@ const Budgets: React.FC = () => {
                         <span className="material-symbols-outlined text-primary">savings</span>
                     </div>
                     <p className="text-2xl font-bold text-primary">{formatCurrency(remaining)}</p>
-                    <div className="flex items-center gap-1 text-slate-500 text-sm font-medium">
-                        <span>Cho {dayjs().daysInMonth() - dayjs().date()} ngày còn lại</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-sm font-medium dark:text-slate-400">
+                        <span>Cho {dayjs().daysInMonth() - dayjs().date() + 1} ngày còn lại</span>
                     </div>
                 </div>
             </div>
@@ -118,7 +121,22 @@ const Budgets: React.FC = () => {
                                         </div>
                                         <h4 className="font-bold dark:text-white">{b.category}</h4>
                                     </div>
-                                    <span className="text-sm font-medium text-slate-500">{Math.round(b.percent)}%</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-slate-500">{Math.round(b.percent)}%</span>
+                                        <button 
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                const token = await auth.currentUser?.getIdToken();
+                                                if (!token) return;
+                                                await budgetApi.deleteBudget(b._id, token);
+                                                message.success("Đã xóa ngân sách");
+                                                fetchData();
+                                            }}
+                                            className="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">delete</span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="flex flex-col gap-1.5">
                                     <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -130,7 +148,7 @@ const Budgets: React.FC = () => {
                                     </div>
                                 </div>
                                 <p className={`text-xs font-medium text-${statusColor}-500`}>{statusText}</p>
-                                <div className="pt-2 border-t border-slate-50 dark:border-slate-800 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="pt-2 border-t border-slate-50 dark:border-slate-800 flex justify-end">
                                     <button onClick={(e) => { e.stopPropagation(); setEditing(true); setFormData({ id: b._id, category: b.category, amount: b.amount }); setModalOpen(true); }} className="text-primary text-xs font-bold uppercase tracking-wide hover:underline">Điều chỉnh</button>
                                 </div>
                             </div>

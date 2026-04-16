@@ -8,20 +8,78 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "primary": "#4137cd",
-        "background-light": "#f6f6f8",
-        "background-dark": "#14131f",
+        /* ─── Màu cũ — GIỮ NGUYÊN ─────────────────────── */
+        "primary":           "#4137cd",
+        "background-light":  "#f6f6f8",
+        "background-dark":   "#14131f",
+
+        /* ─── Màu Login page — THÊM MỚI ────────────────── */
+        "surface":                    "#0b1326",
+        "surface-dim":                "#0b1326",
+        "surface-bright":             "#31394d",
+        "surface-container-lowest":   "#060e20",
+        "surface-container-low":      "#131b2e",
+        "surface-container":          "#171f33",
+        "surface-container-high":     "#222a3d",
+        "surface-container-highest":  "#2d3449",
+        "surface-variant":            "#2d3449",
+        "surface-tint":               "#b9c8de",
+        "on-surface":                 "#dae2fd",
+        "on-surface-variant":         "#c6c6cd",
+        "on-background":              "#dae2fd",
+        "background":                 "#0b1326",
+        "outline":                    "#909097",
+        "outline-variant":            "#45464d",
+        "inverse-surface":            "#dae2fd",
+        "inverse-on-surface":         "#283044",
+        "inverse-primary":            "#516072",
+        "primary-fixed":              "#d4e4fa",
+        "primary-fixed-dim":          "#b9c8de",
+        "primary-container":          "#091828",
+        "on-primary":                 "#233143",
+        "on-primary-fixed":           "#0d1c2d",
+        "on-primary-fixed-variant":   "#39485a",
+        "on-primary-container":       "#738296",
+        "secondary":                  "#bcc7de",
+        "secondary-fixed":            "#d8e3fb",
+        "secondary-fixed-dim":        "#bcc7de",
+        "secondary-container":        "#3e495d",
+        "on-secondary":               "#263143",
+        "on-secondary-fixed":         "#111c2d",
+        "on-secondary-fixed-variant": "#3c475a",
+        "on-secondary-container":     "#aeb9d0",
+        "tertiary":                   "#c0c1ff",
+        "tertiary-fixed":             "#e1e0ff",
+        "tertiary-fixed-dim":         "#c0c1ff",
+        "tertiary-container":         "#050060",
+        "on-tertiary":                "#1000a9",
+        "on-tertiary-fixed":          "#07006c",
+        "on-tertiary-fixed-variant":  "#2f2ebe",
+        "on-tertiary-container":      "#6d70fb",
+        "error":                      "#ffb4ab",
+        "error-container":            "#93000a",
+        "on-error":                   "#690005",
+        "on-error-container":         "#ffdad6",
       },
       fontFamily: {
-        "display": ["Inter", "sans-serif"]
+        /* ─── Giữ nguyên font cũ ───────────────────────── */
+        "display": ["Inter", "sans-serif"],
+        /* ─── Thêm cho Login ───────────────────────────── */
+        "headline": ["Inter", "sans-serif"],
+        "body":     ["Inter", "sans-serif"],
+        "label":    ["Inter", "sans-serif"],
       },
       borderRadius: {
+        /* ─── Giữ nguyên cũ ────────────────────────────── */
         "DEFAULT": "0.5rem",
-        "lg": "1rem",
-        "xl": "1.5rem",
-        "full": "9999px"
+        "lg":      "1rem",
+        "xl":      "1.5rem",
+        "full":    "9999px",
+        /* ─── Thêm cho Login ───────────────────────────── */
+        "card":    "1rem",
+        "button":  "0.75rem",
       },
     },
   },
   plugins: [],
-}
+};

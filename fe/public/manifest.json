@@ -1,30 +1,32 @@
 {
-  "short_name": "Ton Finance",
-  "name": "Ton Finance Management",
-  "description": "Quản lý tài chính cá nhân",
-  "icons": [
-    {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "logo.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
-    }
-  ],
-  "start_url": "/",
-  "display": "standalone",
-  "theme_color": "#4f46e5",
-  "background_color": "#ffffff",
-  "categories": ["finance", "productivity"],
-  "lang": "vi"
+    "short_name": "Ton Finance",
+    "name": "Ton Finance Management",
+    "description": "Quản lý tài chính cá nhân",
+    "icons": [
+        {
+            "src": "logo.png",
+            "sizes": "64x64 32x32 24x24 16x16",
+            "type": "image/png"
+        },
+        {
+            "src": "logo192.png",
+            "type": "image/png",
+            "sizes": "192x192",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "logo512.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "any maskable"
+        }
+    ],
+    "start_url": "/",
+    "display": "standalone",
+    "theme_color": "#1d00a5",
+    "background_color": "#121318",
+    "categories": ["finance", "productivity", "business"],
+    "lang": "vi",
+    "scope": "/",
+    "orientation": "portrait-primary"
 }

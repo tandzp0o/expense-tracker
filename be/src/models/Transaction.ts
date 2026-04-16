@@ -5,6 +5,7 @@ export enum TransactionType {
     EXPENSE = "EXPENSE",
     GOAL_DEPOSIT = "GOAL_DEPOSIT",
     GOAL_WITHDRAW = "GOAL_WITHDRAW",
+    ADJUSTMENT = "ADJUSTMENT",
 }
 
 export interface ITransaction extends Document {
@@ -16,6 +17,8 @@ export interface ITransaction extends Document {
     amount: number;
     category: string;
     date: Date;
+    isSystemGenerated?: boolean;
+    isDeletable?: boolean;
     note?: string;
     createdAt: Date;
 }
@@ -31,6 +34,8 @@ const TransactionSchema: Schema = new Schema({
         required: true,
     },
     amount: { type: Number, required: true, min: 0 },
+    isSystemGenerated: { type: Boolean, default: false },
+    isDeletable: { type: Boolean, default: true },
     category: { type: String, required: true },
     date: { type: Date, required: true, default: Date.now },
     note: { type: String },

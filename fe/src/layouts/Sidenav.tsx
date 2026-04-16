@@ -6,7 +6,9 @@ interface SidenavProps {
 }
 
 const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
-    const handleItemClick = () => { if (onCloseMenu) onCloseMenu(); };
+    const handleItemClick = () => {
+        if (onCloseMenu) onCloseMenu();
+    };
 
     const navItems = [
         { to: "/dashboard", icon: "dashboard", label: "Tổng quan" },
@@ -22,11 +24,17 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
     return (
         <div className="flex flex-col h-full">
             <div className="p-6 flex items-center gap-3">
-                <div className="bg-primary size-10 rounded-lg flex items-center justify-center text-white">
-                    <span className="material-symbols-outlined">account_balance_wallet</span>
+                <div className="size-10 rounded-lg flex items-center justify-center overflow-hidden">
+                    <img
+                        src="/logo.png"
+                        alt="FinTrack Logo"
+                        className="w-full h-full object-contain"
+                    />
                 </div>
                 <div>
-                    <h1 className="font-bold text-lg leading-tight dark:text-white">FinTrack</h1>
+                    <h1 className="font-bold text-lg leading-tight dark:text-white">
+                        FinTrack
+                    </h1>
                     <p className="text-xs text-slate-500">Quản lý Tài chính</p>
                 </div>
             </div>
@@ -37,7 +45,7 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                         key={item.to}
                         to={item.to}
                         onClick={handleItemClick}
-                        className={({ isActive }) => 
+                        className={({ isActive }) =>
                             `flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                                 isActive
                                     ? "bg-primary text-white font-medium"
@@ -45,7 +53,9 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                             }`
                         }
                     >
-                        <span className="material-symbols-outlined">{item.icon}</span>
+                        <span className="material-symbols-outlined">
+                            {item.icon}
+                        </span>
                         <span>{item.label}</span>
                     </NavLink>
                 ))}
@@ -53,7 +63,9 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
 
             <div className="p-4">
                 <button className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20">
-                    <span className="material-symbols-outlined">add_circle</span>
+                    <span className="material-symbols-outlined">
+                        add_circle
+                    </span>
                     <span>Thêm giao dịch</span>
                 </button>
             </div>

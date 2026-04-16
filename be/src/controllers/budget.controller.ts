@@ -173,6 +173,10 @@ export const deleteBudget = async (req: any, res: Response) => {
                 .json({ message: "Không tìm thấy ngân sách" });
         }
 
+        // Nullify budget reference in transactions
+        const { Types } = await import("mongoose");
+        await Transaction.updateMany({ budgetId: new Types.ObjectId(id as string), userId }, { budgetId: null });
+
         return res.json({ message: "Xóa ngân sách thành công" });
     } catch (error) {
         console.error("Error deleting budget:", error);
@@ -242,6 +246,17 @@ export const getBudgetSummary = async (req: any, res: Response) => {
             0,
         );
 
+        // Previous month data for growth calculation
+        const prevMonth = month === 1 ? 12 : month - 1;
+        const prevYear = month === 1 ? year - 1 : year;
+        
+        const prevBudgets = await Budget.find({ userId, month: prevMonth, year: prevYear });
+        const prevTotalBudget = prevBudgets.reduce((s, b) => s + b.amount, 0);
+
+        const growth = prevTotalBudget > 0 
+            ? parseFloat(((totalBudget - prevTotalBudget) / prevTotalBudget * 100).toFixed(1))
+            : 0;
+
         res.set({
             "Cache-Control": "no-cache, no-store, must-revalidate",
             Pragma: "no-cache",
@@ -253,6 +268,7 @@ export const getBudgetSummary = async (req: any, res: Response) => {
             year,
             totalBudget,
             totalSpent,
+            growth,
             items,
         });
     } catch (error) {

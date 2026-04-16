@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
-import { DatePicker, Select, Spin, message } from "antd";
+import { App, DatePicker, Select, Spin } from "antd";
 import { auth } from "../firebase/config";
 import { transactionApi, walletApi, goalApi, budgetApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
@@ -22,6 +22,7 @@ interface Transaction {
 }
 
 const Analytics: React.FC = () => {
+    const { message } = App.useApp();
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState<string>("current_month");
@@ -54,8 +55,20 @@ const Analytics: React.FC = () => {
                 const firebaseUser = auth.currentUser;
                 if (!firebaseUser) return;
                 const token = await firebaseUser.getIdToken();
-                const range = getDateRange();
-                const txRes = await transactionApi.getTransactions({ startDate: range.start.toISOString(), endDate: range.end.toISOString(), limit: 1000 }, token);
+                
+                // Luôn load ít nhất 6 tháng cho chart, còn stats sẽ filter trong frontend
+                const chartStart = dayjs().subtract(5, "month").startOf("month");
+                const currentRange = getDateRange();
+                
+                // Lấy ngày nhỏ nhất giữa chartStart và currentRange.start
+                const fetchStart = chartStart.isBefore(currentRange.start) ? chartStart : currentRange.start;
+                
+                const txRes = await transactionApi.getTransactions({ 
+                    startDate: fetchStart.toISOString(), 
+                    endDate: currentRange.end.toISOString(), 
+                    limit: 2000 
+                }, token);
+                
                 setTransactions(txRes?.data?.transactions || []);
             } catch (e) {
                 message.error("Lỗi khi tải dữ liệu");
@@ -64,22 +77,29 @@ const Analytics: React.FC = () => {
         fetchData();
     }, [selectedPeriod, customRange]);
 
-    const range = getDateRange();
+    const filteredTransactions = useMemo(() => {
+        const range = getDateRange();
+        return transactions.filter(t => {
+            const d = dayjs(t.date);
+            return d.isAfter(range.start) && d.isBefore(range.end);
+        });
+    }, [transactions, selectedPeriod, customRange]);
+
     const stats = useMemo(() => {
-        const income = transactions.filter(t => t.type === "INCOME").reduce((s, t) => s + parseAmount(t.amount), 0);
-        const expense = transactions.filter(t => t.type === "EXPENSE").reduce((s, t) => s + parseAmount(t.amount), 0);
-        return { income, expense, net: income - expense, count: transactions.length };
-    }, [transactions]);
+        const income = filteredTransactions.filter(t => t.type === "INCOME").reduce((s, t) => s + parseAmount(t.amount), 0);
+        const expense = filteredTransactions.filter(t => t.type === "EXPENSE").reduce((s, t) => s + parseAmount(t.amount), 0);
+        return { income, expense, net: income - expense, count: filteredTransactions.length };
+    }, [filteredTransactions]);
 
     const breakdown = useMemo(() => {
         const map: Record<string, number> = {};
-        transactions.filter(t => t.type === "EXPENSE").forEach(t => { map[t.category] = (map[t.category] || 0) + parseAmount(t.amount); });
+        filteredTransactions.filter(t => t.type === "EXPENSE").forEach(t => { map[t.category] = (map[t.category] || 0) + parseAmount(t.amount); });
         const total = Object.values(map).reduce((s, v) => s + v, 0);
         const colors = ["#4137cd", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#14b8a6", "#ec4899"];
         return Object.entries(map).sort((a,b) => b[1] - a[1]).map(([name, val], i) => ({
             name, val, percent: total > 0 ? (val/total)*100 : 0, color: colors[i % colors.length]
         })).slice(0, 5);
-    }, [transactions]);
+    }, [filteredTransactions]);
 
     const chartData = useMemo(() => {
         const months = [];

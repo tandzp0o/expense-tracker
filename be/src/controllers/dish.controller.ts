@@ -38,6 +38,17 @@ export const createDish = [
         }
       }
 
+      const parseArray = (value: any) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [value];
+        } catch (e) {
+          return typeof value === "string" ? value.split(",").map(v => v.trim()) : [value];
+        }
+      };
+
       const dish = new Dish({
         userId,
         name,
@@ -45,7 +56,7 @@ export const createDish = [
           price && price !== "" && price !== "null" ? parseFloat(price) : null,
         description,
         imageUrls,
-        preferences: preferences ? preferences.split(",") : [],
+        preferences: parseArray(preferences),
         address,
       });
 
@@ -65,7 +76,8 @@ export const getDishes = async (req: any, res: Response) => {
 
     let filter: any = { userId };
     if (preferences) {
-      filter.preferences = { $in: preferences.split(",") };
+      const prefArray = typeof preferences === "string" ? preferences.split(",") : preferences;
+      filter.preferences = { $in: prefArray };
     }
 
     const dishes = await Dish.find(filter).sort({ createdAt: -1 });
@@ -83,7 +95,8 @@ export const getRandomDish = async (req: any, res: Response) => {
 
     let filter: any = { userId };
     if (preferences) {
-      filter.preferences = { $in: preferences.split(",") };
+      const prefArray = typeof preferences === "string" ? preferences.split(",") : preferences;
+      filter.preferences = { $in: prefArray };
     }
 
     const dishes = await Dish.find(filter);
@@ -107,6 +120,17 @@ export const updateDish = [
       const { name, price, description, preferences, existingImages, address } =
         req.body;
       const userId = req.user.uid;
+
+      const parseArray = (value: any) => {
+        if (!value) return null;
+        if (Array.isArray(value)) return value;
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [value];
+        } catch (e) {
+          return typeof value === "string" ? value.split(",").map(v => v.trim()) : [value];
+        }
+      };
 
       const dish = await Dish.findOne({ _id: id, userId });
       if (!dish) {
@@ -143,9 +167,10 @@ export const updateDish = [
       dish.description =
         description !== undefined ? description : dish.description;
       dish.imageUrls = imageUrls;
-      dish.preferences = preferences
-        ? preferences.split(",")
-        : dish.preferences;
+      
+      const parsedPrefs = parseArray(preferences);
+      if (parsedPrefs) dish.preferences = parsedPrefs;
+
       dish.address = address !== undefined ? address : dish.address;
 
       await dish.save();

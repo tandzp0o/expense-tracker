@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
-import { message, Spin } from "antd";
+import { App, Card, Spin, Progress, Popconfirm, Table, Button } from "antd";
 import { auth } from "../firebase/config";
-import { walletApi, transactionApi } from "../services/api";
+import { walletApi, transactionApi, userApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import LineChart from "../components/charts/LineChart";
 
@@ -26,9 +27,19 @@ interface Wallet {
 }
 
 const Dashboard: React.FC = () => {
+    const { message } = App.useApp();
+    const navigate = useNavigate();
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<any>(null);
+    const [filterType, setFilterType] = useState<"ALL" | "INCOME" | "EXPENSE">("ALL");
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+    const filteredTransactions = useMemo(() => {
+        if (filterType === "ALL") return transactions;
+        return transactions.filter(t => t.type === filterType);
+    }, [transactions, filterType]);
 
     const parseAmount = (raw: unknown) => {
         if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
@@ -39,28 +50,43 @@ const Dashboard: React.FC = () => {
         return 0;
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const firebaseUser = auth.currentUser;
-                if (!firebaseUser) return;
-                const token = await firebaseUser.getIdToken();
-                const now = dayjs();
-                const startDate = now.subtract(6, "month").startOf("month").toISOString();
-                const endDate = now.endOf("day").toISOString();
+    const fetchData = useCallback(async () => {
+        try {
+            const firebaseUser = auth.currentUser;
+            if (!firebaseUser) return;
+            const token = await firebaseUser.getIdToken();
+            const now = dayjs();
+            const startDate = now.subtract(6, "month").startOf("month").toISOString();
+            const endDate = now.endOf("day").toISOString();
 
-                const [walletsRes, txRes] = await Promise.all([
-                    walletApi.getWallets(token),
-                    transactionApi.getTransactions({ startDate, endDate }, token),
-                ]);
+            const [walletsRes, txRes, statsRes] = await Promise.all([
+                walletApi.getWallets(token),
+                transactionApi.getTransactions({ startDate, endDate }, token),
+                userApi.getProfileStats(token)
+            ]);
 
-                setWallets(walletsRes?.wallets || []);
-                setTransactions(txRes?.data?.transactions || []);
-            } catch (e) { message.error("Lỗi tải dữ liệu"); }
-            finally { setLoading(false); }
-        };
-        fetchData();
+            setWallets(walletsRes?.wallets || []);
+            setTransactions(txRes?.data?.transactions || []);
+            setStats(statsRes);
+        } catch (e) { message.error("Lỗi tải dữ liệu"); }
+        finally { setLoading(false); }
     }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    const handleDeleteTransaction = async (id: string) => {
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) return;
+            await transactionApi.deleteTransaction(id, token);
+            message.success("Đã xóa giao dịch");
+            fetchData();
+        } catch (e: any) {
+            message.error(e.message || "Lỗi xóa giao dịch");
+        }
+    };
 
     const totalBalance = useMemo(() => wallets.reduce((sum, w) => sum + (w.balance || 0), 0), [wallets]);
     const monthlyIncome = useMemo(() => {
@@ -73,12 +99,22 @@ const Dashboard: React.FC = () => {
     }, [transactions]);
 
     const chartData = useMemo(() => {
+        if (stats?.history) {
+            return {
+                labels: stats.history.map((h: any) => h.month),
+                datasets: [
+                    { label: "Thu nhập", data: stats.history.map((h: any) => h.income), borderColor: "#10b981", tension: 0.4, fill: true, backgroundColor: "rgba(16, 185, 129, 0.05)" },
+                    { label: "Chi tiêu", data: stats.history.map((h: any) => h.expense), borderColor: "#f59e0b", tension: 0.4 }
+                ]
+            };
+        }
+
         const months = [];
         for (let i = 5; i >= 0; i--) {
             months.push(dayjs().subtract(i, 'month'));
         }
 
-        const labels = months.map(m => `T${m.month() + 1}`);
+        const labels = months.map(m => `Th${m.month() + 1}`);
         const incomeData = months.map(m => {
             return transactions
                 .filter(t => t.type === "INCOME" && dayjs(t.date).isSame(m, 'month'))
@@ -97,7 +133,7 @@ const Dashboard: React.FC = () => {
                 { label: "Chi tiêu", data: expenseData, borderColor: "#f59e0b", tension: 0.4 }
             ]
         };
-    }, [transactions]);
+    }, [transactions, stats]);
 
     if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Spin size="large" /></div>;
 
@@ -117,16 +153,35 @@ const Dashboard: React.FC = () => {
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
                     <div className="relative z-10">
                         <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Tổng số dư</p>
-                        <h3 className="text-2xl font-bold mb-2 dark:text-white">{formatCurrency(totalBalance)}</h3>
-                        <div className="flex items-center gap-1 text-emerald-500 text-sm font-bold">
-                            <span className="material-symbols-outlined text-sm">trending_up</span>
-                            <span>+5.2% tháng này</span>
+                        <h3 className="text-2xl font-bold mb-2 dark:text-white">{formatCurrency(stats?.totalBalance || totalBalance)}</h3>
+                        <div className={`flex items-center gap-1 ${(stats?.growth || 0) >= 0 ? 'text-emerald-500' : 'text-red-500'} text-sm font-bold`}>
+                            <span className="material-symbols-outlined text-sm">{(stats?.growth || 0) >= 0 ? 'trending_up' : 'trending_down'}</span>
+                            <span>{stats?.growth > 0 ? '+' : ''}{stats?.growth || 0}% tháng này</span>
                         </div>
                     </div>
-                    {/* Decorative Trend Line (SVG) from template */}
+                    {/* Decorative Trend Line (SVG) from history data */}
                     <div className="absolute bottom-0 right-0 w-full h-16 opacity-30 pointer-events-none group-hover:opacity-40 transition-opacity">
                         <svg className="w-full h-full fill-none stroke-primary stroke-[3]" preserveAspectRatio="none" viewBox="0 0 500 100">
-                            <path d="M0,80 Q50,60 100,70 T200,40 T300,50 T400,20 T500,10" strokeLinecap="round"></path>
+                            <path 
+                                d={(() => {
+                                    const history = stats?.history || [];
+                                    if (history.length < 2) return "M0,80 Q50,60 100,70 T200,40 T300,50 T400,20 T500,10";
+                                    
+                                    const balances = history.map((h: any) => h.balance);
+                                    const min = Math.min(...balances);
+                                    const max = Math.max(...balances);
+                                    const range = max - min || 1;
+                                    
+                                    const points = history.map((h: any, i: number) => {
+                                        const x = (i / (history.length - 1)) * 500;
+                                        const y = 80 - ((h.balance - min) * 60 / range);
+                                        return `${x},${y}`;
+                                    });
+                                    
+                                    return `M${points.join(' L')}`;
+                                })()} 
+                                strokeLinecap="round"
+                            ></path>
                         </svg>
                     </div>
                 </div>
@@ -137,10 +192,12 @@ const Dashboard: React.FC = () => {
                         <div className="size-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center">
                             <span className="material-symbols-outlined">call_received</span>
                         </div>
-                        <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 px-2 py-1 rounded-md text-xs font-bold">+12%</span>
+                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${(stats?.incomeGrowth || 0) >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-red-100 dark:bg-red-900/30 text-red-600'}`}>
+                            {stats?.incomeGrowth > 0 ? '+' : ''}{stats?.incomeGrowth || 0}%
+                        </span>
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Thu nhập tháng này</p>
-                    <h3 className="text-2xl font-bold mt-1 dark:text-white">{formatCurrency(monthlyIncome)}</h3>
+                    <h3 className="text-2xl font-bold mt-1 dark:text-white">{formatCurrency(stats?.monthlyIncome || monthlyIncome)}</h3>
                 </div>
 
                 {/* Monthly Expense */}
@@ -149,10 +206,12 @@ const Dashboard: React.FC = () => {
                         <div className="size-10 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center">
                             <span className="material-symbols-outlined">call_made</span>
                         </div>
-                        <span className="bg-red-100 dark:bg-red-900/30 text-red-600 px-2 py-1 rounded-md text-xs font-bold">-5%</span>
+                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${(stats?.expenseGrowth || 0) <= 0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-red-100 dark:bg-red-900/30 text-red-600'}`}>
+                            {stats?.expenseGrowth > 0 ? '+' : ''}{stats?.expenseGrowth || 0}%
+                        </span>
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Chi tiêu tháng này</p>
-                    <h3 className="text-2xl font-bold mt-1 dark:text-white">{formatCurrency(monthlyExpense)}</h3>
+                    <h3 className="text-2xl font-bold mt-1 dark:text-white">{formatCurrency(stats?.monthlyExpense || monthlyExpense)}</h3>
                 </div>
             </div>
 
@@ -165,9 +224,13 @@ const Dashboard: React.FC = () => {
                             <h3 className="text-lg font-bold dark:text-white">Thu nhập vs Chi tiêu</h3>
                             <p className="text-sm text-slate-500 dark:text-slate-400">Dữ liệu 6 tháng gần nhất</p>
                         </div>
-                        <select className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm py-1.5 pl-3 pr-8 focus:ring-primary dark:text-slate-300">
-                            <option>Năm 2024</option>
-                            <option>Năm 2023</option>
+                        <select 
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(Number(e.target.value))}
+                            className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm py-1.5 pl-3 pr-8 focus:ring-primary dark:text-slate-300"
+                        >
+                            <option value={new Date().getFullYear()}>Năm {new Date().getFullYear()}</option>
+                            <option value={new Date().getFullYear() - 1}>Năm {new Date().getFullYear() - 1}</option>
                         </select>
                     </div>
                     <div className="h-64">
@@ -189,7 +252,7 @@ const Dashboard: React.FC = () => {
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold dark:text-white">Ví của tôi</h3>
-                        <button className="text-primary text-sm font-bold hover:underline">Xem tất cả</button>
+                        <button onClick={() => navigate('/wallets')} className="text-primary text-sm font-bold hover:underline">Xem tất cả</button>
                     </div>
                     <div className="space-y-4">
                         {/* Primary Card Preview (Template Style) */}
@@ -199,7 +262,7 @@ const Dashboard: React.FC = () => {
                                     <span className="text-xs opacity-80 uppercase tracking-wide">{wallets[0]?.name || 'Visa Debit'}</span>
                                     <span className="material-symbols-outlined">contactless</span>
                                 </div>
-                                <p className="text-lg tracking-wide font-mono mb-4 text-center">**** **** **** 8899</p>
+                                <p className="text-lg tracking-wide font-mono mb-4 text-center">**** **** **** {wallets[0]?._id ? wallets[0]._id.slice(-4) : '8899'}</p>
                                 <div className="flex justify-between items-end">
                                     <div>
                                         <p className="text-xs uppercase opacity-70">Số dư</p>
@@ -235,9 +298,24 @@ const Dashboard: React.FC = () => {
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <h3 className="text-lg font-bold dark:text-white">Giao dịch gần đây</h3>
                     <div className="flex gap-2">
-                        <button className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold transition-all">Tất cả</button>
-                        <button className="px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-xs font-bold text-slate-500 transition-all">Thu nhập</button>
-                        <button className="px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-xs font-bold text-slate-500 transition-all">Chi tiêu</button>
+                        <button 
+                            onClick={() => setFilterType('ALL')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'ALL' ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                        >
+                            Tất cả
+                        </button>
+                        <button 
+                            onClick={() => setFilterType('INCOME')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'INCOME' ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                        >
+                            Thu nhập
+                        </button>
+                        <button 
+                            onClick={() => setFilterType('EXPENSE')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'EXPENSE' ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                        >
+                            Chi tiêu
+                        </button>
                     </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -249,10 +327,11 @@ const Dashboard: React.FC = () => {
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ngày</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Số tiền</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Trạng thái</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Hành động</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {transactions.slice(0, 6).map(t => (
+                            {filteredTransactions.slice(0, 6).map(t => (
                                 <tr key={t._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center gap-3">
@@ -268,9 +347,22 @@ const Dashboard: React.FC = () => {
                                         {t.type === 'INCOME' ? '+' : '-'}{formatCurrency(parseAmount(t.amount))}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 text-xs font-bold rounded-full uppercase">
-                                            Hoàn tất
+                                        <span className={`px-2.5 py-1 ${t.status === 'failed' ? 'bg-red-100 dark:bg-red-900/30 text-red-600' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'} text-xs font-bold rounded-full uppercase`}>
+                                            {t.status === 'completed' ? 'Hoàn tất' : (t.status === 'failed' ? 'Thất bại' : 'Hoàn tất')}
                                         </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                        <Popconfirm
+                                            title="Xóa giao dịch này?"
+                                            onConfirm={() => handleDeleteTransaction(t._id)}
+                                            okText="Xóa"
+                                            cancelText="Hủy"
+                                            okButtonProps={{ danger: true }}
+                                        >
+                                            <button className="p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
+                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                            </button>
+                                        </Popconfirm>
                                     </td>
                                 </tr>
                             ))}

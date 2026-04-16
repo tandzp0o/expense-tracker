@@ -1,151 +1,130 @@
-// public/sw.js - Enhanced Service Worker for PWA
-const CACHE_NAME = "ton-finance-v2";
-const urlsToCache = [
+// public/sw.js - Ton Finance PWA Service Worker
+// ✅ Tăng version khi muốn force refresh cache cho user
+const CACHE_NAME = "ton-finance-cache-v1";
+
+const ASSETS_TO_CACHE = [
     "/",
-    "/static/js/bundle.js",
-    "/static/css/main.css",
     "/manifest.json",
     "/logo.png",
     "/logo512.png",
-    "/favicon.ico",
 ];
 
-// Install event - Cache resources
+// ─── Helper: bỏ qua HMR và dev files ─────────────────────
+const shouldSkip = (url) => {
+    return (
+        url.includes("hot-update.js") ||
+        url.includes("hot-update.json") ||
+        url.includes("webpack-hmr") ||
+        url.includes("sockjs-node") ||
+        url.includes("__webpack") ||
+        url.includes("/api/") // Không cache API calls
+    );
+};
+
+// ─── Install ──────────────────────────────────────────────
 self.addEventListener("install", (event) => {
-    console.log("🔧 Service Worker: Installing...");
+    console.log("[SW] Installing - ton-finance");
     event.waitUntil(
-        caches
-            .open(CACHE_NAME)
-            .then((cache) => {
-                console.log("🔧 Service Worker: Caching app shell");
-                return cache.addAll(urlsToCache);
-            })
-            .then(() => {
-                console.log("🔧 Service Worker: Installation complete");
-                return self.skipWaiting(); // Force activation
-            }),
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log("[SW] Caching app shell assets");
+            return cache.addAll(ASSETS_TO_CACHE);
+        }),
     );
+    self.skipWaiting(); // Kích hoạt ngay, không chờ tab cũ đóng
 });
 
-// Activate event - Clean up old caches
+// ─── Activate ─────────────────────────────────────────────
 self.addEventListener("activate", (event) => {
-    console.log("🚀 Service Worker: Activating...");
+    console.log("[SW] Activating - cleaning old caches...");
     event.waitUntil(
-        caches
-            .keys()
-            .then((cacheNames) => {
-                return Promise.all(
-                    cacheNames.map((cacheName) => {
-                        if (cacheName !== CACHE_NAME) {
-                            console.log(
-                                "🗑️ Service Worker: Deleting old cache:",
-                                cacheName,
-                            );
-                            return caches.delete(cacheName);
-                        }
-                    }),
-                );
-            })
-            .then(() => {
-                console.log("🚀 Service Worker: Activation complete");
-                return self.clients.claim(); // Take control of all pages
-            }),
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log("[SW] Deleting old cache:", cacheName);
+                        return caches.delete(cacheName);
+                    }
+                }),
+            );
+        }),
     );
+    self.clients.claim(); // Kiểm soát tất cả tab ngay lập tức
 });
 
-// Fetch event - Serve from cache when offline
+// ─── Fetch: Network first → Cache fallback ────────────────
+// Bắt buộc có fetch handler để browser hiện gợi ý "Cài đặt app"
 self.addEventListener("fetch", (event) => {
+    const url = event.request.url;
+
+    // ✅ Bỏ qua HMR files (dev only) — không intercept
+    if (shouldSkip(url)) return;
+
+    // ✅ Chỉ xử lý GET
+    if (event.request.method !== "GET") return;
+
     event.respondWith(
-        caches
-            .match(event.request)
+        fetch(event.request)
             .then((response) => {
-                // Cache hit - return response
-                if (response) {
-                    console.log(
-                        "📦 Service Worker: Serving from cache:",
-                        event.request.url,
-                    );
-                    return response;
-                }
-
-                // Network request
-                console.log(
-                    "🌐 Service Worker: Fetching from network:",
-                    event.request.url,
-                );
-                return fetch(event.request).then((response) => {
-                    // Check if valid response
-                    if (
-                        !response ||
-                        response.status !== 200 ||
-                        response.type !== "basic"
-                    ) {
-                        return response;
-                    }
-
-                    // Clone response for caching
-                    const responseToCache = response.clone();
-
-                    caches.open(CACHE_NAME).then((cache) => {
-                        console.log(
-                            "💾 Service Worker: Caching new resource:",
-                            event.request.url,
-                        );
-                        cache.put(event.request, responseToCache);
-                    });
-
+                // Lấy được từ network → cập nhật cache và trả về
+                return caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(event.request, response.clone());
                     return response;
                 });
             })
             .catch(() => {
-                // Offline fallback
-                console.log(
-                    "❌ Service Worker: Network failed, serving offline page",
-                );
-                return caches.match("/");
+                // Mất mạng → fallback về cache
+                return caches.match(event.request).then((cached) => {
+                    if (cached) return cached;
+                    // Nếu không có cache → trả về trang chủ (offline fallback)
+                    return caches.match("/");
+                });
             }),
     );
 });
 
-// Handle push notifications (optional)
+// ─── Push Notification ────────────────────────────────────
 self.addEventListener("push", (event) => {
-    if (event.data) {
-        const data = event.data.json();
-        console.log("📬 Service Worker: Push received:", data);
+    if (!event.data) return;
+    const data = event.data.json();
 
-        const options = {
+    event.waitUntil(
+        self.registration.showNotification(data.title, {
             body: data.body,
             icon: "/logo.png",
-            badge: "/favicon.ico",
-            vibrate: [100, 50, 100],
-            data: {
-                dateOfArrival: Date.now(),
-                primaryKey: 1,
-            },
+            badge: "/logo.png",
+            tag: data.tag,
+            vibrate: [200, 100, 200],
+            data: data.data,
+            requireInteraction: true, // Không tự biến mất
+            renotify: true, // Hiện lại dù cùng tag
+            silent: false, // Có âm thanh + rung
             actions: [
-                {
-                    action: "explore",
-                    title: "Explore",
-                    icon: "/logo.png",
-                },
-                {
-                    action: "close",
-                    title: "Close",
-                    icon: "/favicon.ico",
-                },
+                { action: "open", title: "📂 Xem chi tiết" },
+                { action: "dismiss", title: "✕ Bỏ qua" },
             ],
-        };
-
-        event.waitUntil(
-            self.registration.showNotification(data.title, options),
-        );
-    }
+        }),
+    );
 });
 
-// Handle notification click
+// ─── Notification Click ───────────────────────────────────
 self.addEventListener("notificationclick", (event) => {
-    console.log("🔔 Service Worker: Notification clicked");
     event.notification.close();
+    if (event.action === "dismiss") return;
 
-    event.waitUntil(clients.openWindow("/"));
+    const actionUrl = event.notification.data?.actionUrl || "/";
+
+    event.waitUntil(
+        clients
+            .matchAll({ type: "window", includeUncontrolled: true })
+            .then((clientList) => {
+                // Focus tab đang mở nếu có
+                for (const client of clientList) {
+                    if (client.url.includes(actionUrl) && "focus" in client) {
+                        return client.focus();
+                    }
+                }
+                // Không có tab nào → mở tab mới
+                return clients.openWindow(actionUrl);
+            }),
+    );
 });

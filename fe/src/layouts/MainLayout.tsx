@@ -40,7 +40,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     ];
 
     return (
-        <div className={`flex h-screen overflow-hidden ${theme === "dark" ? "dark" : ""}`}>
+        <div
+            className={`flex h-screen overflow-hidden ${theme === "dark" ? "dark" : ""}`}
+        >
             {/* Sidebar Navigation - Desktop */}
             {!isMobile && (
                 <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
@@ -66,43 +68,52 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             {/* Main Content */}
             <main className="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
                 <Header onMenuClick={openDrawer} />
-                
-                <div className={`flex-1 overflow-y-auto p-4 md:p-8 ${isMobile ? "pb-24" : "pb-8"}`}>
-                    <div className="w-full">
-                        {children}
-                        <Footer />
-                    </div>
+
+                <div
+                    className={`flex-1 overflow-y-auto p-4 md:p-8 ${isMobile ? "pb-24" : "pb-8"}`}
+                >
+                    <div className="w-full">{children}</div>
                 </div>
+                <Footer />
 
                 {/* Mobile Bottom Navigation */}
                 {isMobile && (
                     <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-2 pb-6 pt-2 z-20">
                         <div className="flex justify-around items-center">
-                            {bottomNavItems.map((item) => (
+                            {bottomNavItems.map((item) =>
                                 item.isMiddle ? (
-                                    <div key={item.to} className="relative -top-8">
-                                        <NavLink 
+                                    <div
+                                        key={item.to}
+                                        className="relative -top-8"
+                                    >
+                                        <NavLink
                                             to="/transactions"
                                             className="size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/40 flex items-center justify-center transform active:scale-95 transition-transform"
                                         >
-                                            <span className="material-symbols-outlined text-3xl font-bold">add</span>
+                                            <span className="material-symbols-outlined text-3xl font-bold">
+                                                add
+                                            </span>
                                         </NavLink>
                                     </div>
                                 ) : (
-                                    <NavLink 
+                                    <NavLink
                                         key={item.to}
                                         to={item.to}
-                                        className={({ isActive }) => 
+                                        className={({ isActive }) =>
                                             `flex flex-col items-center gap-1 transition-colors ${isActive ? "text-primary" : "text-slate-400 dark:text-slate-500"}`
                                         }
                                     >
-                                        <span className={`material-symbols-outlined ${location.pathname === item.to ? 'font-variation-fill' : ''}`}>
+                                        <span
+                                            className={`material-symbols-outlined ${location.pathname === item.to ? "font-variation-fill" : ""}`}
+                                        >
                                             {item.icon}
                                         </span>
-                                        <span className="text-[10px] font-bold">{item.label}</span>
+                                        <span className="text-[10px] font-bold">
+                                            {item.label}
+                                        </span>
                                     </NavLink>
-                                )
-                            ))}
+                                ),
+                            )}
                         </div>
                     </nav>
                 )}

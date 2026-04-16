@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+export const API_URL = process.env.REACT_APP_API_URL || "http://localhost:1810";
 
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
@@ -117,9 +117,9 @@ export const walletApi = {
         }
     },
     // Create a new wallet
-    createWallet: async (walletData: any, token?: string) => {
+    createWallet: async (walletData: FormData, token?: string) => {
         try {
-            const apiClient = createApiClient(token);
+            const apiClient = createMultipartApiClient(token);
             const response = await apiClient.post("/wallets", walletData);
             return response.data;
         } catch (error) {
@@ -127,9 +127,9 @@ export const walletApi = {
         }
     },
     // Update an existing wallet
-    updateWallet: async (id: string, walletData: any, token?: string) => {
+    updateWallet: async (id: string, walletData: FormData, token?: string) => {
         try {
-            const apiClient = createApiClient(token);
+            const apiClient = createMultipartApiClient(token);
             const response = await apiClient.put(`/wallets/${id}`, walletData);
             return response.data;
         } catch (error) {
@@ -158,6 +158,7 @@ export const transactionApi = {
             type?: "INCOME" | "EXPENSE";
             category?: string;
             walletId?: string;
+            page?: number;
             limit?: number;
             sort?: string;
             note?: string;
@@ -401,9 +402,9 @@ export const goalApi = {
     },
 
     // Create a new goal
-    createGoal: async (goalData: any, token?: string) => {
+    createGoal: async (goalData: FormData, token?: string) => {
         try {
-            const apiClient = createApiClient(token);
+            const apiClient = createMultipartApiClient(token);
             const response = await apiClient.post("/goals", goalData);
             return response.data;
         } catch (error) {
@@ -412,9 +413,9 @@ export const goalApi = {
     },
 
     // Update an existing goal
-    updateGoal: async (id: string, goalData: any, token?: string) => {
+    updateGoal: async (id: string, goalData: FormData, token?: string) => {
         try {
-            const apiClient = createApiClient(token);
+            const apiClient = createMultipartApiClient(token);
             const response = await apiClient.put(`/goals/${id}`, goalData);
             return response.data;
         } catch (error) {

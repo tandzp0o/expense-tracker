@@ -14,11 +14,13 @@ import budgetRoutes from "./routers/budget.routes";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 1810;
 
 // Cấu hình CORS động
 app.set("trust proxy", 1);
 const allowedOrigins = [
+    "http://localhost:916",
+    "http://localhost:3001",
     "http://localhost:3000",
     process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
@@ -49,6 +51,7 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(morgan("dev"));
+app.use("/uploads", express.static("uploads"));
 
 // Routes
 app.use("/api/auth", authRoutes);

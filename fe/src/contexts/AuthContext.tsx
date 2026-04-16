@@ -45,7 +45,7 @@ type AuthProviderProps = {
 const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
     // Sử dụng dấu backtick để template literal hoạt động
     // Nếu biến REACT_APP_API_URL trống, nó sẽ mặc định dùng localhost
-    const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
+    const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:1810";
 
     console.log(
         "Verifying token with backend at:",
