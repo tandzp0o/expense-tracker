@@ -104,7 +104,7 @@ services:
         # Cực kỳ quan trọng: React cần biến này lúc build
         - REACT_APP_API_URL=${REACT_APP_API_URL}
     ports:
-      - "3000:3000"
+      - "0916:916"
     environment:
       - NODE_ENV=production
     depends_on:
@@ -117,10 +117,10 @@ services:
       context: ./be
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "1810:1810"
     environment:
       - NODE_ENV=production
-      - PORT=5000
+      - PORT=1810
       # Kết nối đến service mongo trong mạng nội bộ
       - MONGO_URI=${MONGO_URI}
       # Biến cho Frontend URL để cấu hình CORS (đã sửa ở file index.ts trước đó)

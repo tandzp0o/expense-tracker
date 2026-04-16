@@ -23,9 +23,9 @@ COPY --from=build /app/node_modules ./node_modules
 
 # Biến môi trường mặc định
 ENV NODE_ENV=production
-ENV PORT=5000
+ENV PORT=1810
 
-EXPOSE 5000
+EXPOSE 1810
 
 # Chạy server từ file đã build
 CMD ["node", "dist/index.js"]
