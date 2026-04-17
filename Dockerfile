@@ -1,22 +1,16 @@
-# Root Dockerfile - Build Backend từ be/
-
-# Bước 1: Build stage
 FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Copy từ thư mục be/ (vì build context là root repo)
 COPY be/package*.json ./
 COPY be/tsconfig.json ./
 
 RUN npm install
 
-# Copy source code của backend
 COPY be/src ./src
 
 RUN npm run build
 
-# Bước 2: Production stage
 FROM node:18-alpine
 
 WORKDIR /app
