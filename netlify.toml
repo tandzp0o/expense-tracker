@@ -1,9 +1,12 @@
 [build]
-  base = "fe"
+  base    = "fe"
   command = "npm run build"
-  publish = "build"
+  publish = "fe/build"
+
+[build.environment]
+  NODE_VERSION = "18"
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from   = "/*"
+  to     = "/index.html"
   status = 200

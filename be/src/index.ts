@@ -22,6 +22,7 @@ const allowedOrigins = [
     "http://localhost:916",
     "http://localhost:3001",
     "http://localhost:3000",
+    "https://ton-tracker.netlify.app",
     process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
 
