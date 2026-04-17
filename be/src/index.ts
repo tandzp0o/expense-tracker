@@ -28,8 +28,6 @@ const allowedOrigins = [
 app.use(
     cors({
         origin: function (origin, callback) {
-            // Cho phép các request không có origin (như Postman hoặc thiết bị di động)
-            // hoặc các origin nằm trong danh sách cho phép
             if (!origin || allowedOrigins.indexOf(origin) !== -1) {
                 callback(null, true);
             } else {
@@ -43,7 +41,6 @@ app.use(
     }),
 );
 
-// GIẢI QUYẾT LỖI POPUP GOOGLE: Thêm Header COOP
 app.use((req, res, next) => {
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
     next();
@@ -62,23 +59,34 @@ app.use("/api/goals", goalRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/budgets", budgetRoutes);
 
-// Health check
+// Health check — Back4App sẽ hit endpoint này
 app.get("/health", (req, res) => {
     res.status(200).json({ status: "OK", message: "Server is running" });
 });
 
-// Kết nối MongoDB và khởi động server
-connectDB()
-    .then(() => {
-        // Quan trọng: Phải có '0.0.0.0' để Docker bên ngoài truy cập được vào trong
-        app.listen(Number(PORT), "0.0.0.0", () => {
-            console.log(`✅ Server đang chạy trên cổng ${PORT}`);
-            console.log(`✅ Cho phép CORS từ: ${allowedOrigins.join(", ")}`);
+// ✅ QUAN TRỌNG: Server listen TRƯỚC, connect DB SAU
+app.listen(Number(PORT), "0.0.0.0", () => {
+    console.log(`✅ Server đang chạy trên cổng ${PORT}`);
+    console.log(`✅ Cho phép CORS từ: ${allowedOrigins.join(", ")}`);
+
+    // Connect DB sau khi server đã sẵn sàng nhận request
+    connectDB()
+        .then(() => {
+            console.log("✅ MongoDB connected successfully");
+        })
+        .catch((err) => {
+            // Log lỗi nhưng KHÔNG exit — server vẫn chạy
+            console.error("❌ MongoDB connection failed:", err.message);
         });
-    })
-    .catch((err) => {
-        console.error("Không thể kết nối Database:", err);
-        process.exit(1);
-    });
+});
+
+// Tránh crash khi có lỗi không được xử lý
+process.on("unhandledRejection", (reason) => {
+    console.error("⚠️ Unhandled Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+    console.error("⚠️ Uncaught Exception:", err.message);
+});
 
 export default app;
