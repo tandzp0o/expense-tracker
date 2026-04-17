@@ -11,7 +11,9 @@ const Login: React.FC = () => {
         setSigningIn(true);
         try {
             await signInWithGoogle();
-        } catch (error) {
+        } catch (error: any) {
+            const errorCode = error?.code || "unknown";
+            console.error("Google sign-in error code:", errorCode);
             console.error("Lỗi chi tiết khi đăng nhập:", error);
             message.error("Đăng nhập thất bại. Vui lòng thử lại.");
         } finally {

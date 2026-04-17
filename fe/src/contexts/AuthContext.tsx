@@ -43,14 +43,9 @@ type AuthProviderProps = {
 };
 
 const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
-    // Sử dụng dấu backtick để template literal hoạt động
-    // Nếu biến REACT_APP_API_URL trống, nó sẽ mặc định dùng localhost
     const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:1810";
 
-    console.log(
-        "Verifying token with backend at:",
-        `${baseUrl}/api/auth/verify`,
-    );
+    console.log("Verifying token with backend at:", `${baseUrl}/api/auth/verify`);
     const response = await fetch(`${baseUrl}/api/auth/verify`, {
         method: "GET",
         headers: {
@@ -65,7 +60,7 @@ const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
             throw new Error(
                 errorData.message || `Server responded with ${response.status}`,
             );
-        } catch (e) {
+        } catch {
             throw new Error(`Server error on verification: ${response.status}`);
         }
     }
@@ -79,43 +74,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const isAuthenticated = !!currentUser;
 
     useEffect(() => {
-        console.log("🔍 AuthContext - Setting up auth state listener...");
+        console.log("AuthContext - Setting up auth state listener...");
 
         const unsubscribe = onAuthStateChanged(
             auth,
             async (firebaseUser: FirebaseUser | null) => {
                 console.log(
-                    "🔍 AuthContext - Auth state changed:",
+                    "AuthContext - Auth state changed:",
                     firebaseUser?.email || "null",
                 );
 
                 if (firebaseUser) {
                     try {
-                        console.log("🔍 AuthContext - Getting ID token...");
-                        const token = await firebaseUser.getIdToken(true); // Lấy token mới nhất
+                        console.log("AuthContext - Getting ID token...");
+                        const token = await firebaseUser.getIdToken(true);
                         console.log(
-                            "🔍 AuthContext - Token received, verifying with backend...",
+                            "AuthContext - Token received, verifying with backend...",
                         );
 
                         const appUserData = await verifyTokenWithBackend(token);
                         console.log(
-                            "✅ AuthContext - Backend verification successful:",
+                            "AuthContext - Backend verification successful:",
                             appUserData,
                         );
 
                         setCurrentUser(appUserData);
                     } catch (error) {
                         console.error(
-                            "❌ AuthContext - Lỗi nghiêm trọng khi đồng bộ người dùng, đăng xuất:",
+                            "AuthContext - User sync failed, signing out:",
                             error,
                         );
-                        // Chỉ đăng xuất khi có lỗi nghiêm trọng không thể phục hồi
                         await firebaseSignOut(auth);
                         setCurrentUser(null);
                     }
                 } else {
                     console.log(
-                        "❌ AuthContext - No firebase user, setting currentUser to null",
+                        "AuthContext - No firebase user, setting currentUser to null",
                     );
                     setCurrentUser(null);
                 }
@@ -124,42 +118,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         );
 
         return () => {
-            console.log("🔍 AuthContext - Cleaning up auth state listener...");
+            console.log("AuthContext - Cleaning up auth state listener...");
             unsubscribe();
         };
     }, []);
 
     const handleGoogleSignIn = async (): Promise<void> => {
-        // Hàm này giờ chỉ cần kích hoạt popup.
-        // onAuthStateChanged sẽ tự động xử lý phần còn lại.
         try {
             setLoading(true);
             await signInWithGoogle();
-            // Không cần làm gì thêm ở đây. `useEffect` ở trên sẽ lo tất cả.
         } catch (error) {
-            console.error("Lỗi trong quá trình mở popup Google:", error);
-            // Ném lỗi ra để component Login có thể xử lý (hiển thị alert)
+            console.error("Google popup sign-in failed:", error);
+            setLoading(false);
             throw error;
-        } finally {
-            // Không set loading về false ở đây, để `useEffect` kiểm soát
         }
     };
 
-    // 5. Hàm đăng xuất không đổi
     const logout = async () => {
         try {
             await firebaseSignOut(auth);
             setCurrentUser(null);
         } catch (error) {
-            console.error("Lỗi khi đăng xuất:", error);
+            console.error("Logout failed:", error);
             throw error;
         }
     };
 
-    // 6. Hàm mới để cập nhật trạng thái newUser từ component con
     const updateUserStatus = (isNew: boolean) => {
         if (currentUser) {
-            // Cập nhật lại state của context để UI thay đổi ngay lập tức
             setCurrentUser({ ...currentUser, newUser: isNew });
         }
     };
@@ -170,11 +156,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         signInWithGoogle: handleGoogleSignIn,
         logout,
         isAuthenticated,
-        updateUserStatus, // <-- Cung cấp hàm này ra context
+        updateUserStatus,
     };
 
-    // Chỉ render children khi đã xác thực xong
-    // Bạn có thể thêm một màn hình loading đẹp hơn ở đây
     return (
         <AuthContext.Provider value={value}>
             {loading ? (
