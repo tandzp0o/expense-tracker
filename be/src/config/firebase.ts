@@ -64,26 +64,20 @@ if (!admin.apps.length) {
   try {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
 
-    if (!projectId || !clientEmail || !privateKey) {
+    if (!projectId || !clientEmail || !privateKeyRaw) {
       throw new Error('Thiếu cấu hình Firebase (Project ID, Email hoặc Private Key)');
     }
 
-    // Xử lý tất cả các format private key có thể có:
-    // 1. Literal \n  (từ env var dạng string)
-    // 2. \\n         (double escaped)
-    // 3. Xuống dòng thật (từ Python paste trực tiếp)
-    const normalizedKey = privateKey
-      .replace(/\\\\n/g, '\n')  // \\n → \n thật
-      .replace(/\\n/g, '\n')    // \n literal → \n thật
-      .trim();
+    // Decode Base64 → private key gốc
+    const privateKey = Buffer.from(privateKeyRaw, 'base64').toString('utf8');
 
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId,
         clientEmail,
-        privateKey: normalizedKey,
+        privateKey,
       }),
     });
 
