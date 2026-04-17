@@ -1,6 +1,4 @@
-# =========================================
-# Root Dockerfile — Build Backend từ be/
-# =========================================
+# Root Dockerfile - Build Backend từ be/
 
 # Bước 1: Build stage
 FROM node:18-alpine AS build
