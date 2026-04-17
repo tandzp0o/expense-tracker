@@ -57,21 +57,24 @@
 //--------------------------------------------------
 import * as admin from 'firebase-admin';
 import * as dotenv from 'dotenv';
-
 dotenv.config();
 
 if (!admin.apps.length) {
   try {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
+    const part1 = process.env.FIREBASE_PRIVATE_KEY_1 || '';
+    const part2 = process.env.FIREBASE_PRIVATE_KEY_2 || '';
+    const part3 = process.env.FIREBASE_PRIVATE_KEY_3 || '';
 
-    if (!projectId || !clientEmail || !privateKeyRaw) {
-      throw new Error('Thiếu cấu hình Firebase (Project ID, Email hoặc Private Key)');
+    if (!projectId || !clientEmail || !part1) {
+      throw new Error('Thiếu cấu hình Firebase');
     }
 
-    // Decode Base64 → private key gốc
-    const privateKey = Buffer.from(privateKeyRaw, 'base64').toString('utf8');
+    // Ghép lại và decode base64
+    const privateKey = Buffer
+      .from(part1 + part2 + part3, 'base64')
+      .toString('utf8');
 
     admin.initializeApp({
       credential: admin.credential.cert({
