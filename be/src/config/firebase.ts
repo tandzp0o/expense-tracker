@@ -1,93 +1,52 @@
-// import * as admin from 'firebase-admin';
-// import * as dotenv from 'dotenv';
+import * as admin from "firebase-admin";
+import * as dotenv from "dotenv";
 
-// dotenv.config();
-
-// if (!admin.apps.length) {
-//   try {
-//     admin.initializeApp({
-//       credential: admin.credential.cert({
-//         projectId: process.env.FIREBASE_PROJECT_ID,
-//         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-//         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-//       }),
-//     });
-//     console.log('Firebase Admin đã được khởi tạo');
-//   } catch (error: any) {
-//     console.error('Lỗi khởi tạo Firebase Admin:', error.message);
-//   }
-// }
-
-// export default admin;
-
-
-// //------------------------------------------------
-// import * as admin from 'firebase-admin';
-// import * as dotenv from 'dotenv';
-
-// dotenv.config();
-
-// if (!admin.apps.length) {
-//   try {
-//     const projectId = process.env.FIREBASE_PROJECT_ID;
-//     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-//     const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-
-//     if (!projectId || !clientEmail || !privateKey) {
-//       throw new Error('Thiếu cấu hình Firebase (Project ID, Email hoặc Private Key)');
-//     }
-
-//     admin.initializeApp({
-//       credential: admin.credential.cert({
-//         projectId: projectId,
-//         clientEmail: clientEmail,
-//         // Railway đôi khi yêu cầu xử lý ký tự xuống dòng của Private Key
-//         privateKey: privateKey.replace(/\\n/g, '\n'),
-//       }),
-//     });
-    
-//     console.log('✅ Firebase Admin đã được khởi tạo thành công');
-//   } catch (error: any) {
-//     console.error('❌ Lỗi khởi tạo Firebase Admin:', error.message);
-//   }
-// }
-
-// export default admin;
-
-//--------------------------------------------------
-import * as admin from 'firebase-admin';
-import * as dotenv from 'dotenv';
 dotenv.config();
 
-if (!admin.apps.length) {
-  try {
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const part1 = process.env.FIREBASE_PRIVATE_KEY_1 || '';
-    const part2 = process.env.FIREBASE_PRIVATE_KEY_2 || '';
-    const part3 = process.env.FIREBASE_PRIVATE_KEY_3 || '';
+const resolvePrivateKey = () => {
+    const part1 = process.env.FIREBASE_PRIVATE_KEY_1 || "";
+    const part2 = process.env.FIREBASE_PRIVATE_KEY_2 || "";
+    const part3 = process.env.FIREBASE_PRIVATE_KEY_3 || "";
+    const combinedParts = `${part1}${part2}${part3}`.trim();
 
-    if (!projectId || !clientEmail || !part1) {
-      throw new Error('Thiếu cấu hình Firebase');
+    if (combinedParts) {
+        return Buffer.from(combinedParts, "base64").toString("utf8");
     }
 
-    // Ghép lại và decode base64
-    const privateKey = Buffer
-      .from(part1 + part2 + part3, 'base64')
-      .toString('utf8');
+    const fallbackKey = process.env.FIREBASE_PRIVATE_KEY?.trim();
+    if (!fallbackKey) {
+        return "";
+    }
 
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-    });
+    if (fallbackKey.includes("BEGIN PRIVATE KEY")) {
+        return fallbackKey.replace(/\\n/g, "\n");
+    }
 
-    console.log('✅ Firebase Admin đã được khởi tạo thành công');
-  } catch (error: any) {
-    console.error('❌ Lỗi khởi tạo Firebase Admin:', error.message);
-  }
+    return Buffer.from(fallbackKey, "base64").toString("utf8");
+};
+
+if (!admin.apps.length) {
+    try {
+        const projectId = process.env.FIREBASE_PROJECT_ID;
+        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+        const privateKey = resolvePrivateKey();
+
+        if (!projectId || !clientEmail || !privateKey) {
+            throw new Error("Thieu cau hinh Firebase");
+        }
+
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId,
+                clientEmail,
+                privateKey,
+            }),
+        });
+
+        console.log("Firebase Admin da duoc khoi tao thanh cong");
+    } catch (error: any) {
+        console.error("Loi khoi tao Firebase Admin:", error.message);
+    }
 }
 
 export default admin;
