@@ -1,15 +1,7 @@
 import axios, { AxiosInstance } from "axios";
+import { API_URL } from "../config/api";
 
-const resolveApiUrl = () => {
-    const configuredUrl =
-        process.env.REACT_APP_API_URL_LOCAL ||
-        process.env.REACT_APP_API_URL ||
-        "http://localhost:1810";
-
-    return configuredUrl.replace(/\/+$/, "");
-};
-
-export const API_URL = resolveApiUrl();
+export { API_URL };
 
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
