@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import {
@@ -14,6 +14,8 @@ import { auth } from "../firebase/config";
 import { walletApi, transactionApi, userApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
 import LineChart from "../components/charts/LineChart";
+import SpotlightGuide from "../components/SpotlightGuide";
+import { useAuth } from "../contexts/AuthContext";
 
 const { confirm } = Modal;
 
@@ -35,8 +37,21 @@ interface Wallet {
     updatedAt: string;
 }
 
+type WalletGuideStep = 0 | 1 | 2 | 3 | 4;
+
+type GuideConfig = {
+    targetRef: React.RefObject<HTMLElement | null>;
+    title: string;
+    description: string;
+    placement: "top" | "bottom" | "left" | "right";
+    actionLabel?: string;
+    actionDisabled?: boolean;
+    onAction?: () => void;
+};
+
 const Wallets: React.FC = () => {
     const { message } = App.useApp();
+    const { currentUser, updateUserStatus } = useAuth();
     const [loading, setLoading] = useState(true);
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [modalOpen, setModalOpen] = useState(false);
@@ -61,6 +76,7 @@ const Wallets: React.FC = () => {
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string>("");
     const [confirmTypeChange, setConfirmTypeChange] = useState(false);
+    const [guideStep, setGuideStep] = useState<WalletGuideStep | null>(null);
 
     // Form states for Transfer
     const [transferValues, setTransferValues] = useState({
@@ -68,6 +84,22 @@ const Wallets: React.FC = () => {
         toWalletId: "",
         amount: 0,
     });
+
+    const addWalletButtonRef = useRef<HTMLButtonElement | null>(null);
+    const nameFieldRef = useRef<HTMLDivElement | null>(null);
+    const typeFieldRef = useRef<HTMLDivElement | null>(null);
+    const balanceFieldRef = useRef<HTMLDivElement | null>(null);
+    const submitButtonRef = useRef<HTMLButtonElement | null>(null);
+
+    const hasWallets = wallets.length > 0;
+    const onboardingStorageKey = useMemo(
+        () =>
+            currentUser?.uid
+                ? `fintrack-wallet-onboarding:${currentUser.uid}`
+                : "",
+        [currentUser?.uid],
+    );
+    const isGuideEligible = !!currentUser?.newUser && !hasWallets;
 
     const fetchData = async () => {
         try {
@@ -100,6 +132,53 @@ const Wallets: React.FC = () => {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        if (!currentUser?.newUser || !hasWallets) {
+            return;
+        }
+
+        updateUserStatus(false);
+        if (onboardingStorageKey) {
+            window.localStorage.setItem(onboardingStorageKey, "done");
+        }
+    }, [
+        currentUser?.newUser,
+        hasWallets,
+        onboardingStorageKey,
+        updateUserStatus,
+    ]);
+
+    useEffect(() => {
+        if (loading || !isGuideEligible || !onboardingStorageKey) {
+            return;
+        }
+
+        const guideState = window.localStorage.getItem(onboardingStorageKey);
+        if (!guideState) {
+            setGuideStep((currentStep) => currentStep ?? 0);
+            return;
+        }
+
+        setGuideStep(null);
+    }, [isGuideEligible, loading, onboardingStorageKey]);
+
+    useEffect(() => {
+        if (!isGuideEligible || guideStep !== 1) {
+            return;
+        }
+
+        if (formValues.name.trim()) {
+            setGuideStep(2);
+        }
+    }, [formValues.name, guideStep, isGuideEligible]);
+
+    const finishOnboarding = (status: "done" | "skip") => {
+        if (onboardingStorageKey) {
+            window.localStorage.setItem(onboardingStorageKey, status);
+        }
+        setGuideStep(null);
+    };
+
     const handleOpenModal = (w: Wallet | null = null) => {
         if (w) {
             setEditing(w);
@@ -130,6 +209,18 @@ const Wallets: React.FC = () => {
         }
         setImageFile(null);
         setModalOpen(true);
+
+        if (!w && isGuideEligible && guideStep === 0) {
+            setGuideStep(1);
+        }
+    };
+
+    const handleCloseModal = () => {
+        setModalOpen(false);
+
+        if (isGuideEligible) {
+            setGuideStep(0);
+        }
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,6 +308,10 @@ const Wallets: React.FC = () => {
                 message.success("Đã cập nhật ví");
             } else {
                 await walletApi.createWallet(formData, token);
+                if (currentUser?.newUser) {
+                    updateUserStatus(false);
+                }
+                finishOnboarding("done");
                 message.success("Đã tạo ví mới");
             }
             setModalOpen(false);
@@ -298,6 +393,56 @@ const Wallets: React.FC = () => {
         }
     };
 
+    const guideConfigs: Record<WalletGuideStep, GuideConfig> = {
+        0: {
+            targetRef: addWalletButtonRef,
+            title: "Bat dau bang cach tao vi dau tien",
+            description:
+                "Day la noi mo form tao vi. Bam vao nut nay, FinTrack se dua ban qua tung buoc de khai bao nguon tien dau tien.",
+            placement: "bottom" as const,
+            actionLabel: "Mo form tao vi",
+            onAction: () => handleOpenModal(),
+        },
+        1: {
+            targetRef: nameFieldRef,
+            title: "Dat ten de de nhan dien",
+            description:
+                "Nhap ten vi nhu Tien mat, Techcombank hoac Momo. Khi truong nay co noi dung, huong dan se chuyen sang buoc tiep theo.",
+            placement: "right" as const,
+            actionLabel: "Tiep tuc",
+            onAction: () => setGuideStep(2),
+            actionDisabled: !formValues.name.trim(),
+        },
+        2: {
+            targetRef: typeFieldRef,
+            title: "Chon dung loai vi",
+            description:
+                "Hay chon Tien mat, Ngan hang hoac Vi dien tu de bao cao sau nay phan loai dung. Neu ban giu nguyen mac dinh, co the bam Tiep tuc.",
+            placement: "right" as const,
+            actionLabel: "Tiep tuc",
+            onAction: () => setGuideStep(3),
+        },
+        3: {
+            targetRef: balanceFieldRef,
+            title: "Nhap so du khoi tao",
+            description:
+                "Day la so tien hien co trong vi tai thoi diem ban bat dau su dung app. Ban co the nhap 0 neu muon thiet lap sau.",
+            placement: "left" as const,
+            actionLabel: "Tiep tuc",
+            onAction: () => setGuideStep(4),
+        },
+        4: {
+            targetRef: submitButtonRef,
+            title: "Luu lai va hoan tat",
+            description:
+                "Khi da xong, bam nut nay de tao vi. Sau do ban se co the bat dau them giao dich, ngan sach va cac muc tieu tiet kiem.",
+            placement: "top" as const,
+        },
+    } as const;
+
+    const currentGuide =
+        guideStep !== null && isGuideEligible ? guideConfigs[guideStep] : null;
+
     if (loading)
         return (
             <div className="flex items-center justify-center min-h-[400px]">
@@ -307,6 +452,21 @@ const Wallets: React.FC = () => {
 
     return (
         <div className="flex-1 animate-in fade-in duration-500">
+            {currentGuide ? (
+                <SpotlightGuide
+                    open={!!currentGuide}
+                    targetRef={currentGuide.targetRef}
+                    title={currentGuide.title}
+                    description={currentGuide.description}
+                    placement={currentGuide.placement}
+                    stepLabel={`Buoc ${(guideStep || 0) + 1}/5`}
+                    actionLabel={currentGuide.actionLabel}
+                    actionDisabled={currentGuide.actionDisabled}
+                    onAction={currentGuide.onAction}
+                    onSkip={() => finishOnboarding("skip")}
+                />
+            ) : null}
+
             {/* Page Header */}
             <div className="flex justify-between items-end mb-8">
                 <div>
@@ -319,6 +479,7 @@ const Wallets: React.FC = () => {
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
+                    ref={addWalletButtonRef}
                     className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
                 >
                     <span className="material-symbols-outlined">add</span>
@@ -669,7 +830,7 @@ const Wallets: React.FC = () => {
             <Modal
                 title={editing ? "Cập nhật ví" : "Tạo ví mới"}
                 open={modalOpen}
-                onCancel={() => setModalOpen(false)}
+                onCancel={handleCloseModal}
                 footer={null}
                 centered
                 className="premium-modal"
@@ -724,7 +885,7 @@ const Wallets: React.FC = () => {
                             )}
                         </div>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5" ref={nameFieldRef}>
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                             Tên ví / Tài khoản
                         </label>
@@ -733,12 +894,17 @@ const Wallets: React.FC = () => {
                             placeholder="Ví dụ: Techcombank, Tiền mặt..."
                             className="rounded-xl h-11"
                             value={formValues.name}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                                const nextName = e.target.value;
                                 setFormValues((prev) => ({
                                     ...prev,
-                                    name: e.target.value,
-                                }))
-                            }
+                                    name: nextName,
+                                }));
+
+                                if (guideStep === 1 && nextName.trim()) {
+                                    setGuideStep(2);
+                                }
+                            }}
                         />
                     </div>
                     <div className="space-y-1.5">
@@ -759,19 +925,23 @@ const Wallets: React.FC = () => {
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
+                        <div className="space-y-1.5" ref={typeFieldRef}>
                             <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Loại ví
                             </label>
                             <Select
                                 className="w-full h-11"
                                 value={formValues.type}
-                                onChange={(v) =>
+                                onChange={(v) => {
                                     setFormValues((prev) => ({
                                         ...prev,
                                         type: v as "cash" | "bank" | "ewallet",
-                                    }))
-                                }
+                                    }));
+
+                                    if (guideStep === 2) {
+                                        setGuideStep(3);
+                                    }
+                                }}
                                 options={[
                                     { label: "Tiền mặt", value: "cash" },
                                     { label: "Ngân hàng", value: "bank" },
@@ -881,7 +1051,7 @@ const Wallets: React.FC = () => {
                             />
                         </div>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5" ref={balanceFieldRef}>
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                             Số dư hiện tại (₫)
                         </label>
@@ -890,12 +1060,16 @@ const Wallets: React.FC = () => {
                             size="large"
                             placeholder="0"
                             value={formValues.initialBalance}
-                            onChange={(v) =>
+                            onChange={(v) => {
                                 setFormValues((prev) => ({
                                     ...prev,
                                     initialBalance: Number(v) || 0,
-                                }))
-                            }
+                                }));
+
+                                if (guideStep === 3) {
+                                    setGuideStep(4);
+                                }
+                            }}
                             formatter={(v) =>
                                 `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
                             }
@@ -906,12 +1080,13 @@ const Wallets: React.FC = () => {
                     </div>
                     <div className="flex justify-end pt-4 gap-3">
                         <button
-                            onClick={() => setModalOpen(false)}
+                            onClick={handleCloseModal}
                             className="h-11 px-8 rounded-xl uppercase text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                         >
                             Bỏ qua
                         </button>
                         <button
+                            ref={submitButtonRef}
                             className="bg-primary text-white h-11 px-8 rounded-xl uppercase text-xs font-bold shadow-lg shadow-primary/20"
                             onClick={handleSubmit}
                             disabled={submitting}
