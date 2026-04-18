@@ -43,7 +43,7 @@ type AuthProviderProps = {
 };
 
 const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
-    const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:1810";
+    const baseUrl = process.env.REACT_APP_API_URL_PRODUCT || "http://localhost:1810";
 
     console.log("Verifying token with backend at:", `${baseUrl}/api/auth/verify`);
     const response = await fetch(`${baseUrl}/api/auth/verify`, {
