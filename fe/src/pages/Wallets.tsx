@@ -86,10 +86,11 @@ const Wallets: React.FC = () => {
     });
 
     const addWalletButtonRef = useRef<HTMLButtonElement | null>(null);
-    const nameFieldRef = useRef<HTMLDivElement | null>(null);
-    const typeFieldRef = useRef<HTMLDivElement | null>(null);
-    const balanceFieldRef = useRef<HTMLDivElement | null>(null);
+    const nameFieldRef = useRef<HTMLElement | null>(null);
+    const typeFieldRef = useRef<HTMLElement | null>(null);
+    const balanceFieldRef = useRef<HTMLElement | null>(null);
     const submitButtonRef = useRef<HTMLButtonElement | null>(null);
+    const pendingGuideStepRef = useRef<WalletGuideStep | null>(null);
 
     const hasWallets = wallets.length > 0;
     const onboardingStorageKey = useMemo(
@@ -179,6 +180,22 @@ const Wallets: React.FC = () => {
         setGuideStep(null);
     };
 
+    const bindTargetRef =
+        (
+            targetRef: React.MutableRefObject<HTMLElement | null>,
+            selector?: string,
+        ) =>
+        (node: HTMLDivElement | null) => {
+            if (!node) {
+                targetRef.current = null;
+                return;
+            }
+
+            targetRef.current = selector
+                ? (node.querySelector(selector) as HTMLElement | null) || node
+                : node;
+        };
+
     const handleOpenModal = (w: Wallet | null = null) => {
         if (w) {
             setEditing(w);
@@ -211,11 +228,16 @@ const Wallets: React.FC = () => {
         setModalOpen(true);
 
         if (!w && isGuideEligible && guideStep === 0) {
-            setGuideStep(1);
+            pendingGuideStepRef.current = 1;
+            setGuideStep(null);
+            return;
         }
+
+        pendingGuideStepRef.current = null;
     };
 
     const handleCloseModal = () => {
+        pendingGuideStepRef.current = null;
         setModalOpen(false);
 
         if (isGuideEligible) {
@@ -398,17 +420,15 @@ const Wallets: React.FC = () => {
             targetRef: addWalletButtonRef,
             title: "Bat dau bang cach tao vi dau tien",
             description:
-                "Day la noi mo form tao vi. Bam vao nut nay, FinTrack se dua ban qua tung buoc de khai bao nguon tien dau tien.",
-            placement: "bottom" as const,
-            actionLabel: "Mo form tao vi",
-            onAction: () => handleOpenModal(),
+                "Bam truc tiep vao nut Them vi moi de mo form. Sau khi form hien ra, huong dan se tiep tuc tren tung truong nhap.",
+            placement: "left" as const,
         },
         1: {
             targetRef: nameFieldRef,
             title: "Dat ten de de nhan dien",
             description:
                 "Nhap ten vi nhu Tien mat, Techcombank hoac Momo. Khi truong nay co noi dung, huong dan se chuyen sang buoc tiep theo.",
-            placement: "right" as const,
+            placement: "top" as const,
             actionLabel: "Tiep tuc",
             onAction: () => setGuideStep(2),
             actionDisabled: !formValues.name.trim(),
@@ -418,7 +438,7 @@ const Wallets: React.FC = () => {
             title: "Chon dung loai vi",
             description:
                 "Hay chon Tien mat, Ngan hang hoac Vi dien tu de bao cao sau nay phan loai dung. Neu ban giu nguyen mac dinh, co the bam Tiep tuc.",
-            placement: "right" as const,
+            placement: "top" as const,
             actionLabel: "Tiep tuc",
             onAction: () => setGuideStep(3),
         },
@@ -427,7 +447,7 @@ const Wallets: React.FC = () => {
             title: "Nhap so du khoi tao",
             description:
                 "Day la so tien hien co trong vi tai thoi diem ban bat dau su dung app. Ban co the nhap 0 neu muon thiet lap sau.",
-            placement: "left" as const,
+            placement: "top" as const,
             actionLabel: "Tiep tuc",
             onAction: () => setGuideStep(4),
         },
@@ -831,6 +851,14 @@ const Wallets: React.FC = () => {
                 title={editing ? "Cập nhật ví" : "Tạo ví mới"}
                 open={modalOpen}
                 onCancel={handleCloseModal}
+                afterOpenChange={(isOpen) => {
+                    if (!isOpen || pendingGuideStepRef.current === null) {
+                        return;
+                    }
+
+                    setGuideStep(pendingGuideStepRef.current);
+                    pendingGuideStepRef.current = null;
+                }}
                 footer={null}
                 centered
                 className="premium-modal"
@@ -885,11 +913,18 @@ const Wallets: React.FC = () => {
                             )}
                         </div>
                     </div>
-                    <div className="space-y-1.5" ref={nameFieldRef}>
+                    <div
+                        className="space-y-1.5"
+                        ref={bindTargetRef(
+                            nameFieldRef,
+                            "#wallet-guide-name-input",
+                        )}
+                    >
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                             Tên ví / Tài khoản
                         </label>
                         <Input
+                            id="wallet-guide-name-input"
                             size="large"
                             placeholder="Ví dụ: Techcombank, Tiền mặt..."
                             className="rounded-xl h-11"
@@ -925,7 +960,13 @@ const Wallets: React.FC = () => {
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5" ref={typeFieldRef}>
+                        <div
+                            className="space-y-1.5"
+                            ref={bindTargetRef(
+                                typeFieldRef,
+                                ".ant-select-selector",
+                            )}
+                        >
                             <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Loại ví
                             </label>
@@ -1051,7 +1092,13 @@ const Wallets: React.FC = () => {
                             />
                         </div>
                     </div>
-                    <div className="space-y-1.5" ref={balanceFieldRef}>
+                    <div
+                        className="space-y-1.5"
+                        ref={bindTargetRef(
+                            balanceFieldRef,
+                            ".ant-input-number-input",
+                        )}
+                    >
                         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
                             Số dư hiện tại (₫)
                         </label>

@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from "axios";
 
 const resolveApiUrl = () => {
     const configuredUrl =
-        process.env.REACT_APP_API_URL_PRODUCT ||
+        process.env.REACT_APP_API_URL_LOCAL ||
         process.env.REACT_APP_API_URL ||
         "http://localhost:1810";
 

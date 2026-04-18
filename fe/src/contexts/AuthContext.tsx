@@ -44,7 +44,7 @@ type AuthProviderProps = {
 
 const verifyTokenWithBackend = async (token: string): Promise<AppUser> => {
     const baseUrl = (
-        process.env.REACT_APP_API_URL_PRODUCT ||
+        process.env.REACT_APP_API_URL_LOCAL ||
         process.env.REACT_APP_API_URL ||
         "http://localhost:1810"
     ).replace(/\/+$/, "");
