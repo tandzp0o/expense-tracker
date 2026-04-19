@@ -36,7 +36,7 @@ import { Dialog } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Select } from "../components/ui/select";
 import { Spinner } from "../components/ui/spinner";
-import SpotlightGuide from "../components/SpotlightGuide";
+import { SpotlightGuide } from "../components";
 import LineChart from "../components/charts/LineChart";
 
 dayjs.locale("vi");
@@ -68,6 +68,11 @@ type GuideConfig = {
     actionDisabled?: boolean;
     onAction?: () => void;
 };
+
+type GuideStepUpdate =
+    | WalletGuideStep
+    | null
+    | ((current: WalletGuideStep | null) => WalletGuideStep | null);
 
 const walletIconMap = {
     account_balance: Building2,
@@ -343,6 +348,9 @@ const Wallets: React.FC = () => {
               transferTo: (name?: string) => `Transfer to ${name || "destination wallet"}`,
               transferFrom: (name?: string) => `Received from ${name || "source wallet"}`,
           };
+    const guideOpenFormLabel = isVietnamese
+        ? "M\u1edf form \u2192"
+        : "Open form ->";
     const getWalletTypeLabel = (type: WalletItem["type"]) => walletTypeText[type][language];
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -384,6 +392,47 @@ const Wallets: React.FC = () => {
     );
     const hasWallets = wallets.length > 0;
     const isGuideEligible = !!currentUser?.newUser && !hasWallets;
+    const logGuide = useCallback(
+        (event: string, details?: Record<string, unknown>) => {
+            console.info("[WalletGuide]", event, {
+                currentUserId: currentUser?.uid || null,
+                guideStep,
+                hasWallets,
+                isGuideEligible,
+                modalOpen,
+                ...details,
+            });
+        },
+        [currentUser?.uid, guideStep, hasWallets, isGuideEligible, modalOpen],
+    );
+    const setGuideStepWithLog = useCallback(
+        (next: GuideStepUpdate, reason: string) => {
+            setGuideStep((current) => {
+                const resolved =
+                    typeof next === "function"
+                        ? next(current)
+                        : next;
+
+                if (current !== resolved) {
+                    logGuide("Guide step changed", {
+                        from: current,
+                        reason,
+                        to: resolved,
+                    });
+                }
+
+                return resolved;
+            });
+        },
+        [logGuide],
+    );
+    const getGuideState = useCallback(() => {
+        if (!onboardingStorageKey || typeof window === "undefined") {
+            return null;
+        }
+
+        return window.localStorage.getItem(onboardingStorageKey);
+    }, [onboardingStorageKey]);
 
     // Locale-derived error labels are intentionally reduced to stable primitives above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -430,39 +479,197 @@ const Wallets: React.FC = () => {
     }, [fetchData]);
 
     useEffect(() => {
+        logGuide("Guide state snapshot", {
+            onboardingStorageKey,
+            persistedState: getGuideState(),
+        });
+    }, [getGuideState, logGuide, onboardingStorageKey]);
+
+    useEffect(() => {
         if (!currentUser?.newUser || !hasWallets) {
             return;
         }
+        logGuide("User now has wallet, marking onboarding done");
         updateUserStatus(false);
         if (onboardingStorageKey) {
             window.localStorage.setItem(onboardingStorageKey, "done");
         }
-    }, [currentUser?.newUser, hasWallets, onboardingStorageKey, updateUserStatus]);
+    }, [
+        currentUser?.newUser,
+        hasWallets,
+        logGuide,
+        onboardingStorageKey,
+        updateUserStatus,
+    ]);
 
     useEffect(() => {
-        if (loading || !isGuideEligible || !onboardingStorageKey) {
+        if (loading || modalOpen || !isGuideEligible || !onboardingStorageKey) {
+            logGuide("Guide bootstrap skipped", {
+                loading,
+                modalOpen,
+                onboardingStorageKey,
+            });
             return;
         }
 
-        const guideState = window.localStorage.getItem(onboardingStorageKey);
-        if (!guideState) {
-            setGuideStep((current) => current ?? 0);
+        let guideState = getGuideState();
+        if (guideState === "done") {
+            logGuide("Detected stale persisted done state for eligible user, resetting it");
+            window.localStorage.removeItem(onboardingStorageKey);
+            guideState = null;
+        }
+
+        if (guideState === "skip") {
+            logGuide(
+                "Persisted skip state found, but guide will restart until the first wallet exists",
+            );
+        }
+
+        let frameId = 0;
+        let attempts = 0;
+        let cancelled = false;
+
+        const ensureGuideStarts = () => {
+            if (cancelled) {
+                return;
+            }
+
+            if (addWalletButtonRef.current) {
+                logGuide("Step 0 target ready, showing guide", {
+                    attempts,
+                });
+                setGuideStepWithLog((current) => current ?? 0, "bootstrap step 0");
+                return;
+            }
+
+            if (attempts >= 24) {
+                logGuide("Step 0 target still missing after retries", {
+                    attempts,
+                });
+                return;
+            }
+
+            attempts += 1;
+            logGuide("Waiting for step 0 target ref", {
+                attempts,
+            });
+            frameId = window.requestAnimationFrame(ensureGuideStarts);
+        };
+
+        logGuide("Starting guide bootstrap", {
+            persistedState: guideState,
+        });
+        frameId = window.requestAnimationFrame(ensureGuideStarts);
+
+        return () => {
+            cancelled = true;
+            window.cancelAnimationFrame(frameId);
+        };
+    }, [
+        getGuideState,
+        isGuideEligible,
+        loading,
+        logGuide,
+        modalOpen,
+        onboardingStorageKey,
+        setGuideStepWithLog,
+    ]);
+
+    useEffect(() => {
+        if (guideStep === null) {
+            logGuide("Guide hidden");
             return;
         }
-        setGuideStep(null);
-    }, [isGuideEligible, loading, onboardingStorageKey]);
+
+        logGuide("Guide visible", {
+            step: guideStep,
+        });
+    }, [guideStep, logGuide]);
+
+    useEffect(() => {
+        if (!modalOpen || pendingGuideStepRef.current === null) {
+            return;
+        }
+
+        logGuide("Dialog opened, preparing next guided step", {
+            pendingStep: pendingGuideStepRef.current,
+        });
+        let frameId = 0;
+        let attempts = 0;
+
+        const getPendingTarget = (step: WalletGuideStep) => {
+            if (step === 1) {
+                return nameFieldRef.current;
+            }
+
+            if (step === 2) {
+                return typeFieldRef.current;
+            }
+
+            if (step === 3) {
+                return balanceFieldRef.current;
+            }
+
+            if (step === 4) {
+                return submitButtonRef.current;
+            }
+
+            return addWalletButtonRef.current;
+        };
+
+        const continueGuideInsideDialog = () => {
+            const pendingStep = pendingGuideStepRef.current;
+            if (pendingStep === null) {
+                return;
+            }
+
+            if (getPendingTarget(pendingStep)) {
+                logGuide("Dialog target ready, continuing guide", {
+                    pendingStep,
+                });
+                setGuideStepWithLog(pendingStep, "dialog target mounted");
+                pendingGuideStepRef.current = null;
+                return;
+            }
+
+            if (attempts >= 24) {
+                logGuide("Dialog target missing after retries", {
+                    attempts,
+                    pendingStep,
+                });
+                pendingGuideStepRef.current = null;
+                return;
+            }
+
+            attempts += 1;
+            logGuide("Waiting for dialog target ref", {
+                attempts,
+                pendingStep,
+            });
+            frameId = window.requestAnimationFrame(continueGuideInsideDialog);
+        };
+
+        frameId = window.requestAnimationFrame(continueGuideInsideDialog);
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+        };
+    }, [logGuide, modalOpen, setGuideStepWithLog]);
 
     useEffect(() => {
         if (guideStep === 1 && formValues.name.trim()) {
-            setGuideStep(2);
+            setGuideStepWithLog(2, "name entered");
         }
-    }, [formValues.name, guideStep]);
+    }, [formValues.name, guideStep, setGuideStepWithLog]);
 
     const finishOnboarding = (status: "done" | "skip") => {
         if (onboardingStorageKey) {
             window.localStorage.setItem(onboardingStorageKey, status);
         }
-        setGuideStep(null);
+        logGuide("Finishing onboarding", {
+            status,
+        });
+        setGuideStepWithLog(null, `finish onboarding: ${status}`);
     };
 
     const bindTargetRef =
@@ -470,14 +677,30 @@ const Wallets: React.FC = () => {
         (node: HTMLDivElement | null) => {
             if (!node) {
                 targetRef.current = null;
+                logGuide("Guide target cleared", {
+                    selector: selector || "self",
+                });
                 return;
             }
             targetRef.current = selector
                 ? (node.querySelector(selector) as HTMLElement | null) || node
                 : node;
+            logGuide("Guide target attached", {
+                resolved: targetRef.current?.tagName || null,
+                selector: selector || "self",
+            });
         };
 
-    const openCreate = () => {
+    const openCreate = (source: "empty-state" | "guide-cta" | "header" = "header") => {
+        const persistedGuideState = getGuideState();
+        const shouldContinueGuide =
+            isGuideEligible && persistedGuideState !== "done";
+        logGuide("Open create wallet requested", {
+            persistedGuideState,
+            shouldContinueGuide,
+            source,
+        });
+
         setEditing(null);
         setFormValues({
             name: "",
@@ -492,9 +715,10 @@ const Wallets: React.FC = () => {
         setImagePreview("");
         setModalOpen(true);
 
-        if (isGuideEligible && guideStep === 0) {
+        if (shouldContinueGuide) {
             pendingGuideStepRef.current = 1;
-            setGuideStep(null);
+            logGuide("Queued guide step 1 after opening dialog");
+            setGuideStepWithLog(null, "opening create dialog");
         } else {
             pendingGuideStepRef.current = null;
         }
@@ -514,15 +738,17 @@ const Wallets: React.FC = () => {
         setImageFile(null);
         setImagePreview(wallet.imageUrl || "");
         pendingGuideStepRef.current = null;
+        logGuide("Open edit wallet dialog", {
+            walletId: wallet._id,
+        });
         setModalOpen(true);
     };
 
     const handleCloseModal = () => {
         pendingGuideStepRef.current = null;
+        logGuide("Closing wallet dialog");
+        setGuideStepWithLog(null, "dialog closed");
         setModalOpen(false);
-        if (isGuideEligible) {
-            setGuideStep(0);
-        }
     };
 
     const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -744,6 +970,8 @@ const Wallets: React.FC = () => {
             title: copy.firstWalletGuide,
             description: copy.firstWalletGuideDesc,
             placement: "left",
+            actionLabel: guideOpenFormLabel,
+            onAction: () => openCreate("guide-cta"),
         },
         1: {
             targetRef: nameFieldRef,
@@ -751,7 +979,7 @@ const Wallets: React.FC = () => {
             description: copy.clearNameGuideDesc,
             placement: "top",
             actionLabel: copy.continue,
-            onAction: () => setGuideStep(2),
+            onAction: () => setGuideStepWithLog(2, "step 1 CTA"),
             actionDisabled: !formValues.name.trim(),
         },
         2: {
@@ -760,7 +988,7 @@ const Wallets: React.FC = () => {
             description: copy.walletTypeGuideDesc,
             placement: "top",
             actionLabel: copy.continue,
-            onAction: () => setGuideStep(3),
+            onAction: () => setGuideStepWithLog(3, "step 2 CTA"),
         },
         3: {
             targetRef: balanceFieldRef,
@@ -768,7 +996,7 @@ const Wallets: React.FC = () => {
             description: copy.startingBalanceGuideDesc,
             placement: "top",
             actionLabel: copy.continue,
-            onAction: () => setGuideStep(4),
+            onAction: () => setGuideStepWithLog(4, "step 3 CTA"),
         },
         4: {
             targetRef: submitButtonRef,
@@ -822,7 +1050,7 @@ const Wallets: React.FC = () => {
 
             <PageHeader
                 actions={
-                    <Button onClick={openCreate} ref={addWalletButtonRef}>
+                    <Button onClick={() => openCreate("header")} ref={addWalletButtonRef}>
                         <Plus className="h-4 w-4" />
                         {copy.newWallet}
                     </Button>
@@ -1039,7 +1267,7 @@ const Wallets: React.FC = () => {
                     actionLabel={copy.createWallet}
                     description={copy.noWalletsDesc}
                     icon={WalletCards}
-                    onAction={openCreate}
+                    onAction={() => openCreate("empty-state")}
                     title={copy.noWallets}
                 />
             )}

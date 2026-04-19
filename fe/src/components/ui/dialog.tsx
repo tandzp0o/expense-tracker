@@ -50,6 +50,9 @@ export const Dialog: React.FC<DialogProps> = ({
                     "relative z-[1] w-full max-w-2xl rounded-[var(--app-radius-xl)] border border-border bg-card text-card-foreground shadow-2xl",
                     className,
                 )}
+                data-spotlight-boundary="dialog"
+                role="dialog"
+                aria-modal="true"
             >
                 <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
                     <div>
