@@ -120,11 +120,16 @@ const invalidateTransactionCache = () => {
     keysToDelete.forEach((key) => window.sessionStorage.removeItem(key));
 };
 
+export const clearApiCaches = () => {
+    invalidateTransactionCache();
+};
+
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
     return axios.create({
         baseURL: API_URL + "/api",
         headers: {
+            "Cache-Control": "no-store",
             "Content-Type": "application/json",
             ...(token && { Authorization: `Bearer ${token}` }),
         },
@@ -136,6 +141,7 @@ const createMultipartApiClient = (token?: string): AxiosInstance => {
     return axios.create({
         baseURL: API_URL + "/api",
         headers: {
+            "Cache-Control": "no-store",
             // Let the browser set the Content-Type to multipart/form-data
             ...(token && { Authorization: `Bearer ${token}` }),
         },

@@ -59,7 +59,7 @@ const ProtectedRoute = () => {
     }
 
     return (
-        <MainLayout>
+        <MainLayout key={currentUser.uid}>
             <Outlet />
         </MainLayout>
     );

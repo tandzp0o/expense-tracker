@@ -25,6 +25,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     const { logout, currentUser } = useAuth();
     const { language, isVietnamese } = useLocale();
     const [menuOpen, setMenuOpen] = useState(false);
+    const [isScrolled, setIsScrolled] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
     const navigationItems = useMemo(
         () => buildNavigationItems(language),
@@ -44,6 +45,17 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        const syncScrollState = () => {
+            setIsScrolled(window.scrollY > 16);
+        };
+
+        syncScrollState();
+        window.addEventListener("scroll", syncScrollState, { passive: true });
+
+        return () => window.removeEventListener("scroll", syncScrollState);
+    }, []);
+
     const currentPage = useMemo(
         () =>
             navigationItems.find((item) => item.to === location.pathname) || {
@@ -53,8 +65,18 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     );
 
     return (
-        <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
-            <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
+        <header
+            className={cn(
+                "sticky top-0 z-40 px-3 transition-[padding] duration-200 md:px-4",
+                isScrolled ? "pt-3" : "pt-1 md:pt-2",
+            )}
+        >
+            <div
+                className={cn(
+                    "app-header-shell mx-auto flex h-[72px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6",
+                    isScrolled && "is-scrolled",
+                )}
+            >
                 <div className="flex items-center gap-3">
                     <Button
                         className="md:hidden"
@@ -79,14 +101,17 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
                     <div className="relative" ref={menuRef}>
                         <button
-                            className="flex items-center gap-3 rounded-[var(--app-radius-lg)] border border-border bg-card px-3 py-2 text-left shadow-sm transition-colors hover:bg-muted/60"
+                            className={cn(
+                                "app-header-user-trigger flex items-center gap-3 rounded-[var(--app-radius-lg)] px-3 py-2 text-left transition-colors",
+                                isScrolled && "is-scrolled",
+                            )}
                             onClick={() => setMenuOpen((current) => !current)}
                             type="button"
                         >
                             <Avatar
                                 alt={currentUser?.displayName}
                                 fallback={currentUser?.displayName || "FT"}
-                                src={(currentUser as any)?.photoURL}
+                                src={currentUser?.avatar || currentUser?.photoURL || undefined}
                             />
                             <div className="hidden sm:block">
                                 <p className="text-sm font-medium text-foreground">
@@ -106,7 +131,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                         </button>
 
                         {menuOpen ? (
-                            <div className="absolute right-0 mt-2 w-56 rounded-[var(--app-radius-lg)] border border-border bg-card p-2 shadow-soft">
+                            <div className="glass-panel absolute right-0 mt-3 w-56 rounded-[var(--app-radius-lg)] border border-border/80 bg-card/95 p-2 shadow-soft backdrop-blur-xl">
                                 <Link
                                     className={cn(
                                         "flex items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",

@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useLocale } from "../contexts/LocaleContext";
 import { buildNavigationItems } from "./navigation";
 import { cn } from "../lib/utils";
@@ -29,8 +29,12 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                     onClick={() => handleNavigate("/dashboard")}
                     type="button"
                 >
-                    <div className="flex h-11 w-11 items-center justify-center rounded-[var(--app-radius-md)] bg-primary text-primary-foreground shadow-sm">
-                        <Sparkles className="h-5 w-5" />
+                    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[var(--app-radius-md)] shadow-sm">
+                        <img
+                            alt="FinTrack logo"
+                            className="h-full w-full object-contain"
+                            src={`${process.env.PUBLIC_URL}/logo.png`}
+                        />
                     </div>
                     <div className="text-left">
                         <p className="text-base font-semibold">FinTrack</p>

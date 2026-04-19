@@ -10,8 +10,11 @@ const ASSETS_TO_CACHE = [
 ];
 
 // ─── Helper: bỏ qua HMR và dev files ─────────────────────
-const shouldSkip = (url) => {
+const shouldSkip = (request) => {
+    const url = request.url;
     return (
+        request.method !== "GET" ||
+        request.headers.has("Authorization") ||
         url.includes("hot-update.js") ||
         url.includes("hot-update.json") ||
         url.includes("webpack-hmr") ||
@@ -54,13 +57,8 @@ self.addEventListener("activate", (event) => {
 // ─── Fetch: Network first → Cache fallback ────────────────
 // Bắt buộc có fetch handler để browser hiện gợi ý "Cài đặt app"
 self.addEventListener("fetch", (event) => {
-    const url = event.request.url;
-
-    // ✅ Bỏ qua HMR files (dev only) — không intercept
-    if (shouldSkip(url)) return;
-
-    // ✅ Chỉ xử lý GET
-    if (event.request.method !== "GET") return;
+    // ✅ Bỏ qua HMR files, API có auth và request không nên cache
+    if (shouldSkip(event.request)) return;
 
     event.respondWith(
         fetch(event.request)

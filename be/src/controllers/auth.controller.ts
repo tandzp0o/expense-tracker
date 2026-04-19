@@ -6,6 +6,7 @@ interface AuthenticatedRequest extends Request {
         uid: string;
         email: string;
         name?: string;
+        picture?: string;
     };
 }
 
@@ -19,7 +20,7 @@ export const verifyToken = async (req: AuthenticatedRequest, res: Response) => {
             });
         }
 
-        const { uid, email } = req.user;
+        const { uid, email, picture } = req.user;
         console.log("Xác thực user:", { uid, email });
 
         // Tìm hoặc tạo user mới
@@ -37,11 +38,14 @@ export const verifyToken = async (req: AuthenticatedRequest, res: Response) => {
             });
         }
 
+        res.set("Cache-Control", "private, no-store, max-age=0");
         res.status(200).json({
             success: true,
             uid: user.uid,
             email: user.email,
             displayName: user.displayName,
+            avatar: user.avatar || picture || "",
+            photoURL: picture || "",
             createdAt: user.createdAt,
             newUser: user.newUser,
         });

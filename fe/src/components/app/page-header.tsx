@@ -9,7 +9,7 @@ export const PageHeader: React.FC<{
 }> = ({ title, description, actions, className }) => (
     <div
         className={cn(
-            "flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between",
+            "flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between",
             className,
         )}
     >

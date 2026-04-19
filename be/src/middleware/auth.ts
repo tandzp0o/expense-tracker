@@ -10,6 +10,11 @@ export const verifyFirebaseToken = async (
     res: Response,
     next: NextFunction,
 ) => {
+    res.vary("Authorization");
+    if (req.method === "GET" || req.method === "HEAD") {
+        res.set("Cache-Control", "private, no-store, max-age=0");
+    }
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -25,6 +30,7 @@ export const verifyFirebaseToken = async (
             uid: decodedToken.uid,
             email: decodedToken.email || "",
             name: decodedToken.name || "",
+            picture: decodedToken.picture || "",
         };
         next();
     } catch (error: any) {

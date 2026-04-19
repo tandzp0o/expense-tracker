@@ -40,7 +40,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 </aside>
 
                 <div className="flex min-w-0 flex-1 flex-col">
-                    <div className="glass-panel overflow-hidden rounded-[var(--app-radius-xl)] border border-border shadow-soft">
+                    <div className="glass-panel rounded-[var(--app-radius-xl)] border border-border shadow-soft">
                         <Header onMenuClick={() => setMenuOpen(true)} />
                         <main
                             className={cn(
