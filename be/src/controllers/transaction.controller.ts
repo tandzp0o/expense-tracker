@@ -1,12 +1,65 @@
 import { Request, Response } from "express";
-import Transaction, {
-    TransactionType,
-    ITransaction,
-} from "../models/Transaction";
+import Transaction, { TransactionType } from "../models/Transaction";
 import Wallet from "../models/Wallet";
 import Budget from "../models/Budget";
 import Goal from "../models/Goal";
 import { Types } from "mongoose";
+import {
+    buildTransactionCacheTag,
+    getTransactionCacheState,
+    touchTransactionCacheState,
+} from "../utils/transaction-cache";
+
+const TRANSACTION_LIST_CACHE_CONTROL =
+    "private, max-age=60, stale-while-revalidate=300";
+
+const parsePositiveInt = (value: unknown, fallback: number) => {
+    const parsed = Number.parseInt(String(value ?? ""), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const escapeRegex = (value: string) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const buildTransactionQuery = (userId: string, reqQuery: any) => {
+    const {
+        startDate,
+        endDate,
+        type,
+        category,
+        walletId,
+        note,
+    } = reqQuery;
+    const query: any = { userId };
+
+    if (walletId) query.walletId = walletId;
+    if (type) query.type = type;
+    if (category) query.category = category;
+
+    const normalizedNote =
+        typeof note === "string" ? note.trim() : String(note || "").trim();
+    if (normalizedNote) {
+        query.note = { $regex: escapeRegex(normalizedNote), $options: "i" };
+    }
+
+    if (startDate || endDate) {
+        query.date = {};
+        if (startDate) query.date.$gte = new Date(startDate as string);
+        if (endDate) query.date.$lte = new Date(endDate as string);
+    }
+
+    return query;
+};
+
+const buildTransactionQueryKey = (query: Record<string, unknown>) => {
+    const pairs = Object.entries(query)
+        .filter(([, value]) => value !== undefined && value !== null && value !== "")
+        .sort(([left], [right]) => left.localeCompare(right));
+
+    return new URLSearchParams(
+        pairs.map(([key, value]) => [key, String(value)]),
+    ).toString();
+};
 
 export const createTransaction = async (req: any, res: Response) => {
     const session = await Transaction.startSession();
@@ -180,6 +233,7 @@ export const createTransaction = async (req: any, res: Response) => {
             await wallet.save({ session });
         }
 
+        await touchTransactionCacheState(userId, req.user, session);
         await session.commitTransaction();
         res.status(201).json(transaction);
     } catch (error) {
@@ -294,59 +348,80 @@ export const getStatementReport = async (req: Request, res: Response) => {
 
 export const getTransactions = async (req: any, res: Response) => {
     try {
-        // 1. Thêm 'note' vào đây để lấy nó ra từ query
-        const {
-            startDate,
-            endDate,
-            type,
-            category,
-            walletId,
-            note,
-            page,
-            limit,
-        } = req.query;
         const userId = req.user.uid;
+        const pageNumber = parsePositiveInt(req.query.page, 1);
+        const pageSize = parsePositiveInt(req.query.limit, 10);
+        const query = buildTransactionQuery(userId, req.query);
+        const queryKey = buildTransactionQueryKey({
+            ...req.query,
+            page: pageNumber,
+            limit: pageSize,
+        });
+        const cacheState = await getTransactionCacheState(userId);
 
-        const query: any = { userId };
-
-        if (walletId) query.walletId = walletId;
-        if (type) query.type = type;
-        if (category) query.category = category;
-
-        // 2. Thêm khối xử lý cho 'note'
-        if (note) {
-            // Sử dụng $regex để tìm kiếm 'note' có chứa chuỗi được gửi lên
-            // $options: 'i' để không phân biệt chữ hoa/thường
-            query.note = { $regex: note, $options: "i" };
-        }
-
-        if (startDate || endDate) {
-            query.date = {};
-            if (startDate) query.date.$gte = new Date(startDate as string);
-            if (endDate) query.date.$lte = new Date(endDate as string);
-        }
-
-        const total = await Transaction.countDocuments(query);
-        const transactions = await Transaction.find(query)
-            .sort({ date: -1, createdAt: -1 })
-            .skip((Number(page) - 1) * Number(limit))
-            .limit(Number(limit))
-            .populate("walletId", "name");
-
-        const summaryData = await Transaction.find(query);
-        const summary = summaryData.reduce(
-            (acc, t) => {
-                if (t.type === TransactionType.INCOME) {
-                    acc.income += t.amount;
-                } else if (t.type === TransactionType.EXPENSE) {
-                    acc.expense += t.amount;
-                }
-                return acc;
-            },
-            { income: 0, expense: 0, profit: 0 },
+        res.vary("Authorization");
+        res.set("Cache-Control", TRANSACTION_LIST_CACHE_CONTROL);
+        res.set(
+            "ETag",
+            buildTransactionCacheTag(cacheState.version, queryKey),
         );
+        if (cacheState.updatedAt) {
+            res.set("Last-Modified", cacheState.updatedAt.toUTCString());
+        }
 
-        summary.profit = summary.income - summary.expense;
+        if (req.fresh) {
+            return res.status(304).end();
+        }
+
+        const skip = (pageNumber - 1) * pageSize;
+        const [summaryData, transactions] = await Promise.all([
+            Transaction.aggregate([
+                { $match: query },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: 1 },
+                        income: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$type", TransactionType.INCOME] },
+                                    "$amount",
+                                    0,
+                                ],
+                            },
+                        },
+                        expense: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$type", TransactionType.EXPENSE] },
+                                    "$amount",
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+            ]),
+            Transaction.find(query)
+                .sort({ date: -1, createdAt: -1 })
+                .skip(skip)
+                .limit(pageSize)
+                .select("_id walletId type amount category date note createdAt")
+                .populate("walletId", "name")
+                .lean(),
+        ]);
+
+        const aggregateRow = summaryData[0] || {
+            total: 0,
+            income: 0,
+            expense: 0,
+        };
+        const total = aggregateRow.total;
+        const summary = {
+            income: aggregateRow.income,
+            expense: aggregateRow.expense,
+            profit: aggregateRow.income - aggregateRow.expense,
+        };
 
         res.json({
             success: true,
@@ -356,9 +431,9 @@ export const getTransactions = async (req: any, res: Response) => {
                 total,
                 pagination: {
                     total,
-                    page: Number(page),
-                    limit: Number(limit),
-                    pages: Math.ceil(total / Number(limit)),
+                    page: pageNumber,
+                    limit: pageSize,
+                    pages: Math.max(1, Math.ceil(total / pageSize)),
                 },
             },
         });
@@ -391,7 +466,9 @@ export const getTransactionsByWallet = async (req: any, res: Response) => {
 
         const transactions = await Transaction.find({ walletId, userId })
             .sort({ date: -1, createdAt: -1 })
-            .populate("walletId", "name");
+            .select("_id walletId type amount category date note createdAt")
+            .populate("walletId", "name")
+            .lean();
 
         res.json({
             success: true,
@@ -555,6 +632,7 @@ export const updateTransaction = async (req: any, res: Response) => {
         savePromises.push(updatedTransaction.save({ session }));
         await Promise.all(savePromises);
 
+        await touchTransactionCacheState(userId, req.user, session);
         await session.commitTransaction();
 
         res.json({
@@ -563,6 +641,7 @@ export const updateTransaction = async (req: any, res: Response) => {
             message: "Cập nhật giao dịch thành công",
         });
     } catch (error) {
+        await session.abortTransaction();
         const errorMessage =
             error instanceof Error
                 ? error.message
@@ -626,6 +705,7 @@ export const deleteTransaction = async (req: any, res: Response) => {
         // Xóa giao dịch
         await Transaction.deleteOne({ _id: id }).session(session);
 
+        await touchTransactionCacheState(userId, req.user, session);
         await session.commitTransaction();
 
         res.json({

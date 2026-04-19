@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import {
@@ -15,6 +15,7 @@ import { transactionApi, walletApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
+import { useDebounce } from "../hooks/useDebounce";
 import { PageHeader } from "../components/app/page-header";
 import { EmptyState } from "../components/app/empty-state";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
@@ -96,6 +97,8 @@ const Transactions: React.FC = () => {
         walletId: "",
         date: dayjs().format("YYYY-MM-DD"),
     });
+    const debouncedSearchQuery = useDebounce(searchQuery, 300);
+    const hasLoadedWalletsRef = useRef(false);
 
     const copy = isVietnamese
         ? {
@@ -244,31 +247,34 @@ const Transactions: React.FC = () => {
                 return;
             }
 
-            const [walletResponse, transactionResponse] = await Promise.all([
-                walletApi.getWallets(token),
-                transactionApi.getTransactions(
-                    {
-                        page,
-                        limit: pageSize,
-                        category: selectedCategory || undefined,
-                        walletId: selectedWallet || undefined,
-                        note: searchQuery || undefined,
-                    },
-                    token,
-                ),
-            ]);
+            if (!hasLoadedWalletsRef.current) {
+                const walletResponse = await walletApi.getWallets(token);
+                const walletList = walletResponse?.wallets || [];
 
-            const walletList = walletResponse?.wallets || [];
-            setWallets(walletList);
+                setWallets(walletList);
+                hasLoadedWalletsRef.current = true;
+
+                if (!formValues.walletId && walletList.length > 0) {
+                    setFormValues((current) => ({
+                        ...current,
+                        walletId: walletList[0]._id,
+                    }));
+                }
+            }
+
+            const transactionResponse = await transactionApi.getTransactions(
+                {
+                    page,
+                    limit: pageSize,
+                    category: selectedCategory || undefined,
+                    walletId: selectedWallet || undefined,
+                    note: debouncedSearchQuery || undefined,
+                },
+                token,
+            );
+
             setTransactions(transactionResponse?.data?.transactions || []);
             setTotalTransactions(transactionResponse?.data?.total || 0);
-
-            if (!formValues.walletId && walletList.length > 0) {
-                setFormValues((current) => ({
-                    ...current,
-                    walletId: walletList[0]._id,
-                }));
-            }
         } catch (error: any) {
             toast({
                 title: isVietnamese
@@ -281,11 +287,10 @@ const Transactions: React.FC = () => {
             setLoading(false);
         }
     }, [
-        formValues.walletId,
+        debouncedSearchQuery,
         isVietnamese,
         page,
         pageSize,
-        searchQuery,
         selectedCategory,
         selectedWallet,
         toast,

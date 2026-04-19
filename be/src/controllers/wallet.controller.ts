@@ -5,6 +5,7 @@ import User from "../models/User";
 import { Types } from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
+import { touchTransactionCacheState } from "../utils/transaction-cache";
 
 // Configure Cloudinary
 cloudinary.config({
@@ -250,6 +251,9 @@ export const updateWallet = [
             }
 
             await wallet.save();
+            if (wallet.hasTransactions) {
+                await touchTransactionCacheState(req.user.uid, req.user);
+            }
 
             if (!wallet) {
                 return res
@@ -300,6 +304,7 @@ export const deleteWallet = async (req: any, res: Response) => {
         if (wallet.hasTransactions) {
             wallet.isArchived = true;
             await wallet.save();
+            await touchTransactionCacheState(req.user.uid, req.user);
             return res.json({
                 success: true,
                 message: "Ví đã được lưu trữ (đã có giao dịch)",

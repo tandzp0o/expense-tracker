@@ -15,6 +15,111 @@ export class ApiError extends Error {
     }
 }
 
+const TRANSACTION_CACHE_PREFIX = "expense-tracker:transactions:";
+const TRANSACTION_CACHE_TTL_MS = 60_000;
+
+const decodeBase64Url = (value: string) => {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+        normalized.length + ((4 - (normalized.length % 4)) % 4),
+        "=",
+    );
+    return window.atob(padded);
+};
+
+const getTransactionCacheScope = (token?: string) => {
+    if (!token || typeof window === "undefined") {
+        return "anonymous";
+    }
+
+    const payload = token.split(".")[1];
+    if (!payload) {
+        return token.slice(0, 24);
+    }
+
+    try {
+        const decoded = JSON.parse(decodeBase64Url(payload));
+        return decoded.user_id || decoded.sub || token.slice(0, 24);
+    } catch {
+        return token.slice(0, 24);
+    }
+};
+
+const buildTransactionCacheKey = (
+    params: Record<string, unknown>,
+    token?: string,
+) => {
+    const normalizedParams = Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== null && value !== "")
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, value]) => [key, String(value)]);
+
+    const queryKey = new URLSearchParams(normalizedParams).toString();
+    return `${TRANSACTION_CACHE_PREFIX}${getTransactionCacheScope(token)}:${queryKey}`;
+};
+
+const readTransactionCache = (key: string) => {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    const rawValue = window.sessionStorage.getItem(key);
+    if (!rawValue) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(rawValue) as {
+            expiresAt?: number;
+            data?: any;
+        };
+
+        if (!parsed.expiresAt || parsed.expiresAt <= Date.now()) {
+            window.sessionStorage.removeItem(key);
+            return null;
+        }
+
+        return parsed.data ?? null;
+    } catch {
+        window.sessionStorage.removeItem(key);
+        return null;
+    }
+};
+
+const writeTransactionCache = (key: string, data: any) => {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    try {
+        window.sessionStorage.setItem(
+            key,
+            JSON.stringify({
+                expiresAt: Date.now() + TRANSACTION_CACHE_TTL_MS,
+                data,
+            }),
+        );
+    } catch {
+        invalidateTransactionCache();
+    }
+};
+
+const invalidateTransactionCache = () => {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    const keysToDelete: string[] = [];
+    for (let index = 0; index < window.sessionStorage.length; index += 1) {
+        const key = window.sessionStorage.key(index);
+        if (key?.startsWith(TRANSACTION_CACHE_PREFIX)) {
+            keysToDelete.push(key);
+        }
+    }
+
+    keysToDelete.forEach((key) => window.sessionStorage.removeItem(key));
+};
+
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
     return axios.create({
@@ -144,6 +249,7 @@ export const walletApi = {
         try {
             const apiClient = createMultipartApiClient(token);
             const response = await apiClient.put(`/wallets/${id}`, walletData);
+            invalidateTransactionCache();
             return response.data;
         } catch (error: any) {
             if (error.response) {
@@ -161,6 +267,7 @@ export const walletApi = {
         try {
             const apiClient = createApiClient(token);
             const response = await apiClient.delete(`/wallets/${id}`);
+            invalidateTransactionCache();
             return response.data;
         } catch (error) {
             return handleApiError(error);
@@ -186,8 +293,15 @@ export const transactionApi = {
         token?: string,
     ) => {
         try {
+            const cacheKey = buildTransactionCacheKey(params, token);
+            const cachedResponse = readTransactionCache(cacheKey);
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
             const apiClient = createApiClient(token);
             const response = await apiClient.get("/transactions", { params });
+            writeTransactionCache(cacheKey, response.data);
             return response.data;
         } catch (error) {
             return handleApiError(error);
@@ -202,6 +316,7 @@ export const transactionApi = {
                 "/transactions",
                 transactionData,
             );
+            invalidateTransactionCache();
             return response.data;
         } catch (error) {
             return handleApiError(error);
@@ -220,6 +335,7 @@ export const transactionApi = {
                 `/transactions/${id}`,
                 transactionData,
             );
+            invalidateTransactionCache();
             return response.data;
         } catch (error) {
             return handleApiError(error);
@@ -231,6 +347,7 @@ export const transactionApi = {
         try {
             const apiClient = createApiClient(token);
             const response = await apiClient.delete(`/transactions/${id}`);
+            invalidateTransactionCache();
             return response.data;
         } catch (error) {
             return handleApiError(error);

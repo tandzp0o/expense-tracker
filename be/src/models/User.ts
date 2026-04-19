@@ -16,6 +16,8 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
   newUser: boolean;
+  transactionCacheVersion: number;
+  transactionsUpdatedAt: Date;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -32,6 +34,8 @@ const UserSchema = new Schema<IUser>({
   goalsCompleted: { type: Number, default: 0 },
   goalsActive: { type: Number, default: 0 },
   newUser: { type: Boolean, default: true },
+  transactionCacheVersion: { type: Number, default: 0 },
+  transactionsUpdatedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>("User", UserSchema);
