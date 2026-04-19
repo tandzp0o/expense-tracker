@@ -1,14 +1,39 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
-import { App, Card, Spin, Progress, Popconfirm, Table, Button } from "antd";
+import {
+    ArrowDownRight,
+    ArrowUpRight,
+    Landmark,
+    Target,
+    Trash2,
+    WalletCards,
+} from "lucide-react";
 import { auth } from "../firebase/config";
-import { walletApi, transactionApi, userApi } from "../services/api";
+import { goalApi, transactionApi, userApi, walletApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
+import { useLocale } from "../contexts/LocaleContext";
+import { useToast } from "../contexts/ToastContext";
+import { useTheme } from "../contexts/ThemeContext";
+import { cn, hexToRgba } from "../lib/utils";
+import { PageHeader } from "../components/app/page-header";
+import { MetricCard } from "../components/app/metric-card";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Spinner } from "../components/ui/spinner";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { Progress } from "../components/ui/progress";
+import BarChart from "../components/charts/BarChart";
 import LineChart from "../components/charts/LineChart";
-
-dayjs.locale("vi");
+import PieChart from "../components/charts/PieChart";
 
 interface Transaction {
     _id: string;
@@ -17,7 +42,6 @@ interface Transaction {
     category: string;
     date: string;
     note?: string;
-    status?: string;
 }
 
 interface Wallet {
@@ -26,350 +50,1045 @@ interface Wallet {
     balance: number;
 }
 
+interface GoalItem {
+    _id: string;
+    title: string;
+    description?: string;
+    targetAmount: number;
+    currentAmount: number;
+    category: string;
+    deadline?: string;
+    status: "active" | "completed" | "expired";
+}
+
+interface ProfileStats {
+    totalBalance: number;
+    monthlyIncome: number;
+    monthlyExpense: number;
+    growth: number;
+    incomeGrowth?: number;
+    expenseGrowth?: number;
+    history: Array<{
+        month: string;
+        balance: number;
+        income: number;
+        expense: number;
+    }>;
+}
+
+interface MonthlyPoint {
+    key: string;
+    label: string;
+    income: number;
+    expense: number;
+    balance: number;
+}
+
+const parseAmount = (raw: unknown) => {
+    if (typeof raw === "number") {
+        return Number.isFinite(raw) ? raw : 0;
+    }
+    if (typeof raw === "string") {
+        const value = Number(raw.replace(/[^0-9.-]/g, ""));
+        return Number.isFinite(value) ? value : 0;
+    }
+    return 0;
+};
+
+const toFiniteNumber = (value: unknown, fallback: number = 0) => {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : fallback;
+    }
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    return fallback;
+};
+
+const getChartRadius = (preset: "compact" | "balanced" | "rounded") => {
+    switch (preset) {
+        case "compact":
+            return 6;
+        case "rounded":
+            return 16;
+        default:
+            return 10;
+    }
+};
+
 const Dashboard: React.FC = () => {
-    const { message } = App.useApp();
     const navigate = useNavigate();
+    const { isVietnamese } = useLocale();
+    const { toast } = useToast();
+    const { appearance } = useTheme();
+    const locale = isVietnamese ? "vi-VN" : "en-US";
+    const dayjsLocale = isVietnamese ? "vi" : "en";
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [goals, setGoals] = useState<GoalItem[]>([]);
+    const [stats, setStats] = useState<ProfileStats | null>(null);
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState<any>(null);
-    const [filterType, setFilterType] = useState<"ALL" | "INCOME" | "EXPENSE">("ALL");
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [filterType, setFilterType] = useState<"ALL" | "INCOME" | "EXPENSE">(
+        "ALL",
+    );
+    const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
-    const filteredTransactions = useMemo(() => {
-        if (filterType === "ALL") return transactions;
-        return transactions.filter(t => t.type === filterType);
-    }, [transactions, filterType]);
-
-    const parseAmount = (raw: unknown) => {
-        if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
-        if (typeof raw === "string") {
-            const v = Number(raw.replace(/[^0-9.-]/g, ""));
-            return Number.isFinite(v) ? v : 0;
-        }
-        return 0;
-    };
+    const copy = isVietnamese
+        ? {
+              addTransaction: "Thêm giao dịch",
+              openGoals: "Mở mục tiêu",
+              title: "Tổng quan tài chính",
+              description:
+                  "Bảng điều khiển dùng dữ liệu thật từ ví, giao dịch, thống kê hồ sơ và mục tiêu để hiển thị đúng chức năng hệ thống.",
+              totalBalance: "Tổng số dư",
+              monthlyIncome: "Thu nhập tháng này",
+              monthlyExpense: "Chi tiêu tháng này",
+              vsPreviousMonth: "so với tháng trước",
+              incomeExpenseTitle: "Thu nhập và chi tiêu",
+              incomeExpenseDesc:
+                  "Biểu đồ cột 6 tháng gần nhất từ transactions API và profile stats API.",
+              balanceTitle: "Xu hướng số dư",
+              balanceDesc:
+                  "Biểu đồ line dùng lịch sử số dư để theo dõi biến động tài sản.",
+              categoryMixTitle: "Cơ cấu danh mục chi",
+              categoryMixDesc:
+                  "Biểu đồ tròn tổng hợp các khoản chi trong 6 tháng gần nhất.",
+              recentTransactions: "Giao dịch gần đây",
+              recentTransactionsDesc:
+                  "Danh sách đang lấy từ transactions API, giữ nguyên thao tác xoá giao dịch.",
+              goalsTitle: "Mục tiêu đang theo dõi",
+              goalsDesc:
+                  "Tiến độ mục tiêu lấy từ goal API để hiển thị đúng số tiền đã tích luỹ.",
+              walletsLabel: "Ví đang hoạt động",
+              transactionCountLabel: "Giao dịch đã tải",
+              completedGoalsLabel: "Mục tiêu hoàn thành",
+              activeGoalsLabel: "Mục tiêu đang chạy",
+              savedAmountLabel: "Đã tích luỹ",
+              targetAmountLabel: "Mục tiêu",
+              noDeadline: "Chưa đặt hạn",
+              deadline: "Hạn",
+              otherCategory: "Khác",
+              noExpenseData: "Chưa có chi tiêu",
+              all: "Tất cả",
+              income: "Thu",
+              expense: "Chi",
+              viewTransactions: "Mở giao dịch",
+              viewGoals: "Xem tất cả mục tiêu",
+              noTransactions: "Chưa có giao dịch",
+              noTransactionsDesc:
+                  "Không có giao dịch phù hợp bộ lọc hiện tại trong khoảng thời gian đang tải.",
+              noGoals: "Chưa có mục tiêu",
+              noGoalsDesc:
+                  "Thêm mục tiêu để theo dõi tiến độ tiết kiệm và hiển thị phần goal trên dashboard.",
+              untitledTransaction: "Giao dịch chưa đặt tên",
+              deleteTransaction: "Xoá giao dịch",
+              deleteTransactionDesc: (label: string) =>
+                  `Xoá "${label}" khỏi danh sách giao dịch gần đây?`,
+              keep: "Giữ lại",
+              delete: "Xoá",
+              generalCategory: "Tổng quát",
+              goalStatuses: {
+                  active: "Đang thực hiện",
+                  completed: "Hoàn thành",
+                  expired: "Hết hạn",
+              },
+          }
+        : {
+              addTransaction: "Add transaction",
+              openGoals: "Open goals",
+              title: "Financial dashboard",
+              description:
+                  "This dashboard renders real wallets, transactions, profile stats and goals so the UI stays aligned with the current backend data.",
+              totalBalance: "Total balance",
+              monthlyIncome: "Monthly income",
+              monthlyExpense: "Monthly expense",
+              vsPreviousMonth: "vs previous month",
+              incomeExpenseTitle: "Income and expenses",
+              incomeExpenseDesc:
+                  "Six-month bar chart based on the transactions API and profile stats API.",
+              balanceTitle: "Balance trend",
+              balanceDesc:
+                  "Line chart showing the balance history behind the current asset movement.",
+              categoryMixTitle: "Expense category mix",
+              categoryMixDesc:
+                  "Pie chart aggregating expense categories from the last six months.",
+              recentTransactions: "Recent transactions",
+              recentTransactionsDesc:
+                  "Loaded from the transactions API and keeps the existing delete flow.",
+              goalsTitle: "Tracked goals",
+              goalsDesc:
+                  "Goal progress is sourced from the goals API so saved amounts stay accurate.",
+              walletsLabel: "Active wallets",
+              transactionCountLabel: "Loaded transactions",
+              completedGoalsLabel: "Completed goals",
+              activeGoalsLabel: "Active goals",
+              savedAmountLabel: "Saved",
+              targetAmountLabel: "Target",
+              noDeadline: "No deadline",
+              deadline: "Deadline",
+              otherCategory: "Other",
+              noExpenseData: "No expense data",
+              all: "All",
+              income: "Income",
+              expense: "Expense",
+              viewTransactions: "Open transactions",
+              viewGoals: "View all goals",
+              noTransactions: "No transactions found",
+              noTransactionsDesc:
+                  "No transaction matches the current filter for the loaded period.",
+              noGoals: "No goals yet",
+              noGoalsDesc:
+                  "Create a goal to surface savings progress and goal tracking on the dashboard.",
+              untitledTransaction: "Untitled transaction",
+              deleteTransaction: "Delete transaction",
+              deleteTransactionDesc: (label: string) =>
+                  `Remove "${label}" from the recent transaction list?`,
+              keep: "Keep",
+              delete: "Delete",
+              generalCategory: "General",
+              goalStatuses: {
+                  active: "Active",
+                  completed: "Completed",
+                  expired: "Expired",
+              },
+          };
 
     const fetchData = useCallback(async () => {
+        setLoading(true);
         try {
             const firebaseUser = auth.currentUser;
-            if (!firebaseUser) return;
+            if (!firebaseUser) {
+                return;
+            }
+
             const token = await firebaseUser.getIdToken();
             const now = dayjs();
-            const startDate = now.subtract(6, "month").startOf("month").toISOString();
+            const startDate = now.subtract(5, "month").startOf("month").toISOString();
             const endDate = now.endOf("day").toISOString();
 
-            const [walletsRes, txRes, statsRes] = await Promise.all([
-                walletApi.getWallets(token),
-                transactionApi.getTransactions({ startDate, endDate }, token),
-                userApi.getProfileStats(token)
-            ]);
+            const [walletsRes, transactionRes, statsRes, goalsRes] =
+                await Promise.all([
+                    walletApi.getWallets(token),
+                    transactionApi.getTransactions(
+                        { startDate, endDate, limit: 200, page: 1 },
+                        token,
+                    ),
+                    userApi.getProfileStats(token),
+                    goalApi.getGoals(token),
+                ]);
 
             setWallets(walletsRes?.wallets || []);
-            setTransactions(txRes?.data?.transactions || []);
-            setStats(statsRes);
-        } catch (e) { message.error("Lỗi tải dữ liệu"); }
-        finally { setLoading(false); }
-    }, []);
+            setTransactions(transactionRes?.data?.transactions || []);
+            setStats((statsRes?.data || statsRes) ?? null);
+            setGoals(Array.isArray(goalsRes) ? goalsRes : []);
+        } catch (error: any) {
+            toast({
+                title: isVietnamese
+                    ? "Không thể tải dashboard"
+                    : "Could not load dashboard",
+                description:
+                    error.message ||
+                    (isVietnamese
+                        ? "Vui lòng thử lại sau ít phút."
+                        : "Please retry in a moment."),
+                variant: "destructive",
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [isVietnamese, toast]);
 
     useEffect(() => {
-        fetchData();
+        void fetchData();
     }, [fetchData]);
 
-    const handleDeleteTransaction = async (id: string) => {
+    const handleDeleteTransaction = async () => {
+        if (!pendingDelete) {
+            return;
+        }
+
+        setDeleting(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
-            await transactionApi.deleteTransaction(id, token);
-            message.success("Đã xóa giao dịch");
-            fetchData();
-        } catch (e: any) {
-            message.error(e.message || "Lỗi xóa giao dịch");
+            if (!token) {
+                return;
+            }
+
+            await transactionApi.deleteTransaction(pendingDelete._id, token);
+            toast({
+                title: isVietnamese ? "Đã xoá giao dịch" : "Transaction deleted",
+                variant: "success",
+            });
+            setPendingDelete(null);
+            await fetchData();
+        } catch (error: any) {
+            toast({
+                title: isVietnamese ? "Xoá thất bại" : "Delete failed",
+                description:
+                    error.message ||
+                    (isVietnamese
+                        ? "Không thể xoá giao dịch."
+                        : "Transaction could not be removed."),
+                variant: "destructive",
+            });
+        } finally {
+            setDeleting(false);
         }
     };
 
-    const totalBalance = useMemo(() => wallets.reduce((sum, w) => sum + (w.balance || 0), 0), [wallets]);
+    const filteredTransactions = useMemo(() => {
+        if (filterType === "ALL") {
+            return transactions;
+        }
+        return transactions.filter((transaction) => transaction.type === filterType);
+    }, [filterType, transactions]);
+
+    const totalBalance = useMemo(
+        () => wallets.reduce((sum, wallet) => sum + toFiniteNumber(wallet.balance), 0),
+        [wallets],
+    );
+
     const monthlyIncome = useMemo(() => {
         const start = dayjs().startOf("month");
-        return transactions.filter(t => t.type === "INCOME" && dayjs(t.date).isAfter(start)).reduce((sum, t) => sum + parseAmount(t.amount), 0);
+        return transactions
+            .filter(
+                (transaction) =>
+                    transaction.type === "INCOME" &&
+                    !dayjs(transaction.date).isBefore(start),
+            )
+            .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0);
     }, [transactions]);
+
     const monthlyExpense = useMemo(() => {
         const start = dayjs().startOf("month");
-        return transactions.filter(t => t.type === "EXPENSE" && dayjs(t.date).isAfter(start)).reduce((sum, t) => sum + parseAmount(t.amount), 0);
+        return transactions
+            .filter(
+                (transaction) =>
+                    transaction.type === "EXPENSE" &&
+                    !dayjs(transaction.date).isBefore(start),
+            )
+            .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0);
     }, [transactions]);
 
-    const chartData = useMemo(() => {
-        if (stats?.history) {
+    // Normalize six-month history so charts and cards stay aligned even when one API
+    // returns fewer points than the others.
+    const historyPoints = useMemo<MonthlyPoint[]>(() => {
+        const months = Array.from({ length: 6 }, (_, index) => {
+            const month = dayjs().locale(dayjsLocale).subtract(5 - index, "month");
             return {
-                labels: stats.history.map((h: any) => h.month),
-                datasets: [
-                    { label: "Thu nhập", data: stats.history.map((h: any) => h.income), borderColor: "#10b981", tension: 0.4, fill: true, backgroundColor: "rgba(16, 185, 129, 0.05)" },
-                    { label: "Chi tiêu", data: stats.history.map((h: any) => h.expense), borderColor: "#f59e0b", tension: 0.4 }
-                ]
+                key: month.startOf("month").format("YYYY-MM"),
+                label: isVietnamese ? `Th ${month.month() + 1}` : month.format("MMM"),
+                income: 0,
+                expense: 0,
+                balance: 0,
             };
+        });
+
+        const lookup = new Map<string, MonthlyPoint>(
+            months.map((point) => [point.key, { ...point }]),
+        );
+
+        transactions.forEach((transaction) => {
+            const key = dayjs(transaction.date).startOf("month").format("YYYY-MM");
+            const point = lookup.get(key);
+            if (!point) {
+                return;
+            }
+            const amount = parseAmount(transaction.amount);
+            if (transaction.type === "INCOME") {
+                point.income += amount;
+            }
+            if (transaction.type === "EXPENSE") {
+                point.expense += amount;
+            }
+        });
+
+        const aggregated = months.map((point) => lookup.get(point.key) || point);
+        const endingBalance = toFiniteNumber(stats?.totalBalance, totalBalance);
+        const totalNet = aggregated.reduce(
+            (sum, point) => sum + point.income - point.expense,
+            0,
+        );
+
+        let runningBalance = endingBalance - totalNet;
+        const fallbackHistory = aggregated.map((point) => {
+            runningBalance += point.income - point.expense;
+            return {
+                ...point,
+                balance: runningBalance,
+            };
+        });
+
+        const statsHistory = Array.isArray(stats?.history)
+            ? stats?.history?.slice(-6) || []
+            : [];
+        if (statsHistory.length === 0) {
+            return fallbackHistory;
         }
 
-        const months = [];
-        for (let i = 5; i >= 0; i--) {
-            months.push(dayjs().subtract(i, 'month'));
-        }
+        const offset = fallbackHistory.length - statsHistory.length;
+        return fallbackHistory.map((point, index) => {
+            const statPoint = statsHistory[index - offset];
+            if (!statPoint) {
+                return point;
+            }
 
-        const labels = months.map(m => `Th${m.month() + 1}`);
-        const incomeData = months.map(m => {
-            return transactions
-                .filter(t => t.type === "INCOME" && dayjs(t.date).isSame(m, 'month'))
-                .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+            return {
+                ...point,
+                label: statPoint.month || point.label,
+                income: toFiniteNumber(statPoint.income, point.income),
+                expense: toFiniteNumber(statPoint.expense, point.expense),
+                balance: toFiniteNumber(statPoint.balance, point.balance),
+            };
         });
-        const expenseData = months.map(m => {
-            return transactions
-                .filter(t => t.type === "EXPENSE" && dayjs(t.date).isSame(m, 'month'))
-                .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+    }, [dayjsLocale, isVietnamese, stats, totalBalance, transactions]);
+
+    const goalItems = useMemo(() => {
+        return goals.map((goal) => {
+            const progress =
+                goal.targetAmount > 0
+                    ? Math.min(
+                          Math.round((goal.currentAmount / goal.targetAmount) * 100),
+                          100,
+                      )
+                    : 0;
+            const completed = goal.status === "completed" || progress >= 100;
+            return {
+                ...goal,
+                progress,
+                completed,
+            };
         });
+    }, [goals]);
+
+    const goalSummary = useMemo(() => {
+        const completedCount = goalItems.filter((goal) => goal.completed).length;
+        const activeCount = goalItems.filter(
+            (goal) => !goal.completed && goal.status !== "expired",
+        ).length;
+        const totalSaved = goalItems.reduce(
+            (sum, goal) => sum + toFiniteNumber(goal.currentAmount),
+            0,
+        );
+        const totalTarget = goalItems.reduce(
+            (sum, goal) => sum + toFiniteNumber(goal.targetAmount),
+            0,
+        );
 
         return {
-            labels,
-            datasets: [
-                { label: "Thu nhập", data: incomeData, borderColor: "#10b981", tension: 0.4, fill: true, backgroundColor: "rgba(16, 185, 129, 0.05)" },
-                { label: "Chi tiêu", data: expenseData, borderColor: "#f59e0b", tension: 0.4 }
-            ]
+            completedCount,
+            activeCount,
+            totalSaved,
+            totalTarget,
         };
-    }, [transactions, stats]);
+    }, [goalItems]);
 
-    if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Spin size="large" /></div>;
+    const featuredGoals = useMemo(() => {
+        return [...goalItems]
+            .sort((left, right) => {
+                if (left.completed !== right.completed) {
+                    return left.completed ? 1 : -1;
+                }
+
+                const leftDeadline = left.deadline
+                    ? dayjs(left.deadline).valueOf()
+                    : Number.MAX_SAFE_INTEGER;
+                const rightDeadline = right.deadline
+                    ? dayjs(right.deadline).valueOf()
+                    : Number.MAX_SAFE_INTEGER;
+
+                if (leftDeadline !== rightDeadline) {
+                    return leftDeadline - rightDeadline;
+                }
+
+                return right.progress - left.progress;
+            })
+            .slice(0, 4);
+    }, [goalItems]);
+
+    const categoryMix = useMemo(() => {
+        const totals = new Map<string, number>();
+
+        transactions.forEach((transaction) => {
+            if (transaction.type !== "EXPENSE") {
+                return;
+            }
+            const category = transaction.category?.trim() || copy.otherCategory;
+            totals.set(category, (totals.get(category) || 0) + parseAmount(transaction.amount));
+        });
+
+        const entries = Array.from(totals.entries()).sort(
+            (left, right) => right[1] - left[1],
+        );
+        const compactEntries =
+            entries.length > 5
+                ? [
+                      ...entries.slice(0, 4),
+                      [
+                          copy.otherCategory,
+                          entries
+                              .slice(4)
+                              .reduce((sum, current) => sum + current[1], 0),
+                      ] as [string, number],
+                  ]
+                : entries;
+
+        return compactEntries.length > 0
+            ? compactEntries
+            : [[copy.noExpenseData, 1] as [string, number]];
+    }, [copy.noExpenseData, copy.otherCategory, transactions]);
+
+    const numberFormatter = useMemo(
+        () =>
+            new Intl.NumberFormat(locale, {
+                notation: "compact",
+                maximumFractionDigits: 1,
+            }),
+        [locale],
+    );
+
+    const chartRadius = getChartRadius(appearance.radiusPreset);
+    const tickColor =
+        appearance.mode === "dark"
+            ? "rgba(148, 163, 184, 0.92)"
+            : "rgba(100, 116, 139, 0.92)";
+    const gridColor =
+        appearance.mode === "dark"
+            ? "rgba(148, 163, 184, 0.14)"
+            : "rgba(148, 163, 184, 0.18)";
+
+    const sharedLegend = {
+        position: "bottom" as const,
+        labels: {
+            usePointStyle: true,
+            boxWidth: 8,
+            padding: 18,
+            color: tickColor,
+        },
+    };
+
+    const incomeExpenseChartData = useMemo(
+        () => ({
+            labels: historyPoints.map((point) => point.label),
+            datasets: [
+                {
+                    label: copy.monthlyIncome,
+                    data: historyPoints.map((point) => point.income),
+                    backgroundColor: appearance.primaryColor,
+                    borderRadius: chartRadius,
+                    borderSkipped: false,
+                    maxBarThickness: 18,
+                },
+                {
+                    label: copy.monthlyExpense,
+                    data: historyPoints.map((point) => point.expense),
+                    backgroundColor: "rgba(244, 63, 94, 0.78)",
+                    borderRadius: chartRadius,
+                    borderSkipped: false,
+                    maxBarThickness: 18,
+                },
+            ],
+        }),
+        [
+            appearance.primaryColor,
+            chartRadius,
+            copy.monthlyExpense,
+            copy.monthlyIncome,
+            historyPoints,
+        ],
+    );
+
+    const balanceChartData = useMemo(
+        () => ({
+            labels: historyPoints.map((point) => point.label),
+            datasets: [
+                {
+                    label: copy.totalBalance,
+                    data: historyPoints.map((point) => point.balance),
+                    borderColor: appearance.primaryColor,
+                    backgroundColor: hexToRgba(appearance.primaryColor, 0.14),
+                    pointBackgroundColor: appearance.primaryColor,
+                    pointRadius: 4,
+                    pointHoverRadius: 5,
+                    fill: true,
+                    tension: 0.36,
+                },
+            ],
+        }),
+        [appearance.primaryColor, copy.totalBalance, historyPoints],
+    );
+
+    const categoryColors = useMemo(
+        () => [
+            appearance.primaryColor,
+            "#0f766e",
+            "#ea580c",
+            "#7c3aed",
+            "#16a34a",
+            "#dc2626",
+        ],
+        [appearance.primaryColor],
+    );
+
+    const categoryChartData = useMemo(
+        () => ({
+            labels: categoryMix.map(([label]) => label),
+            datasets: [
+                {
+                    data: categoryMix.map(([, total]) => total),
+                    backgroundColor: categoryMix.map((_, index) =>
+                        index === 0 && categoryMix[0][0] !== copy.noExpenseData
+                            ? hexToRgba(categoryColors[index % categoryColors.length], 0.92)
+                            : categoryMix[0][0] === copy.noExpenseData
+                              ? "rgba(148, 163, 184, 0.35)"
+                              : categoryColors[index % categoryColors.length],
+                    ),
+                    borderWidth: 0,
+                    hoverOffset: 10,
+                },
+            ],
+        }),
+        [categoryColors, categoryMix, copy.noExpenseData],
+    );
+
+    const axisTick = (value: number | string) =>
+        numberFormatter.format(Number(value) || 0);
+
+    const stackedCardClass =
+        "rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4";
+
+    const formatGrowth = (value: number) => {
+        const safeValue = Number.isFinite(value) ? value : 0;
+        const prefix = safeValue > 0 ? "+" : "";
+        return `${prefix}${safeValue}% ${copy.vsPreviousMonth}`;
+    };
+
+    if (loading) {
+        return (
+            <div className="flex min-h-[420px] items-center justify-center">
+                <Spinner className="h-8 w-8" />
+            </div>
+        );
+    }
 
     return (
-        <div className="flex-1 space-y-8 animate-in fade-in duration-500">
-            {/* Header Area correctly handled by MainLayout, but keeping internal title for Dash view */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-xl font-bold dark:text-white">Tổng quan</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Chào mừng trở lại! Đây là tóm tắt tài chính của bạn.</p>
-                </div>
+        <div className="space-y-6">
+            <PageHeader
+                actions={
+                    <>
+                        <Button onClick={() => navigate("/goals")} variant="outline">
+                            {copy.openGoals}
+                        </Button>
+                        <Button onClick={() => navigate("/transactions")}>
+                            {copy.addTransaction}
+                        </Button>
+                    </>
+                }
+                description={copy.description}
+                title={copy.title}
+            />
+
+            <div className="grid gap-4 md:grid-cols-3">
+                <MetricCard
+                    icon={Landmark}
+                    subtitle={formatGrowth(toFiniteNumber(stats?.growth))}
+                    title={copy.totalBalance}
+                    value={formatCurrency(toFiniteNumber(stats?.totalBalance, totalBalance))}
+                />
+                <MetricCard
+                    icon={ArrowUpRight}
+                    subtitle={formatGrowth(toFiniteNumber(stats?.incomeGrowth))}
+                    title={copy.monthlyIncome}
+                    value={formatCurrency(
+                        toFiniteNumber(stats?.monthlyIncome, monthlyIncome),
+                    )}
+                />
+                <MetricCard
+                    icon={ArrowDownRight}
+                    subtitle={formatGrowth(toFiniteNumber(stats?.expenseGrowth))}
+                    title={copy.monthlyExpense}
+                    value={formatCurrency(
+                        toFiniteNumber(stats?.monthlyExpense, monthlyExpense),
+                    )}
+                />
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Total Balance */}
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-                    <div className="relative z-10">
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Tổng số dư</p>
-                        <h3 className="text-2xl font-bold mb-2 dark:text-white">{formatCurrency(stats?.totalBalance || totalBalance)}</h3>
-                        <div className={`flex items-center gap-1 ${(stats?.growth || 0) >= 0 ? 'text-emerald-500' : 'text-red-500'} text-sm font-bold`}>
-                            <span className="material-symbols-outlined text-sm">{(stats?.growth || 0) >= 0 ? 'trending_up' : 'trending_down'}</span>
-                            <span>{stats?.growth > 0 ? '+' : ''}{stats?.growth || 0}% tháng này</span>
+            <div className="grid gap-6 xl:grid-cols-12">
+                <Card className="overflow-hidden xl:col-span-7">
+                    <CardHeader>
+                        <CardTitle>{copy.incomeExpenseTitle}</CardTitle>
+                        <CardDescription>{copy.incomeExpenseDesc}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-[320px]">
+                            <BarChart
+                                data={incomeExpenseChartData}
+                                options={{
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: sharedLegend,
+                                    },
+                                    scales: {
+                                        x: {
+                                            grid: { display: false },
+                                            ticks: { color: tickColor },
+                                        },
+                                        y: {
+                                            grid: { color: gridColor },
+                                            ticks: {
+                                                color: tickColor,
+                                                callback: axisTick,
+                                            },
+                                        },
+                                    },
+                                }}
+                            />
                         </div>
-                    </div>
-                    {/* Decorative Trend Line (SVG) from history data */}
-                    <div className="absolute bottom-0 right-0 w-full h-16 opacity-30 pointer-events-none group-hover:opacity-40 transition-opacity">
-                        <svg className="w-full h-full fill-none stroke-primary stroke-[3]" preserveAspectRatio="none" viewBox="0 0 500 100">
-                            <path 
-                                d={(() => {
-                                    const history = stats?.history || [];
-                                    if (history.length < 2) return "M0,80 Q50,60 100,70 T200,40 T300,50 T400,20 T500,10";
-                                    
-                                    const balances = history.map((h: any) => h.balance);
-                                    const min = Math.min(...balances);
-                                    const max = Math.max(...balances);
-                                    const range = max - min || 1;
-                                    
-                                    const points = history.map((h: any, i: number) => {
-                                        const x = (i / (history.length - 1)) * 500;
-                                        const y = 80 - ((h.balance - min) * 60 / range);
-                                        return `${x},${y}`;
-                                    });
-                                    
-                                    return `M${points.join(' L')}`;
-                                })()} 
-                                strokeLinecap="round"
-                            ></path>
-                        </svg>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
-                {/* Monthly Income */}
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="size-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center">
-                            <span className="material-symbols-outlined">call_received</span>
+                <Card className="overflow-hidden xl:col-span-5">
+                    <CardHeader>
+                        <CardTitle>{copy.balanceTitle}</CardTitle>
+                        <CardDescription>{copy.balanceDesc}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <div className={stackedCardClass}>
+                                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                                    {copy.walletsLabel}
+                                </p>
+                                <p className="mt-2 text-2xl font-semibold text-foreground">
+                                    {wallets.length}
+                                </p>
+                            </div>
+                            <div className={stackedCardClass}>
+                                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                                    {copy.transactionCountLabel}
+                                </p>
+                                <p className="mt-2 text-2xl font-semibold text-foreground">
+                                    {transactions.length}
+                                </p>
+                            </div>
+                            <div className={stackedCardClass}>
+                                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                                    {copy.completedGoalsLabel}
+                                </p>
+                                <p className="mt-2 text-2xl font-semibold text-foreground">
+                                    {goalSummary.completedCount}/{goals.length}
+                                </p>
+                            </div>
                         </div>
-                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${(stats?.incomeGrowth || 0) >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-red-100 dark:bg-red-900/30 text-red-600'}`}>
-                            {stats?.incomeGrowth > 0 ? '+' : ''}{stats?.incomeGrowth || 0}%
-                        </span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Thu nhập tháng này</p>
-                    <h3 className="text-2xl font-bold mt-1 dark:text-white">{formatCurrency(stats?.monthlyIncome || monthlyIncome)}</h3>
-                </div>
 
-                {/* Monthly Expense */}
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:shadow-md">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="size-10 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center">
-                            <span className="material-symbols-outlined">call_made</span>
+                        <div className="h-[262px]">
+                            <LineChart
+                                data={balanceChartData}
+                                options={{
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            display: false,
+                                        },
+                                    },
+                                    scales: {
+                                        x: {
+                                            grid: { display: false },
+                                            ticks: { color: tickColor },
+                                        },
+                                        y: {
+                                            grid: { color: gridColor },
+                                            ticks: {
+                                                color: tickColor,
+                                                callback: axisTick,
+                                            },
+                                        },
+                                    },
+                                }}
+                            />
                         </div>
-                        <span className={`px-2 py-1 rounded-md text-xs font-bold ${(stats?.expenseGrowth || 0) <= 0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-red-100 dark:bg-red-900/30 text-red-600'}`}>
-                            {stats?.expenseGrowth > 0 ? '+' : ''}{stats?.expenseGrowth || 0}%
-                        </span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Chi tiêu tháng này</p>
-                    <h3 className="text-2xl font-bold mt-1 dark:text-white">{formatCurrency(stats?.monthlyExpense || monthlyExpense)}</h3>
-                </div>
-            </div>
+                    </CardContent>
+                </Card>
 
-            {/* Middle Section: Analytics & Wallets */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Analytics Chart */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <div className="flex items-center justify-between mb-8">
+                <Card className="overflow-hidden xl:col-span-8">
+                    <CardHeader className="flex flex-col gap-4 border-b border-border/70 md:flex-row md:items-start md:justify-between">
                         <div>
-                            <h3 className="text-lg font-bold dark:text-white">Thu nhập vs Chi tiêu</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">Dữ liệu 6 tháng gần nhất</p>
+                            <CardTitle>{copy.recentTransactions}</CardTitle>
+                            <CardDescription>
+                                {copy.recentTransactionsDesc}
+                            </CardDescription>
                         </div>
-                        <select 
-                            value={selectedYear}
-                            onChange={(e) => setSelectedYear(Number(e.target.value))}
-                            className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm py-1.5 pl-3 pr-8 focus:ring-primary dark:text-slate-300"
-                        >
-                            <option value={new Date().getFullYear()}>Năm {new Date().getFullYear()}</option>
-                            <option value={new Date().getFullYear() - 1}>Năm {new Date().getFullYear() - 1}</option>
-                        </select>
-                    </div>
-                    <div className="h-64">
-                         <LineChart data={chartData} options={{ maintainAspectRatio: false }} />
-                    </div>
-                    <div className="mt-6 flex justify-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <div className="size-3 bg-primary rounded-full"></div>
-                            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Thu nhập</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="size-3 bg-primary/20 rounded-full"></div>
-                            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Chi tiêu</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Wallets Preview Section */}
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-bold dark:text-white">Ví của tôi</h3>
-                        <button onClick={() => navigate('/wallets')} className="text-primary text-sm font-bold hover:underline">Xem tất cả</button>
-                    </div>
-                    <div className="space-y-4">
-                        {/* Primary Card Preview (Template Style) */}
-                        <div className="p-4 rounded-xl bg-gradient-to-br from-primary to-[#6e64f1] text-white shadow-lg relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform">
-                            <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-6">
-                                    <span className="text-xs opacity-80 uppercase tracking-wide">{wallets[0]?.name || 'Visa Debit'}</span>
-                                    <span className="material-symbols-outlined">contactless</span>
-                                </div>
-                                <p className="text-lg tracking-wide font-mono mb-4 text-center">**** **** **** {wallets[0]?._id ? wallets[0]._id.slice(-4) : '8899'}</p>
-                                <div className="flex justify-between items-end">
-                                    <div>
-                                        <p className="text-xs uppercase opacity-70">Số dư</p>
-                                        <p className="font-bold text-lg">{formatCurrency(wallets[0]?.balance || 0)}</p>
-                                    </div>
-                                    <div className="size-8 opacity-40 bg-white rounded-full"></div>
-                                </div>
-                            </div>
-                            <div className="absolute -right-12 -bottom-12 size-36 bg-white/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-700"></div>
-                        </div>
-
-                        {/* List items for other wallets */}
-                        {wallets.slice(1, 4).map(w => (
-                            <div key={w._id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="size-10 bg-orange-100 dark:bg-orange-900/20 text-orange-600 rounded-full flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold dark:text-white">{w.name}</p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">Số dư hiện tại</p>
-                                    </div>
-                                </div>
-                                <p className="text-sm font-bold dark:text-white">{formatCurrency(w.balance)}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Recent Transactions Table */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <h3 className="text-lg font-bold dark:text-white">Giao dịch gần đây</h3>
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => setFilterType('ALL')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'ALL' ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
-                        >
-                            Tất cả
-                        </button>
-                        <button 
-                            onClick={() => setFilterType('INCOME')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'INCOME' ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
-                        >
-                            Thu nhập
-                        </button>
-                        <button 
-                            onClick={() => setFilterType('EXPENSE')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === 'EXPENSE' ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
-                        >
-                            Chi tiêu
-                        </button>
-                    </div>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 dark:bg-slate-800/50">
-                            <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Mô tả</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Danh mục</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ngày</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Số tiền</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Trạng thái</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {filteredTransactions.slice(0, 6).map(t => (
-                                <tr key={t._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`size-8 ${t.type === 'INCOME' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'} rounded-lg flex items-center justify-center`}>
-                                                <span className="material-symbols-outlined text-base">{t.type === 'INCOME' ? 'payments' : 'shopping_bag'}</span>
-                                            </div>
-                                            <span className="text-sm font-medium dark:text-slate-200">{t.note || 'Giao dịch không tên'}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{t.category}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{formatDate(t.date)}</td>
-                                    <td className={`px-6 py-4 whitespace-nowrap font-bold text-sm ${t.type === 'INCOME' ? 'text-emerald-500' : 'text-red-500'}`}>
-                                        {t.type === 'INCOME' ? '+' : '-'}{formatCurrency(parseAmount(t.amount))}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2.5 py-1 ${t.status === 'failed' ? 'bg-red-100 dark:bg-red-900/30 text-red-600' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'} text-xs font-bold rounded-full uppercase`}>
-                                            {t.status === 'completed' ? 'Hoàn tất' : (t.status === 'failed' ? 'Thất bại' : 'Hoàn tất')}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                                        <Popconfirm
-                                            title="Xóa giao dịch này?"
-                                            onConfirm={() => handleDeleteTransaction(t._id)}
-                                            okText="Xóa"
-                                            cancelText="Hủy"
-                                            okButtonProps={{ danger: true }}
-                                        >
-                                            <button className="p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
-                                                <span className="material-symbols-outlined text-sm">delete</span>
-                                            </button>
-                                        </Popconfirm>
-                                    </td>
-                                </tr>
+                        <div className="flex flex-wrap gap-2">
+                            {(["ALL", "INCOME", "EXPENSE"] as const).map((type) => (
+                                <Button
+                                    key={type}
+                                    onClick={() => setFilterType(type)}
+                                    size="sm"
+                                    variant={filterType === type ? "default" : "outline"}
+                                >
+                                    {type === "ALL"
+                                        ? copy.all
+                                        : type === "INCOME"
+                                          ? copy.income
+                                          : copy.expense}
+                                </Button>
                             ))}
-                        </tbody>
-                    </table>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-6">
+                        {filteredTransactions.length > 0 ? (
+                            filteredTransactions.slice(0, 6).map((transaction) => {
+                                const isIncome = transaction.type === "INCOME";
+                                const label =
+                                    transaction.note || copy.untitledTransaction;
+
+                                return (
+                                    <div
+                                        key={transaction._id}
+                                        className="grid gap-4 rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4 lg:grid-cols-[minmax(0,1.8fr)_auto_auto_auto] lg:items-center"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex items-start gap-3">
+                                                <div
+                                                    className={cn(
+                                                        "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--app-radius-md)]",
+                                                        isIncome
+                                                            ? "bg-emerald-500/10 text-emerald-600"
+                                                            : "bg-rose-500/10 text-rose-600",
+                                                    )}
+                                                >
+                                                    {isIncome ? (
+                                                        <ArrowUpRight className="h-4 w-4" />
+                                                    ) : (
+                                                        <ArrowDownRight className="h-4 w-4" />
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="truncate font-medium text-foreground">
+                                                        {label}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        {transaction.category || copy.generalCategory}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {formatDate(transaction.date)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center lg:justify-center">
+                                            <Badge
+                                                variant={isIncome ? "success" : "danger"}
+                                            >
+                                                {isIncome ? copy.income : copy.expense}
+                                            </Badge>
+                                        </div>
+
+                                        <div className="text-left lg:text-right">
+                                            <p
+                                                className={cn(
+                                                    "font-semibold",
+                                                    isIncome
+                                                        ? "text-emerald-600"
+                                                        : "text-rose-600",
+                                                )}
+                                            >
+                                                {isIncome ? "+" : "-"}
+                                                {formatCurrency(parseAmount(transaction.amount))}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center justify-end">
+                                            <Button
+                                                onClick={() => setPendingDelete(transaction)}
+                                                size="icon"
+                                                variant="ghost"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-6 py-10 text-center">
+                                <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-[var(--app-radius-lg)] bg-primary-soft text-primary">
+                                    <WalletCards className="h-6 w-6" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground">
+                                    {copy.noTransactions}
+                                </h3>
+                                <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                                    {copy.noTransactionsDesc}
+                                </p>
+                                <Button
+                                    className="mt-5"
+                                    onClick={() => navigate("/transactions")}
+                                >
+                                    {copy.viewTransactions}
+                                </Button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <div className="space-y-6 xl:col-span-4">
+                    <Card className="overflow-hidden">
+                        <CardHeader>
+                            <CardTitle>{copy.categoryMixTitle}</CardTitle>
+                            <CardDescription>{copy.categoryMixDesc}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-[288px]">
+                                <PieChart
+                                    data={categoryChartData}
+                                    options={{
+                                        maintainAspectRatio: false,
+                                        plugins: {
+                                            legend: sharedLegend,
+                                        },
+                                    }}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="overflow-hidden">
+                        <CardHeader>
+                            <CardTitle>{copy.goalsTitle}</CardTitle>
+                            <CardDescription>{copy.goalsDesc}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className={stackedCardClass}>
+                                    <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                                        {copy.activeGoalsLabel}
+                                    </p>
+                                    <p className="mt-2 text-2xl font-semibold text-foreground">
+                                        {goalSummary.activeCount}
+                                    </p>
+                                </div>
+                                <div className={stackedCardClass}>
+                                    <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                                        {copy.savedAmountLabel}
+                                    </p>
+                                    <p className="mt-2 text-base font-semibold text-foreground">
+                                        {formatCurrency(goalSummary.totalSaved)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {featuredGoals.length > 0 ? (
+                                <>
+                                    {featuredGoals.map((goal) => (
+                                        <div
+                                            key={goal._id}
+                                            className="rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="truncate font-medium text-foreground">
+                                                        {goal.title}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-muted-foreground">
+                                                        {goal.category || copy.generalCategory}
+                                                    </p>
+                                                </div>
+                                                <Badge
+                                                    variant={
+                                                        goal.completed
+                                                            ? "success"
+                                                            : goal.status === "expired"
+                                                              ? "danger"
+                                                              : "outline"
+                                                    }
+                                                >
+                                                    {
+                                                        copy.goalStatuses[
+                                                            goal.status as keyof typeof copy.goalStatuses
+                                                        ]
+                                                    }
+                                                </Badge>
+                                            </div>
+
+                                            <div className="mt-4 space-y-2">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-muted-foreground">
+                                                        {copy.savedAmountLabel}
+                                                    </span>
+                                                    <span className="font-medium text-foreground">
+                                                        {formatCurrency(goal.currentAmount)}
+                                                    </span>
+                                                </div>
+                                                <Progress className="h-2.5" value={goal.progress} />
+                                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                    <span>
+                                                        {copy.targetAmountLabel}:{" "}
+                                                        {formatCurrency(goal.targetAmount)}
+                                                    </span>
+                                                    <span>{goal.progress}%</span>
+                                                </div>
+                                            </div>
+
+                                            <p className="mt-3 text-xs text-muted-foreground">
+                                                {goal.deadline
+                                                    ? `${copy.deadline}: ${formatDate(goal.deadline)}`
+                                                    : copy.noDeadline}
+                                            </p>
+                                        </div>
+                                    ))}
+
+                                    <Button
+                                        className="w-full"
+                                        onClick={() => navigate("/goals")}
+                                        variant="outline"
+                                    >
+                                        {copy.viewGoals}
+                                    </Button>
+                                </>
+                            ) : (
+                                <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-6 py-10 text-center">
+                                    <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-[var(--app-radius-lg)] bg-primary-soft text-primary">
+                                        <Target className="h-6 w-6" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-foreground">
+                                        {copy.noGoals}
+                                    </h3>
+                                    <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                                        {copy.noGoalsDesc}
+                                    </p>
+                                    <Button
+                                        className="mt-5"
+                                        onClick={() => navigate("/goals")}
+                                    >
+                                        {copy.openGoals}
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
+
+            <ConfirmDialog
+                busy={deleting}
+                cancelLabel={copy.keep}
+                confirmLabel={copy.delete}
+                description={
+                    pendingDelete
+                        ? copy.deleteTransactionDesc(
+                              pendingDelete.note || pendingDelete.category,
+                          )
+                        : ""
+                }
+                onClose={() => setPendingDelete(null)}
+                onConfirm={handleDeleteTransaction}
+                open={!!pendingDelete}
+                title={copy.deleteTransaction}
+                variant="destructive"
+            />
         </div>
     );
 };

@@ -1,10 +1,22 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
-import { App, Input, InputNumber, Modal, Spin } from "antd";
+import { CreditCard, Plus, Trash2 } from "lucide-react";
 import { auth } from "../firebase/config";
 import { budgetApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
+import { useLocale } from "../contexts/LocaleContext";
+import { useToast } from "../contexts/ToastContext";
+import { PageHeader } from "../components/app/page-header";
+import { MetricCard } from "../components/app/metric-card";
+import { EmptyState } from "../components/app/empty-state";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Dialog } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Progress } from "../components/ui/progress";
+import { Spinner } from "../components/ui/spinner";
 
 dayjs.locale("vi");
 
@@ -17,7 +29,8 @@ interface BudgetSummaryItem {
 }
 
 const Budgets: React.FC = () => {
-    const { message } = App.useApp();
+    const { isVietnamese } = useLocale();
+    const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [budgets, setBudgets] = useState<BudgetSummaryItem[]>([]);
@@ -25,78 +38,195 @@ const Budgets: React.FC = () => {
     const [totalBudget, setTotalBudget] = useState(0);
     const [totalSpent, setTotalSpent] = useState(0);
     const [modalOpen, setModalOpen] = useState(false);
-    const [editing, setEditing] = useState(false);
+    const [editing, setEditing] = useState<BudgetSummaryItem | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<BudgetSummaryItem | null>(
+        null,
+    );
     const [formData, setFormData] = useState({
-        id: "",
         category: "",
         amount: 0,
     });
 
+    const copy = isVietnamese
+        ? {
+              title: "Ngân sách",
+              description:
+                  "Tổng hợp theo tháng lấy từ `/budgets/summary` và dùng dữ liệu chi tiêu thực tế đã gom theo ngân sách.",
+              newBudget: "Thêm ngân sách",
+              totalBudget: "Tổng ngân sách",
+              spent: "Đã chi",
+              remaining: "Còn lại",
+              vsPreviousMonth: "so với tháng trước",
+              plannedBudgetUsed: "ngân sách kế hoạch đã dùng",
+              daysLeftThisMonth: (days: number) => `Còn ${days} ngày trong tháng này`,
+              monthlyCategories: "Danh mục trong tháng",
+              monthlyCategoriesDesc:
+                  "Mỗi thẻ dùng đúng summary item do backend trả về.",
+              of: "trên",
+              edit: "Chỉnh sửa",
+              noBudgets: "Chưa có ngân sách",
+              noBudgetsDesc: "Chưa có ngân sách nào cho tháng hiện tại.",
+              createBudget: "Tạo ngân sách",
+              formDescription:
+                  "Biểu mẫu gửi category, amount, month và year đúng như budget API yêu cầu.",
+              editBudget: "Chỉnh sửa ngân sách",
+              createBudgetTitle: "Tạo ngân sách",
+              category: "Danh mục",
+              amount: "Số tiền",
+              categoryPlaceholder: "Ví dụ: Ăn uống, Tiền nhà, Du lịch",
+              cancel: "Hủy",
+              saving: "Đang lưu...",
+              updateBudget: "Cập nhật ngân sách",
+              categoryRequired: "Cần nhập danh mục",
+              categoryRequiredDesc: "Danh mục ngân sách không được để trống.",
+              invalidAmount: "Số tiền không hợp lệ",
+              invalidAmountDesc: "Ngân sách phải lớn hơn 0.",
+              budgetUpdated: "Đã cập nhật ngân sách",
+              budgetCreated: "Đã tạo ngân sách",
+              saveFailed: "Lưu thất bại",
+              saveFailedDesc: "Không thể lưu ngân sách.",
+              budgetDeleted: "Đã xóa ngân sách",
+              deleteFailed: "Xóa thất bại",
+              deleteFailedDesc: "Không thể xóa ngân sách.",
+              keep: "Giữ lại",
+              delete: "Xóa",
+              deleteBudget: "Xóa ngân sách",
+              deleteBudgetDesc: (category: string) => `Xóa ngân sách "${category}"?`,
+              loadFailed: "Không thể tải ngân sách",
+              retry: "Vui lòng thử lại.",
+          }
+        : {
+              title: "Budgets",
+              description:
+                  "Summary for the current month. Data comes from `/budgets/summary` and uses actual spent-by-budget aggregation.",
+              newBudget: "New budget",
+              totalBudget: "Total budget",
+              spent: "Spent",
+              remaining: "Remaining",
+              vsPreviousMonth: "vs previous month",
+              plannedBudgetUsed: "of planned budget used",
+              daysLeftThisMonth: (days: number) => `${days} days left this month`,
+              monthlyCategories: "Monthly categories",
+              monthlyCategoriesDesc:
+                  "Each card uses the summary item returned by the backend.",
+              of: "of",
+              edit: "Edit",
+              noBudgets: "No budgets yet",
+              noBudgetsDesc: "No budget exists for the current month yet.",
+              createBudget: "Create budget",
+              formDescription:
+                  "The form posts category, amount, month and year exactly as expected by the budget API.",
+              editBudget: "Edit budget",
+              createBudgetTitle: "Create budget",
+              category: "Category",
+              amount: "Amount",
+              categoryPlaceholder: "Example: Food, Rent, Travel",
+              cancel: "Cancel",
+              saving: "Saving...",
+              updateBudget: "Update budget",
+              categoryRequired: "Category required",
+              categoryRequiredDesc: "Budget category cannot be empty.",
+              invalidAmount: "Invalid amount",
+              invalidAmountDesc: "Budget amount must be greater than zero.",
+              budgetUpdated: "Budget updated",
+              budgetCreated: "Budget created",
+              saveFailed: "Save failed",
+              saveFailedDesc: "Budget could not be saved.",
+              budgetDeleted: "Budget deleted",
+              deleteFailed: "Delete failed",
+              deleteFailedDesc: "Budget could not be removed.",
+              keep: "Keep",
+              delete: "Delete",
+              deleteBudget: "Delete budget",
+              deleteBudgetDesc: (category: string) => `Delete budget "${category}"?`,
+              loadFailed: "Could not load budgets",
+              retry: "Please retry.",
+          };
+    const loadFailedTitle = isVietnamese
+        ? "Không thể tải ngân sách"
+        : "Could not load budgets";
+    const retryText = isVietnamese ? "Vui lòng thử lại." : "Please retry.";
+
+    // Locale-derived error labels are intentionally reduced to stable primitives above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const fetchData = useCallback(async () => {
+        setLoading(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
-            const res: any = await budgetApi.getBudgetSummary(
+            if (!token) {
+                return;
+            }
+            const response: any = await budgetApi.getBudgetSummary(
                 { month: dayjs().month() + 1, year: dayjs().year() },
                 token,
             );
-            setBudgets(res?.items || []);
-            setTotalBudget(res?.totalBudget || 0);
-            setTotalSpent(res?.totalSpent || 0);
-            setGrowth(res?.growth || 0);
+            setBudgets(response?.items || []);
+            setTotalBudget(response?.totalBudget || 0);
+            setTotalSpent(response?.totalSpent || 0);
+            setGrowth(response?.growth || 0);
         } catch (error: any) {
-            message.error(error.message || "Lỗi tải dữ liệu");
+            toast({
+                title: loadFailedTitle,
+                description: error.message || retryText,
+                variant: "destructive",
+            });
         } finally {
             setLoading(false);
         }
-    }, [message]);
+    }, [loadFailedTitle, retryText, toast]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
+    const remaining = totalBudget - totalSpent;
+    const spentPercent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+    const monthLabel = useMemo(
+        () => dayjs().locale(isVietnamese ? "vi" : "en").format("MMMM YYYY"),
+        [isVietnamese],
+    );
+
     const openCreate = () => {
-        setEditing(false);
-        setFormData({ id: "", category: "", amount: 0 });
+        setEditing(null);
+        setFormData({ category: "", amount: 0 });
         setModalOpen(true);
     };
 
     const openEdit = (budget: BudgetSummaryItem) => {
-        setEditing(true);
+        setEditing(budget);
         setFormData({
-            id: budget._id,
             category: budget.category,
             amount: budget.amount,
         });
         setModalOpen(true);
     };
 
-    const handleDelete = async (budgetId: string) => {
-        try {
-            const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
-            await budgetApi.deleteBudget(budgetId, token);
-            message.success("Đã xóa ngân sách");
-            fetchData();
-        } catch (error: any) {
-            message.error(error.message || "Lỗi xóa ngân sách");
-        }
-    };
-
     const handleSubmit = async () => {
         if (!formData.category.trim()) {
-            message.warning("Vui lòng nhập tên danh mục");
-            return;
-        }
-        if (formData.amount <= 0) {
-            message.warning("Vui lòng nhập hạn mức hợp lệ");
+            toast({
+                title: copy.categoryRequired,
+                description: copy.categoryRequiredDesc,
+                variant: "destructive",
+            });
             return;
         }
 
+        if (formData.amount <= 0) {
+            toast({
+                title: copy.invalidAmount,
+                description: copy.invalidAmountDesc,
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setSubmitting(true);
         try {
-            setSubmitting(true);
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
+            if (!token) {
+                return;
+            }
 
             const payload = {
                 category: formData.category.trim(),
@@ -106,17 +236,56 @@ const Budgets: React.FC = () => {
             };
 
             if (editing) {
-                await budgetApi.updateBudget(formData.id, payload, token);
-                message.success("Đã cập nhật ngân sách");
+                await budgetApi.updateBudget(editing._id, payload, token);
+                toast({
+                    title: copy.budgetUpdated,
+                    variant: "success",
+                });
             } else {
                 await budgetApi.createBudget(payload, token);
-                message.success("Đã tạo ngân sách");
+                toast({
+                    title: copy.budgetCreated,
+                    variant: "success",
+                });
             }
 
             setModalOpen(false);
-            fetchData();
+            await fetchData();
         } catch (error: any) {
-            message.error(error.message || "Lỗi lưu ngân sách");
+            toast({
+                title: copy.saveFailed,
+                description: error.message || copy.saveFailedDesc,
+                variant: "destructive",
+            });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!pendingDelete) {
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) {
+                return;
+            }
+            await budgetApi.deleteBudget(pendingDelete._id, token);
+            toast({
+                title: copy.budgetDeleted,
+                variant: "success",
+            });
+            setPendingDelete(null);
+            await fetchData();
+        } catch (error: any) {
+            toast({
+                title: copy.deleteFailed,
+                description: error.message || copy.deleteFailedDesc,
+                variant: "destructive",
+            });
         } finally {
             setSubmitting(false);
         }
@@ -124,299 +293,185 @@ const Budgets: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Spin size="large" />
+            <div className="flex min-h-[420px] items-center justify-center">
+                <Spinner className="h-8 w-8" />
             </div>
         );
     }
 
-    const remaining = totalBudget - totalSpent;
-    const spentPercent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-
     return (
-        <div className="flex-1 space-y-8 animate-in fade-in duration-500">
-            <div className="flex justify-between items-end mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight dark:text-white">
-                        Quản lý Ngân sách
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                        Thiết lập giới hạn chi tiêu để tối ưu hóa dòng tiền
-                    </p>
-                </div>
-                <button
-                    onClick={openCreate}
-                    className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-primary/20"
-                >
-                    <span className="material-symbols-outlined">add_task</span>
-                    <span>Tạo ngân sách</span>
-                </button>
+        <div className="space-y-6">
+            <PageHeader
+                actions={
+                    <Button onClick={openCreate}>
+                        <Plus className="h-4 w-4" />
+                        {copy.newBudget}
+                    </Button>
+                }
+                description={`${copy.description} ${monthLabel}.`}
+                title={copy.title}
+            />
+
+            <div className="grid gap-4 md:grid-cols-3">
+                <MetricCard
+                    icon={CreditCard}
+                    subtitle={`${growth}% ${copy.vsPreviousMonth}`}
+                    title={copy.totalBudget}
+                    value={formatCurrency(totalBudget)}
+                />
+                <MetricCard
+                    icon={CreditCard}
+                    subtitle={`${Math.round(spentPercent)}% ${copy.plannedBudgetUsed}`}
+                    title={copy.spent}
+                    value={formatCurrency(totalSpent)}
+                />
+                <MetricCard
+                    icon={CreditCard}
+                    subtitle={copy.daysLeftThisMonth(
+                        Math.max(0, dayjs().daysInMonth() - dayjs().date() + 1),
+                    )}
+                    title={copy.remaining}
+                    value={formatCurrency(remaining)}
+                />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                        <p className="text-slate-500 text-sm font-medium">
-                            Tổng ngân sách
-                        </p>
-                        <span className="material-symbols-outlined text-primary">
-                            account_balance
-                        </span>
-                    </div>
-                    <p className="text-2xl font-bold dark:text-white">
-                        {formatCurrency(totalBudget)}
-                    </p>
-                    <div
-                        className={`flex items-center gap-1 ${
-                            growth >= 0 ? "text-emerald-500" : "text-red-500"
-                        } text-sm font-bold`}
-                    >
-                        <span className="material-symbols-outlined text-sm">
-                            {growth >= 0 ? "trending_up" : "trending_down"}
-                        </span>
-                        <span>
-                            {growth > 0 ? "+" : ""}
-                            {growth}% so với tháng trước
-                        </span>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                        <p className="text-slate-500 text-sm font-medium">
-                            Đã chi tiêu
-                        </p>
-                        <span className="material-symbols-outlined text-primary">
-                            shopping_cart
-                        </span>
-                    </div>
-                    <p className="text-2xl font-bold dark:text-white">
-                        {formatCurrency(totalSpent)}
-                    </p>
-                    <div
-                        className="flex items-center gap-1 text-sm font-bold"
-                        style={{
-                            color: spentPercent > 85 ? "#ef4444" : "#10b981",
-                        }}
-                    >
-                        <span className="material-symbols-outlined text-sm">
-                            {spentPercent > 85 ? "warning" : "check_circle"}
-                        </span>
-                        <span>
-                            {spentPercent > 85
-                                ? "Sắp chạm hạn mức"
-                                : `Dưới hạn mức ${Math.max(
-                                      0,
-                                      Math.round(100 - spentPercent),
-                                  )}%`}
-                        </span>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                        <p className="text-slate-500 text-sm font-medium">
-                            Còn lại
-                        </p>
-                        <span className="material-symbols-outlined text-primary">
-                            savings
-                        </span>
-                    </div>
-                    <p className="text-2xl font-bold text-primary">
-                        {formatCurrency(remaining)}
-                    </p>
-                    <div className="flex items-center gap-1 text-slate-500 text-sm font-medium dark:text-slate-400">
-                        <span>
-                            Cho {dayjs().daysInMonth() - dayjs().date() + 1} ngày
-                            còn lại
-                        </span>
-                    </div>
-                </div>
-            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>{copy.monthlyCategories}</CardTitle>
+                    <CardDescription>
+                        {copy.monthlyCategoriesDesc}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {budgets.length > 0 ? (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {budgets.map((budget) => {
+                                const statusColor =
+                                    budget.percent > 100
+                                        ? "bg-rose-500"
+                                        : budget.percent > 85
+                                          ? "bg-amber-500"
+                                          : "bg-emerald-500";
 
-            <section className="flex flex-col gap-6">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold dark:text-white">
-                        Chi tiết danh mục
-                    </h3>
-                    <div className="flex gap-2">
-                        <button className="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 text-sm font-semibold text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
-                            Tháng này
-                        </button>
-                        <button className="px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm font-bold border border-primary/10">
-                            Tùy chỉnh
-                        </button>
-                    </div>
-                </div>
+                                return (
+                                    <Card key={budget._id} className="border-border/80">
+                                        <CardContent className="p-5">
+                                            <div className="mb-4 flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-base font-semibold text-foreground">
+                                                        {budget.category}
+                                                    </p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {formatCurrency(budget.spent)} {copy.of}{" "}
+                                                        {formatCurrency(budget.amount)}
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    onClick={() => setPendingDelete(budget)}
+                                                    size="icon"
+                                                    variant="ghost"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {budgets.map((budget) => {
-                        const statusText =
-                            budget.percent > 100
-                                ? `Vượt ngân sách ${formatCurrency(
-                                      budget.spent - budget.amount,
-                                  )}`
-                                : budget.percent > 85
-                                  ? "Sắp chạm ngưỡng hạn mức"
-                                  : budget.percent < 30
-                                    ? "Ngân sách dồi dào"
-                                    : "Đang trong tầm kiểm soát";
+                                            <Progress
+                                                indicatorClassName={statusColor}
+                                                value={Math.min(budget.percent, 100)}
+                                            />
+                                            <div className="mt-3 flex items-center justify-between text-sm">
+                                                <span className="text-muted-foreground">
+                                                    {Math.round(budget.percent)}%
+                                                </span>
+                                                <button
+                                                    className="font-medium text-primary"
+                                                    onClick={() => openEdit(budget)}
+                                                    type="button"
+                                                >
+                                                    {copy.edit}
+                                                </button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <EmptyState
+                            actionLabel={copy.createBudget}
+                            description={copy.noBudgetsDesc}
+                            icon={CreditCard}
+                            onAction={openCreate}
+                            title={copy.noBudgets}
+                        />
+                    )}
+                </CardContent>
+            </Card>
 
-                        return (
-                            <div
-                                key={budget._id}
-                                className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-4 group hover:shadow-md transition-all"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                                            <span className="material-symbols-outlined">
-                                                category
-                                            </span>
-                                        </div>
-                                        <h4 className="font-bold dark:text-white">
-                                            {budget.category}
-                                        </h4>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-slate-500">
-                                            {Math.round(budget.percent)}%
-                                        </span>
-                                        <button
-                                            onClick={() =>
-                                                handleDelete(budget._id)
-                                            }
-                                            className="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                        >
-                                            <span className="material-symbols-outlined text-sm">
-                                                delete
-                                            </span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
-                                        <span>
-                                            Đã tiêu: {formatCurrency(budget.spent)}
-                                        </span>
-                                        <span>
-                                            Hạn mức: {formatCurrency(budget.amount)}
-                                        </span>
-                                    </div>
-                                    <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                        <div
-                                            className={`h-full rounded-full transition-all duration-1000 ${
-                                                budget.percent > 100
-                                                    ? "bg-red-500"
-                                                    : budget.percent > 85
-                                                      ? "bg-yellow-500"
-                                                      : "bg-emerald-500"
-                                            }`}
-                                            style={{
-                                                width: `${Math.min(
-                                                    budget.percent,
-                                                    100,
-                                                )}%`,
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                                <p className="text-xs font-medium text-slate-500">
-                                    {statusText}
-                                </p>
-                                <div className="pt-2 border-t border-slate-50 dark:border-slate-800 flex justify-end">
-                                    <button
-                                        onClick={() => openEdit(budget)}
-                                        className="text-primary text-xs font-bold uppercase tracking-wide hover:underline"
-                                    >
-                                        Điều chỉnh
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border-dashed border-2 border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-4">
-                        <button
-                            onClick={openCreate}
-                            className="flex flex-col items-center justify-center gap-2 h-full py-8 text-slate-400 hover:text-primary transition-colors group"
-                        >
-                            <div className="size-12 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center group-hover:border-primary">
-                                <span className="material-symbols-outlined text-3xl">
-                                    add
-                                </span>
-                            </div>
-                            <span className="font-bold text-sm">
-                                Thêm danh mục mới
-                            </span>
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <Modal
-                title={editing ? "Cập nhật ngân sách" : "Tạo ngân sách mới"}
+            <Dialog
+                description={copy.formDescription}
+                onClose={() => setModalOpen(false)}
                 open={modalOpen}
-                onCancel={() => setModalOpen(false)}
-                footer={null}
-                centered
-                className="premium-modal"
+                title={editing ? copy.editBudget : copy.createBudgetTitle}
             >
-                <div className="py-2 space-y-6">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Tên danh mục
-                        </label>
+                <div className="space-y-4">
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.category}</label>
                         <Input
+                            onChange={(event) =>
+                                setFormData((current) => ({
+                                    ...current,
+                                    category: event.target.value,
+                                }))
+                            }
+                            placeholder={copy.categoryPlaceholder}
                             value={formData.category}
-                            onChange={(e) =>
-                                setFormData((prev) => ({
-                                    ...prev,
-                                    category: e.target.value,
-                                }))
-                            }
-                            placeholder="Ví dụ: Ăn uống, Giải trí..."
-                            size="large"
-                            className="rounded-xl h-11"
                         />
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Hạn mức tháng (₫)
-                        </label>
-                        <InputNumber
-                            style={{ width: "100%" }}
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.amount}</label>
+                        <Input
+                            min={0}
+                            onChange={(event) =>
+                                setFormData((current) => ({
+                                    ...current,
+                                    amount: Number(event.target.value) || 0,
+                                }))
+                            }
+                            type="number"
                             value={formData.amount}
-                            onChange={(v) =>
-                                setFormData((prev) => ({
-                                    ...prev,
-                                    amount: Number(v) || 0,
-                                }))
-                            }
-                            size="large"
-                            className="rounded-xl h-11"
-                            placeholder="0"
                         />
                     </div>
-                    <div className="flex justify-end pt-4 gap-3">
-                        <button
-                            onClick={() => setModalOpen(false)}
-                            className="h-11 px-8 rounded-xl uppercase text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
-                        >
-                            Bỏ qua
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={submitting}
-                            className="bg-primary text-white h-11 px-8 rounded-xl uppercase text-xs font-bold shadow-lg shadow-primary/20 disabled:opacity-60"
-                        >
+                    <div className="flex justify-end gap-3">
+                        <Button onClick={() => setModalOpen(false)} variant="outline">
+                            {copy.cancel}
+                        </Button>
+                        <Button disabled={submitting} onClick={handleSubmit}>
                             {submitting
-                                ? "Đang lưu..."
+                                ? copy.saving
                                 : editing
-                                  ? "Cập nhật"
-                                  : "Lưu ngân sách"}
-                        </button>
+                                  ? copy.updateBudget
+                                  : copy.createBudget}
+                        </Button>
                     </div>
                 </div>
-            </Modal>
+            </Dialog>
+
+            <ConfirmDialog
+                busy={submitting}
+                cancelLabel={copy.keep}
+                confirmLabel={copy.delete}
+                description={
+                    pendingDelete
+                        ? copy.deleteBudgetDesc(pendingDelete.category)
+                        : ""
+                }
+                onClose={() => setPendingDelete(null)}
+                onConfirm={handleDelete}
+                open={!!pendingDelete}
+                title={copy.deleteBudget}
+                variant="destructive"
+            />
         </div>
     );
 };

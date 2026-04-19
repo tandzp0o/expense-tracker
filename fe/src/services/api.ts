@@ -3,6 +3,18 @@ import { API_URL } from "../config/api";
 
 export { API_URL };
 
+export class ApiError extends Error {
+    status?: number;
+    payload?: any;
+
+    constructor(message: string, status?: number, payload?: any) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+        this.payload = payload;
+    }
+}
+
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
     return axios.create({
@@ -26,7 +38,7 @@ const createMultipartApiClient = (token?: string): AxiosInstance => {
 };
 
 // Handle API errors consistently
-const handleApiError = (error: any) => {
+const handleApiError = (error: any): never => {
     if (error.response) {
         console.error("API Error:", error.response.data);
         throw new Error(
@@ -133,7 +145,14 @@ export const walletApi = {
             const apiClient = createMultipartApiClient(token);
             const response = await apiClient.put(`/wallets/${id}`, walletData);
             return response.data;
-        } catch (error) {
+        } catch (error: any) {
+            if (error.response) {
+                throw new ApiError(
+                    error.response.data?.message || "Wallet update failed.",
+                    error.response.status,
+                    error.response.data,
+                );
+            }
             return handleApiError(error);
         }
     },

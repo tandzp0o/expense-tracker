@@ -1,198 +1,240 @@
 import React, {
+    ReactNode,
     createContext,
     useContext,
-    useState,
     useEffect,
-    ReactNode,
+    useMemo,
+    useState,
 } from "react";
-import { theme as antdTheme } from "antd";
 
-export type ThemeType = "light" | "dark" | "custom";
+export type ThemeMode = "light" | "dark";
+export type FontPreset = "sans" | "serif" | "mono" | "rounded";
+export type FontScale = "sm" | "md" | "lg";
+export type RadiusPreset = "compact" | "balanced" | "rounded";
 
-export interface CustomTheme {
+export interface AppearanceSettings {
+    mode: ThemeMode;
     primaryColor: string;
-    backgroundColor: string;
-    textColor: string;
-    secondaryColor: string;
-    accentColor: string;
+    fontPreset: FontPreset;
+    fontScale: FontScale;
+    radiusPreset: RadiusPreset;
 }
 
-export interface ThemeContextType {
-    theme: ThemeType;
-    customTheme: CustomTheme;
-    setTheme: (theme: ThemeType) => void;
-    setCustomTheme: (customTheme: CustomTheme) => void;
-    antdTheme: any;
+interface ThemeContextValue {
+    appearance: AppearanceSettings;
+    setMode: (mode: ThemeMode) => void;
+    updateAppearance: (updates: Partial<AppearanceSettings>) => void;
+    resetAppearance: () => void;
 }
 
-const defaultCustomTheme: CustomTheme = {
-    primaryColor: "#667eea",
-    backgroundColor: "#ffffff",
-    textColor: "#1e293b",
-    secondaryColor: "#f1f5f9",
-    accentColor: "#06b6d4",
+const STORAGE_KEY = "fintrack-appearance";
+
+const DEFAULT_APPEARANCE: AppearanceSettings = {
+    mode: "light",
+    primaryColor: "#2563eb",
+    fontPreset: "sans",
+    fontScale: "md",
+    radiusPreset: "balanced",
 };
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const FONT_PRESETS: Record<FontPreset, string> = {
+    sans: '"Inter", "Segoe UI", sans-serif',
+    serif: '"Georgia", "Times New Roman", serif',
+    mono: '"JetBrains Mono", "Consolas", monospace',
+    rounded: '"Trebuchet MS", "Segoe UI", sans-serif',
+};
 
-const hexToRgba = (hex: string, alpha: number) => {
-    const cleaned = hex.replace("#", "").trim();
-    if (![3, 6].includes(cleaned.length)) {
-        return `rgba(0, 0, 0, ${alpha})`;
+const FONT_SCALES: Record<FontScale, string> = {
+    sm: "15px",
+    md: "16px",
+    lg: "17px",
+};
+
+const RADIUS_PRESETS: Record<
+    RadiusPreset,
+    { sm: string; md: string; lg: string; xl: string }
+> = {
+    compact: {
+        sm: "8px",
+        md: "10px",
+        lg: "16px",
+        xl: "20px",
+    },
+    balanced: {
+        sm: "12px",
+        md: "16px",
+        lg: "24px",
+        xl: "30px",
+    },
+    rounded: {
+        sm: "18px",
+        md: "22px",
+        lg: "32px",
+        xl: "40px",
+    },
+};
+
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+
+const clampHex = (value: string) => {
+    const normalized = value.trim();
+    return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)
+        ? normalized
+        : DEFAULT_APPEARANCE.primaryColor;
+};
+
+const expandHex = (value: string) => {
+    const normalized = clampHex(value).replace("#", "");
+    if (normalized.length === 3) {
+        return normalized
+            .split("")
+            .map((char) => `${char}${char}`)
+            .join("");
+    }
+    return normalized;
+};
+
+const hexToRgb = (value: string) => {
+    const expanded = expandHex(value);
+    return {
+        r: parseInt(expanded.slice(0, 2), 16),
+        g: parseInt(expanded.slice(2, 4), 16),
+        b: parseInt(expanded.slice(4, 6), 16),
+    };
+};
+
+export const hexToRgba = (value: string, alpha: number) => {
+    const { r, g, b } = hexToRgb(value);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const getContrastColor = (value: string) => {
+    const { r, g, b } = hexToRgb(value);
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return luminance > 0.6 ? "#0f172a" : "#ffffff";
+};
+
+const applyAppearance = (appearance: AppearanceSettings) => {
+    const root = document.documentElement;
+    root.dataset.theme = appearance.mode;
+    root.style.setProperty("--app-primary", clampHex(appearance.primaryColor));
+    root.style.setProperty(
+        "--app-primary-foreground",
+        getContrastColor(appearance.primaryColor),
+    );
+    root.style.setProperty(
+        "--app-primary-soft",
+        hexToRgba(appearance.primaryColor, 0.14),
+    );
+    root.style.setProperty(
+        "--app-primary-soft-strong",
+        hexToRgba(appearance.primaryColor, 0.24),
+    );
+    root.style.setProperty("--app-ring", hexToRgba(appearance.primaryColor, 0.3));
+    root.style.setProperty(
+        "--app-font-family",
+        FONT_PRESETS[appearance.fontPreset],
+    );
+    root.style.setProperty("--app-font-size", FONT_SCALES[appearance.fontScale]);
+    root.style.setProperty(
+        "--app-radius-sm",
+        RADIUS_PRESETS[appearance.radiusPreset].sm,
+    );
+    root.style.setProperty(
+        "--app-radius-md",
+        RADIUS_PRESETS[appearance.radiusPreset].md,
+    );
+    root.style.setProperty(
+        "--app-radius-lg",
+        RADIUS_PRESETS[appearance.radiusPreset].lg,
+    );
+    root.style.setProperty(
+        "--app-radius-xl",
+        RADIUS_PRESETS[appearance.radiusPreset].xl,
+    );
+    root.style.colorScheme = appearance.mode;
+};
+
+const readInitialAppearance = (): AppearanceSettings => {
+    if (typeof window === "undefined") {
+        return DEFAULT_APPEARANCE;
     }
 
-    const full =
-        cleaned.length === 3
-            ? cleaned
-                  .split("")
-                  .map((c) => c + c)
-                  .join("")
-            : cleaned;
+    try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+            return DEFAULT_APPEARANCE;
+        }
+        const parsed = JSON.parse(raw) as Partial<AppearanceSettings>;
+        return {
+            mode: parsed.mode === "dark" ? "dark" : "light",
+            primaryColor: clampHex(
+                parsed.primaryColor || DEFAULT_APPEARANCE.primaryColor,
+            ),
+            fontPreset:
+                parsed.fontPreset && parsed.fontPreset in FONT_PRESETS
+                    ? parsed.fontPreset
+                    : DEFAULT_APPEARANCE.fontPreset,
+            fontScale:
+                parsed.fontScale && parsed.fontScale in FONT_SCALES
+                    ? parsed.fontScale
+                    : DEFAULT_APPEARANCE.fontScale,
+            radiusPreset:
+                parsed.radiusPreset && parsed.radiusPreset in RADIUS_PRESETS
+                    ? parsed.radiusPreset
+                    : DEFAULT_APPEARANCE.radiusPreset,
+        };
+    } catch {
+        return DEFAULT_APPEARANCE;
+    }
+};
 
-    const r = parseInt(full.slice(0, 2), 16);
-    const g = parseInt(full.slice(2, 4), 16);
-    const b = parseInt(full.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
+    children,
+}) => {
+    const [appearance, setAppearance] =
+        useState<AppearanceSettings>(readInitialAppearance);
+
+    useEffect(() => {
+        applyAppearance(appearance);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(appearance));
+    }, [appearance]);
+
+    const value = useMemo<ThemeContextValue>(
+        () => ({
+            appearance,
+            setMode: (mode) =>
+                setAppearance((current) => ({
+                    ...current,
+                    mode,
+                })),
+            updateAppearance: (updates) =>
+                setAppearance((current) => ({
+                    ...current,
+                    ...updates,
+                    primaryColor: updates.primaryColor
+                        ? clampHex(updates.primaryColor)
+                        : current.primaryColor,
+                    radiusPreset:
+                        updates.radiusPreset &&
+                        updates.radiusPreset in RADIUS_PRESETS
+                            ? updates.radiusPreset
+                            : current.radiusPreset,
+                })),
+            resetAppearance: () => setAppearance(DEFAULT_APPEARANCE),
+        }),
+        [appearance],
+    );
+
+    return (
+        <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+    );
 };
 
 export const useTheme = () => {
     const context = useContext(ThemeContext);
     if (!context) {
-        throw new Error("useTheme must be used within a ThemeProvider");
+        throw new Error("useTheme must be used within ThemeProvider");
     }
     return context;
-};
-
-interface ThemeProviderProps {
-    children: ReactNode;
-}
-
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-    const [theme, setTheme] = useState<ThemeType>(() => {
-        const saved = localStorage.getItem("app-theme");
-        return (saved as ThemeType) || "light";
-    });
-
-    const [customTheme, setCustomTheme] = useState<CustomTheme>(() => {
-        const saved = localStorage.getItem("app-custom-theme");
-        return saved ? JSON.parse(saved) : defaultCustomTheme;
-    });
-
-    useEffect(() => {
-        localStorage.setItem("app-theme", theme);
-    }, [theme]);
-
-    useEffect(() => {
-        localStorage.setItem("app-custom-theme", JSON.stringify(customTheme));
-    }, [customTheme]);
-
-    useEffect(() => {
-        const root = document.documentElement;
-
-        const base =
-            theme === "custom"
-                ? {
-                      primaryColor: customTheme.primaryColor,
-                      backgroundColor: customTheme.backgroundColor,
-                      textColor: customTheme.textColor,
-                      secondaryColor: customTheme.secondaryColor,
-                      accentColor: customTheme.accentColor,
-                  }
-                : theme === "dark"
-                  ? {
-                        primaryColor: "#1890ff",
-                        backgroundColor: "#0b1220",
-                        textColor: "#e5e7eb",
-                        secondaryColor: "#111a2c",
-                        accentColor: "#06b6d4",
-                    }
-                  : {
-                        primaryColor: "#1890ff",
-                        backgroundColor: "#f5f7fb",
-                        textColor: "#0f172a",
-                        secondaryColor: "#ffffff",
-                        accentColor: "#06b6d4",
-                    };
-
-        root.style.setProperty("--primary-color", base.primaryColor);
-        root.style.setProperty("--bg-base", base.backgroundColor);
-        root.style.setProperty("--bg-container", base.secondaryColor);
-        root.style.setProperty("--text-base", base.textColor);
-        root.style.setProperty("--secondary-color", base.secondaryColor);
-        root.style.setProperty("--accent-color", base.accentColor);
-        root.style.setProperty("--text-muted", hexToRgba(base.textColor, 0.74));
-        root.style.setProperty(
-            "--border-color",
-            hexToRgba(base.textColor, 0.16),
-        );
-        root.style.setProperty(
-            "--accent-alpha",
-            hexToRgba(base.accentColor, 0.18),
-        );
-        root.style.setProperty("--sidenav-color", base.primaryColor);
-    }, [theme, customTheme]);
-
-    const getAntdTheme = () => {
-        const baseTheme =
-            theme === "dark"
-                ? antdTheme.darkAlgorithm
-                : antdTheme.defaultAlgorithm;
-
-        if (theme === "custom") {
-            return {
-                algorithm: baseTheme,
-                token: {
-                    colorPrimary: customTheme.primaryColor,
-                    colorBgBase: customTheme.backgroundColor,
-                    colorBgLayout: customTheme.backgroundColor,
-                    colorTextBase: customTheme.textColor,
-                    colorText: customTheme.textColor,
-                    colorTextSecondary: hexToRgba(customTheme.textColor, 0.72),
-                    colorBgContainer: customTheme.secondaryColor,
-                    colorBorder: hexToRgba(customTheme.textColor, 0.12),
-                    colorBorderSecondary: hexToRgba(
-                        customTheme.textColor,
-                        0.12,
-                    ),
-                    colorLink: customTheme.accentColor,
-                    colorLinkHover: customTheme.accentColor,
-                    colorPrimaryHover: customTheme.accentColor,
-                },
-            };
-        }
-
-        if (theme === "dark") {
-            return {
-                algorithm: baseTheme,
-                token: {
-                    colorPrimary: "#1890ff",
-                    colorBgBase: "#111827",
-                    colorBgContainer: "#1f2937",
-                    colorTextBase: "#ffffff",
-                },
-            };
-        }
-
-        return {
-            algorithm: baseTheme,
-            token: {
-                colorPrimary: "#1890ff",
-                colorBgBase: "#fafafa",
-                colorBgContainer: "#ffffff",
-                colorTextBase: "#111827",
-            },
-        };
-    };
-
-    const value: ThemeContextType = {
-        theme,
-        customTheme,
-        setTheme,
-        setCustomTheme,
-        antdTheme: getAntdTheme(),
-    };
-
-    return (
-        <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-    );
 };

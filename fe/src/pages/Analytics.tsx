@@ -1,16 +1,30 @@
-import React, { useEffect, useMemo, useState } from "react";
-import dayjs from "dayjs";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/vi";
-import { App, DatePicker, Select, Spin } from "antd";
+import {
+    ChartColumnBig,
+    CircleDollarSign,
+    PiggyBank,
+    ReceiptText,
+} from "lucide-react";
 import { auth } from "../firebase/config";
-import { transactionApi, walletApi, goalApi, budgetApi } from "../services/api";
+import { transactionApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
+import { useLocale } from "../contexts/LocaleContext";
+import { useToast } from "../contexts/ToastContext";
+import { useTheme } from "../contexts/ThemeContext";
+import { hexToRgba } from "../lib/utils";
+import { PageHeader } from "../components/app/page-header";
+import { MetricCard } from "../components/app/metric-card";
+import { EmptyState } from "../components/app/empty-state";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Progress } from "../components/ui/progress";
+import { Select } from "../components/ui/select";
+import { Spinner } from "../components/ui/spinner";
 import LineChart from "../components/charts/LineChart";
-import BarChart from "../components/charts/BarChart";
 
 dayjs.locale("vi");
-
-const { RangePicker } = DatePicker;
 
 interface Transaction {
     _id: string;
@@ -21,238 +35,460 @@ interface Transaction {
     note?: string;
 }
 
+const parseAmount = (raw: unknown) => {
+    if (typeof raw === "number") {
+        return Number.isFinite(raw) ? raw : 0;
+    }
+    if (typeof raw === "string") {
+        const value = Number(raw.replace(/[^0-9.-]/g, ""));
+        return Number.isFinite(value) ? value : 0;
+    }
+    return 0;
+};
+
 const Analytics: React.FC = () => {
-    const { message } = App.useApp();
+    const { isVietnamese } = useLocale();
+    const { toast } = useToast();
+    const { appearance } = useTheme();
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [selectedPeriod, setSelectedPeriod] = useState<string>("current_month");
-    const [customRange, setCustomRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+    const [selectedPeriod, setSelectedPeriod] = useState("current_month");
+    const [customStart, setCustomStart] = useState("");
+    const [customEnd, setCustomEnd] = useState("");
 
-    const parseAmount = (raw: unknown) => {
-        if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
-        if (typeof raw === "string") {
-            const v = Number(raw.replace(/[^0-9.-]/g, ""));
-            return Number.isFinite(v) ? v : 0;
-        }
-        return 0;
-    };
+    const copy = isVietnamese
+        ? {
+              loadFailed: "Không thể tải phân tích",
+              retry: "Vui lòng thử lại.",
+              currentMonth: "Tháng này",
+              lastMonth: "Tháng trước",
+              last3Months: "3 tháng gần đây",
+              last6Months: "6 tháng gần đây",
+              customRange: "Tùy chọn",
+              pageTitle: "Phân tích",
+              pageDescription:
+                  "Màn này đọc từ transactions API rồi lọc và tổng hợp phía client theo khoảng thời gian đã chọn.",
+              income: "Thu nhập",
+              expense: "Chi tiêu",
+              net: "Chênh lệch",
+              count: "Số giao dịch",
+              filteredIncome: "Thu nhập trong khoảng lọc",
+              filteredExpense: "Chi tiêu trong khoảng lọc",
+              incomeMinusExpense: "Thu nhập trừ chi tiêu",
+              transactionsInRange: "Số giao dịch trong khoảng đã chọn",
+              sixMonthTrend: "Xu hướng 6 tháng",
+              sixMonthTrendDesc:
+                  "Biểu đồ đường dùng toàn bộ giao dịch đã tải, kể cả khi bộ lọc hiện tại ngắn hơn.",
+              expenseMix: "Cơ cấu chi tiêu",
+              expenseMixDesc: "Các danh mục chi tiêu lớn nhất trong khoảng đã lọc.",
+              noExpenseData: "Chưa có dữ liệu chi tiêu",
+              noExpenseDataDesc: "Không có khoản chi nào trong khoảng đã chọn.",
+              insight: "Nhận định",
+              efficiencyTitle: "Ảnh chụp hiệu quả tài chính",
+              insightDesc: (start: string, end: string) =>
+                  `Khoảng hiện tại từ ${start} đến ${end}. Tỷ lệ tiết kiệm được tính bằng chênh lệch ròng trên thu nhập trong giai đoạn này.`,
+              savingRate: "Tỷ lệ tiết kiệm",
+              projectedYearlyNet: "Dự phóng chênh lệch ròng năm",
+              incomeSeriesLabel: "Thu nhập",
+              expenseSeriesLabel: "Chi tiêu",
+          }
+        : {
+              loadFailed: "Could not load analytics",
+              retry: "Please retry.",
+              currentMonth: "Current month",
+              lastMonth: "Last month",
+              last3Months: "Last 3 months",
+              last6Months: "Last 6 months",
+              customRange: "Custom range",
+              pageTitle: "Analytics",
+              pageDescription:
+                  "Analytics reads from the transactions API, then filters and aggregates client-side for the chosen period.",
+              income: "Income",
+              expense: "Expense",
+              net: "Net",
+              count: "Count",
+              filteredIncome: "Filtered period income",
+              filteredExpense: "Filtered period expense",
+              incomeMinusExpense: "Income minus expense",
+              transactionsInRange: "Transactions in the selected range",
+              sixMonthTrend: "Six month trend",
+              sixMonthTrendDesc:
+                  "Line chart combines all loaded transactions, even when the current filter is shorter.",
+              expenseMix: "Expense mix",
+              expenseMixDesc: "Top categories based on filtered expense transactions.",
+              noExpenseData: "No expense data",
+              noExpenseDataDesc: "There are no expense rows in the selected range.",
+              insight: "Insight",
+              efficiencyTitle: "Financial efficiency snapshot",
+              insightDesc: (start: string, end: string) =>
+                  `Current selection spans ${start} to ${end}. Saving rate is based on net over income for this window.`,
+              savingRate: "Saving rate",
+              projectedYearlyNet: "Projected yearly net",
+              incomeSeriesLabel: "Income",
+              expenseSeriesLabel: "Expense",
+          };
+    const loadFailedTitle = isVietnamese
+        ? "Không thể tải phân tích"
+        : "Could not load analytics";
+    const retryText = isVietnamese ? "Vui lòng thử lại." : "Please retry.";
 
-    const getDateRange = () => {
+    const getDateRange = useCallback(() => {
         const now = dayjs();
         switch (selectedPeriod) {
-            case "current_month": return { start: now.startOf("month"), end: now.endOf("month") };
-            case "last_month": return { start: now.subtract(1, "month").startOf("month"), end: now.subtract(1, "month").endOf("month") };
-            case "last_3_months": return { start: now.subtract(3, "month").startOf("month"), end: now.endOf("month") };
-            case "last_6_months": return { start: now.subtract(6, "month").startOf("month"), end: now.endOf("month") };
-            case "custom": return customRange ? { start: customRange[0].startOf("day"), end: customRange[1].endOf("day") } : { start: now.startOf("month"), end: now.endOf("month") };
-            default: return { start: now.startOf("month"), end: now.endOf("month") };
+            case "current_month":
+                return { start: now.startOf("month"), end: now.endOf("month") };
+            case "last_month":
+                return {
+                    start: now.subtract(1, "month").startOf("month"),
+                    end: now.subtract(1, "month").endOf("month"),
+                };
+            case "last_3_months":
+                return {
+                    start: now.subtract(2, "month").startOf("month"),
+                    end: now.endOf("month"),
+                };
+            case "last_6_months":
+                return {
+                    start: now.subtract(5, "month").startOf("month"),
+                    end: now.endOf("month"),
+                };
+            case "custom":
+                return {
+                    start: customStart
+                        ? dayjs(customStart).startOf("day")
+                        : now.startOf("month"),
+                    end: customEnd
+                        ? dayjs(customEnd).endOf("day")
+                        : now.endOf("month"),
+                };
+            default:
+                return { start: now.startOf("month"), end: now.endOf("month") };
         }
-    };
+    }, [customEnd, customStart, selectedPeriod]);
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         const fetchData = async () => {
+            setLoading(true);
             try {
                 const firebaseUser = auth.currentUser;
-                if (!firebaseUser) return;
+                if (!firebaseUser) {
+                    return;
+                }
+
                 const token = await firebaseUser.getIdToken();
-                
-                // Luôn load ít nhất 6 tháng cho chart, còn stats sẽ filter trong frontend
                 const chartStart = dayjs().subtract(5, "month").startOf("month");
                 const currentRange = getDateRange();
-                
-                // Lấy ngày nhỏ nhất giữa chartStart và currentRange.start
-                const fetchStart = chartStart.isBefore(currentRange.start) ? chartStart : currentRange.start;
-                
-                const txRes = await transactionApi.getTransactions({ 
-                    startDate: fetchStart.toISOString(), 
-                    endDate: currentRange.end.toISOString(), 
-                    limit: 2000 
-                }, token);
-                
-                setTransactions(txRes?.data?.transactions || []);
-            } catch (e) {
-                message.error("Lỗi khi tải dữ liệu");
-            } finally { setLoading(false); }
-        };
-        fetchData();
-    }, [selectedPeriod, customRange]);
+                const fetchStart = chartStart.isBefore(currentRange.start)
+                    ? chartStart
+                    : currentRange.start;
 
-    const filteredTransactions = useMemo(() => {
-        const range = getDateRange();
-        return transactions.filter(t => {
-            const d = dayjs(t.date);
-            return d.isAfter(range.start) && d.isBefore(range.end);
-        });
-    }, [transactions, selectedPeriod, customRange]);
+                const response = await transactionApi.getTransactions(
+                    {
+                        startDate: fetchStart.toISOString(),
+                        endDate: currentRange.end.toISOString(),
+                        limit: 2000,
+                        page: 1,
+                    },
+                    token,
+                );
+
+                setTransactions(response?.data?.transactions || []);
+            } catch (error: any) {
+                toast({
+                    title: loadFailedTitle,
+                    description: error.message || retryText,
+                    variant: "destructive",
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        void fetchData();
+    }, [getDateRange, loadFailedTitle, retryText, toast]);
+
+    const currentRange = getDateRange();
+
+    const filteredTransactions = useMemo(
+        () =>
+            transactions.filter((transaction) => {
+                const date = dayjs(transaction.date);
+                return (
+                    (date.isAfter(currentRange.start) || date.isSame(currentRange.start, "day")) &&
+                    (date.isBefore(currentRange.end) || date.isSame(currentRange.end, "day"))
+                );
+            }),
+        [currentRange.end, currentRange.start, transactions],
+    );
 
     const stats = useMemo(() => {
-        const income = filteredTransactions.filter(t => t.type === "INCOME").reduce((s, t) => s + parseAmount(t.amount), 0);
-        const expense = filteredTransactions.filter(t => t.type === "EXPENSE").reduce((s, t) => s + parseAmount(t.amount), 0);
-        return { income, expense, net: income - expense, count: filteredTransactions.length };
+        const income = filteredTransactions
+            .filter((transaction) => transaction.type === "INCOME")
+            .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0);
+        const expense = filteredTransactions
+            .filter((transaction) => transaction.type === "EXPENSE")
+            .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0);
+
+        return {
+            income,
+            expense,
+            net: income - expense,
+            count: filteredTransactions.length,
+        };
     }, [filteredTransactions]);
 
     const breakdown = useMemo(() => {
         const map: Record<string, number> = {};
-        filteredTransactions.filter(t => t.type === "EXPENSE").forEach(t => { map[t.category] = (map[t.category] || 0) + parseAmount(t.amount); });
-        const total = Object.values(map).reduce((s, v) => s + v, 0);
-        const colors = ["#4137cd", "#10b981", "#ef4444", "#f59e0b", "#6366f1", "#14b8a6", "#ec4899"];
-        return Object.entries(map).sort((a,b) => b[1] - a[1]).map(([name, val], i) => ({
-            name, val, percent: total > 0 ? (val/total)*100 : 0, color: colors[i % colors.length]
-        })).slice(0, 5);
+        filteredTransactions
+            .filter((transaction) => transaction.type === "EXPENSE")
+            .forEach((transaction) => {
+                map[transaction.category] =
+                    (map[transaction.category] || 0) + parseAmount(transaction.amount);
+            });
+
+        const total = Object.values(map).reduce((sum, value) => sum + value, 0);
+        return Object.entries(map)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 6)
+            .map(([name, value]) => ({
+                name,
+                value,
+                percent: total > 0 ? (value / total) * 100 : 0,
+            }));
     }, [filteredTransactions]);
 
     const chartData = useMemo(() => {
-        const months = [];
-        for (let i = 5; i >= 0; i--) {
-            months.push(dayjs().subtract(i, 'month'));
+        const months: Dayjs[] = [];
+        for (let index = 5; index >= 0; index -= 1) {
+            months.push(dayjs().subtract(index, "month"));
         }
 
-        const labels = months.map(m => `T${m.month() + 1}`);
-        const incomeData = months.map(m => {
-            return transactions
-                .filter(t => t.type === "INCOME" && dayjs(t.date).isSame(m, 'month'))
-                .reduce((sum, t) => sum + parseAmount(t.amount), 0);
-        });
-        const expenseData = months.map(m => {
-            return transactions
-                .filter(t => t.type === "EXPENSE" && dayjs(t.date).isSame(m, 'month'))
-                .reduce((sum, t) => sum + parseAmount(t.amount), 0);
-        });
-
         return {
-            labels,
+            labels: months.map((month) => `${isVietnamese ? "T" : "M"}${month.month() + 1}`),
             datasets: [
-                { label: "Thu nhập", data: incomeData, borderColor: "#10b981", tension: 0.4 },
-                { label: "Chi tiêu", data: expenseData, borderColor: "#ef4444", tension: 0.4 }
-            ]
+                {
+                    label: copy.incomeSeriesLabel,
+                    data: months.map((month) =>
+                        transactions
+                            .filter(
+                                (transaction) =>
+                                    transaction.type === "INCOME" &&
+                                    dayjs(transaction.date).isSame(month, "month"),
+                            )
+                            .reduce(
+                                (sum, transaction) => sum + parseAmount(transaction.amount),
+                                0,
+                            ),
+                    ),
+                    borderColor: appearance.primaryColor,
+                    backgroundColor: hexToRgba(appearance.primaryColor, 0.15),
+                    fill: true,
+                    tension: 0.35,
+                },
+                {
+                    label: copy.expenseSeriesLabel,
+                    data: months.map((month) =>
+                        transactions
+                            .filter(
+                                (transaction) =>
+                                    transaction.type === "EXPENSE" &&
+                                    dayjs(transaction.date).isSame(month, "month"),
+                            )
+                            .reduce(
+                                (sum, transaction) => sum + parseAmount(transaction.amount),
+                                0,
+                            ),
+                    ),
+                    borderColor: "#ef4444",
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    fill: true,
+                    tension: 0.35,
+                },
+            ],
         };
-    }, [transactions]);
-
-    if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Spin size="large" /></div>;
+    }, [
+        appearance.primaryColor,
+        copy.expenseSeriesLabel,
+        copy.incomeSeriesLabel,
+        isVietnamese,
+        transactions,
+    ]);
 
     const savingRate = stats.income > 0 ? (stats.net / stats.income) * 100 : 0;
 
+    if (loading) {
+        return (
+            <div className="flex min-h-[420px] items-center justify-center">
+                <Spinner className="h-8 w-8" />
+            </div>
+        );
+    }
+
     return (
-        <div className="flex-1 space-y-8 animate-in fade-in duration-500">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Báo cáo & Phân tích</h2>
-                    <p className="text-sm text-slate-500 mt-1">Cái nhìn tổng thể về sức khỏe tài chính của bạn</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Select value={selectedPeriod} onChange={setSelectedPeriod} className="w-40 h-10" options={[
-                        { value: "current_month", label: "Tháng này" },
-                        { value: "last_month", label: "Tháng trước" },
-                        { value: "last_3_months", label: "3 tháng gần đây" },
-                        { value: "custom", label: "Tùy chỉnh" },
-                    ]} />
-                    {selectedPeriod === "custom" && <RangePicker onChange={(d: any) => setCustomRange(d)} format="DD/MM/YYYY" className="h-10 rounded-xl" />}
-                </div>
+        <div className="space-y-6">
+            <PageHeader
+                actions={
+                    <div className="flex flex-wrap gap-3">
+                        <Select
+                            onChange={(event) => setSelectedPeriod(event.target.value)}
+                            value={selectedPeriod}
+                        >
+                            <option value="current_month">{copy.currentMonth}</option>
+                            <option value="last_month">{copy.lastMonth}</option>
+                            <option value="last_3_months">{copy.last3Months}</option>
+                            <option value="last_6_months">{copy.last6Months}</option>
+                            <option value="custom">{copy.customRange}</option>
+                        </Select>
+                        {selectedPeriod === "custom" ? (
+                            <>
+                                <Input
+                                    onChange={(event) => setCustomStart(event.target.value)}
+                                    type="date"
+                                    value={customStart}
+                                />
+                                <Input
+                                    onChange={(event) => setCustomEnd(event.target.value)}
+                                    type="date"
+                                    value={customEnd}
+                                />
+                            </>
+                        ) : null}
+                    </div>
+                }
+                description={copy.pageDescription}
+                title={copy.pageTitle}
+            />
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <MetricCard
+                    icon={CircleDollarSign}
+                    subtitle={copy.filteredIncome}
+                    title={copy.income}
+                    value={formatCurrency(stats.income)}
+                />
+                <MetricCard
+                    icon={ChartColumnBig}
+                    subtitle={copy.filteredExpense}
+                    title={copy.expense}
+                    value={formatCurrency(stats.expense)}
+                />
+                <MetricCard
+                    icon={PiggyBank}
+                    subtitle={copy.incomeMinusExpense}
+                    title={copy.net}
+                    value={formatCurrency(stats.net)}
+                />
+                <MetricCard
+                    icon={ReceiptText}
+                    subtitle={copy.transactionsInRange}
+                    title={copy.count}
+                    value={String(stats.count)}
+                />
             </div>
 
-            {/* Key Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {[
-                    { label: "Tổng thu nhập", val: stats.income, color: "text-emerald-500", icon: "payments", bg: "bg-emerald-50" },
-                    { label: "Tổng chi tiêu", val: stats.expense, color: "text-red-500", icon: "shopping_bag", bg: "bg-red-50" },
-                    { label: "Số dư ròng", val: stats.net, color: "text-primary", icon: "account_balance", bg: "bg-indigo-50" },
-                    { label: "Tổng giao dịch", val: stats.count, color: "text-slate-600", icon: "receipt_long", bg: "bg-slate-50", format: false },
-                ].map((s, i) => (
-                    <div key={i} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className={`size-10 rounded-xl ${s.bg} dark:bg-opacity-10 flex items-center justify-center`}>
-                                <span className={`material-symbols-outlined ${s.color} text-xl`}>{s.icon}</span>
-                            </div>
-                            <span className="material-symbols-outlined text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">north_east</span>
+            <div className="grid gap-6 xl:grid-cols-[1.6fr,1fr]">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{copy.sixMonthTrend}</CardTitle>
+                        <CardDescription>
+                            {copy.sixMonthTrendDesc}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-[320px]">
+                            <LineChart
+                                data={chartData}
+                                options={{
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: "bottom",
+                                        },
+                                    },
+                                    scales: {
+                                        x: {
+                                            grid: { display: false },
+                                        },
+                                        y: {
+                                            ticks: {
+                                                callback: (value: number | string) =>
+                                                    Number(value).toLocaleString(
+                                                        isVietnamese
+                                                            ? "vi-VN"
+                                                            : "en-US",
+                                                    ),
+                                            },
+                                        },
+                                    },
+                                }}
+                            />
                         </div>
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1">{s.label}</p>
-                        <h3 className={`text-2xl font-bold dark:text-white`}>
-                            {s.format !== false ? formatCurrency(s.val) : s.val}
-                        </h3>
-                    </div>
-                ))}
-            </div>
+                    </CardContent>
+                </Card>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-12 gap-8">
-                {/* Trend Chart */}
-                <div className="col-span-12 lg:col-span-8 bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <div className="flex justify-between items-center mb-10">
-                        <h3 className="text-lg font-bold dark:text-white uppercase tracking-tight">Biến động Thu & Chi</h3>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <span className="size-2 rounded-full bg-emerald-500"></span>
-                                <span className="text-xs font-bold text-slate-400 uppercase">Thu nhập</span>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{copy.expenseMix}</CardTitle>
+                        <CardDescription>
+                            {copy.expenseMixDesc}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {breakdown.length > 0 ? (
+                            <div className="space-y-4">
+                                {breakdown.map((item) => (
+                                    <div key={item.name} className="space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="font-medium">{item.name}</span>
+                                            <span className="text-muted-foreground">
+                                                {formatCurrency(item.value)}
+                                            </span>
+                                        </div>
+                                        <Progress value={item.percent} />
+                                    </div>
+                                ))}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="size-2 rounded-full bg-red-500"></span>
-                                <span className="text-xs font-bold text-slate-400 uppercase">Chi tiêu</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="h-80">
-                        <LineChart data={chartData} options={{ maintainAspectRatio: false, scales: { y: { display: false }, x: { grid: { display: false } } } }} />
-                    </div>
-                </div>
-
-                {/* Categories Breakdown */}
-                <div className="col-span-12 lg:col-span-4 bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <h3 className="text-lg font-bold dark:text-white uppercase tracking-tight mb-8">Chi tiêu theo hạng mục</h3>
-                    <div className="space-y-6">
-                        {breakdown.map((b, i) => (
-                            <div key={i} className="space-y-2">
-                                <div className="flex justify-between text-xs font-bold uppercase tracking-wide">
-                                    <span className="text-slate-500">{b.name}</span>
-                                    <span className="text-slate-900 dark:text-white">{Math.round(b.percent)}%</span>
-                                </div>
-                                <div className="h-2 w-full bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${b.percent}%`, backgroundColor: b.color }}></div>
-                                </div>
-                                <p className="text-xs font-bold text-slate-400 text-right">{formatCurrency(b.val)}</p>
-                            </div>
-                        ))}
-                        {breakdown.length === 0 && (
-                            <div className="h-60 flex flex-col items-center justify-center text-slate-400 space-y-2">
-                                <span className="material-symbols-outlined text-4xl opacity-20">analytics</span>
-                                <p className="italic text-sm">Chưa có dữ liệu chi tiêu</p>
-                            </div>
+                        ) : (
+                            <EmptyState
+                                description={copy.noExpenseDataDesc}
+                                icon={ChartColumnBig}
+                                title={copy.noExpenseData}
+                            />
                         )}
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
             </div>
 
-            {/* Summary Insights */}
-            <div className="bg-slate-900 rounded-2xl p-8 text-white relative overflow-hidden group">
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-primary">insights</span>
-                            <span className="text-xs font-bold uppercase tracking-wide text-primary">Tóm tắt Hiệu suất</span>
-                        </div>
-                        <h4 className="text-xl font-bold mb-2 uppercase tracking-tight">Cân bằng Tài chính</h4>
-                        <p className="text-slate-400 text-sm leading-relaxed max-w-xl italic font-medium">
-                            Bạn đã chi tiêu **{Math.round((stats.expense/stats.income)*100 || 0)}%** tổng thu nhập. Duy trì tỷ lệ này dưới 70% để đảm bảo khả năng tích lũy bền vững.
+            <Card className="overflow-hidden">
+                <CardContent className="grid gap-6 p-6 md:grid-cols-[1.3fr,0.7fr]">
+                    <div>
+                        <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
+                            {copy.insight}
+                        </p>
+                        <h3 className="mt-3 text-2xl font-semibold">
+                            {copy.efficiencyTitle}
+                        </h3>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                            {copy.insightDesc(
+                                currentRange.start.format("DD/MM/YYYY"),
+                                currentRange.end.format("DD/MM/YYYY"),
+                            )}
                         </p>
                     </div>
-                    <div className="flex gap-12 text-center">
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Tỷ lệ tiết kiệm</p>
-                            <p className={`text-2xl font-bold ${savingRate > 20 ? 'text-emerald-500' : 'text-orange-500'}`}>{Math.round(savingRate)}%</p>
-                        </div>
-                        <div className="w-px h-12 bg-white/10 hidden md:block"></div>
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Dự phóng năm</p>
-                            <p className="text-2xl font-bold text-primary">{formatCurrency(stats.net * 12)}</p>
-                        </div>
+                    <div className="rounded-[var(--app-radius-lg)] bg-primary-soft p-5">
+                        <p className="text-sm text-muted-foreground">{copy.savingRate}</p>
+                        <p className="mt-2 text-3xl font-semibold text-primary">
+                            {Math.round(savingRate)}%
+                        </p>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                            {copy.projectedYearlyNet}: {formatCurrency(stats.net * 12)}
+                        </p>
                     </div>
-                </div>
-                {/* Decoration */}
-                <div className="absolute top-0 right-0 size-64 bg-primary/10 blur-[120px] rounded-full translate-x-1/2 -translate-y-1/2"></div>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };
-
 
 export default Analytics;

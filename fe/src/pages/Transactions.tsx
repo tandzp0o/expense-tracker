@@ -1,19 +1,31 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import {
-    App,
-    DatePicker,
-    Input,
-    InputNumber,
-    Modal,
-    Select,
-    Spin,
-    Popconfirm,
-} from "antd";
+    Filter,
+    PencilLine,
+    Plus,
+    ReceiptText,
+    Search,
+    Trash2,
+} from "lucide-react";
 import { auth } from "../firebase/config";
 import { transactionApi, walletApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
+import { useLocale } from "../contexts/LocaleContext";
+import { useToast } from "../contexts/ToastContext";
+import { PageHeader } from "../components/app/page-header";
+import { EmptyState } from "../components/app/empty-state";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Dialog } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Select } from "../components/ui/select";
+import { Spinner } from "../components/ui/spinner";
+import { Textarea } from "../components/ui/textarea";
+import { Badge } from "../components/ui/badge";
 
 dayjs.locale("vi");
 
@@ -27,53 +39,212 @@ interface Transaction {
     note?: string;
 }
 
+interface WalletItem {
+    _id: string;
+    name: string;
+}
+
+const categoryOptions = [
+    { value: "An uong", vi: "Ăn uống", en: "Food" },
+    { value: "Di chuyen", vi: "Di chuyển", en: "Transport" },
+    { value: "Mua sam", vi: "Mua sắm", en: "Shopping" },
+    { value: "Giai tri", vi: "Giải trí", en: "Entertainment" },
+    { value: "Suc khoe", vi: "Sức khỏe", en: "Health" },
+    { value: "Giao duc", vi: "Giáo dục", en: "Education" },
+    { value: "Hoa don", vi: "Hóa đơn", en: "Bills" },
+    { value: "Khac", vi: "Khác", en: "Other" },
+] as const;
+
+const transactionTypeText = {
+    INCOME: { vi: "Thu nhập", en: "Income" },
+    EXPENSE: { vi: "Chi tiêu", en: "Expense" },
+    GOAL_DEPOSIT: { vi: "Nạp mục tiêu", en: "Goal deposit" },
+    GOAL_WITHDRAW: { vi: "Rút mục tiêu", en: "Goal withdrawal" },
+} as const;
+
+const parseAmount = (raw: unknown) => {
+    if (typeof raw === "number") {
+        return raw;
+    }
+    if (typeof raw === "string") {
+        return parseFloat(raw.replace(/[^0-9.-]/g, "")) || 0;
+    }
+    return 0;
+};
+
 const Transactions: React.FC = () => {
-    const { message } = App.useApp();
+    const { language, isVietnamese } = useLocale();
+    const { toast } = useToast();
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [wallets, setWallets] = useState<any[]>([]);
+    const [wallets, setWallets] = useState<WalletItem[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(
-        null,
-    );
-    const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const [selectedWallet, setSelectedWallet] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(10);
+    const [totalTransactions, setTotalTransactions] = useState(0);
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Transaction | null>(null);
-    const [submitting, setSubmitting] = useState(false);
-
-    // Form states
+    const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
     const [formValues, setFormValues] = useState({
         type: "EXPENSE" as "INCOME" | "EXPENSE",
         amount: 0,
         note: "",
-        category: "Ăn uống",
+        category: "An uong",
         walletId: "",
-        date: dayjs().toISOString(),
+        date: dayjs().format("YYYY-MM-DD"),
     });
 
-    // Pagination states
-    const [page, setPage] = useState(1);
-    const [pageSize] = useState(10);
-    const [totalTransactions, setTotalTransactions] = useState(0);
+    const copy = isVietnamese
+        ? {
+              pageTitle: "Giao dịch",
+              pageDescription:
+                  "Bộ lọc phía server dùng đúng các tham số note, category và wallet từ transactions API.",
+              newTransaction: "Thêm giao dịch",
+              pageIncome: "Thu trong trang",
+              pageExpense: "Chi trong trang",
+              searchByNote: "Tìm theo ghi chú...",
+              allCategories: "Tất cả danh mục",
+              allWallets: "Tất cả ví",
+              reset: "Đặt lại",
+              transactionList: "Danh sách giao dịch",
+              transactionListDesc: (currentPage: number, totalPages: number, totalRows: number) =>
+                  `Trang ${currentPage}/${totalPages}. Tổng số dòng từ API: ${totalRows}.`,
+              note: "Ghi chú",
+              category: "Danh mục",
+              wallet: "Ví",
+              date: "Ngày",
+              type: "Loại",
+              amount: "Số tiền",
+              action: "Thao tác",
+              untitledTransaction: "Giao dịch chưa đặt tên",
+              unknown: "Không xác định",
+              showingRows: (count: number) => `Đang hiển thị ${count} dòng trên trang này.`,
+              previous: "Trước",
+              next: "Tiếp",
+              noTransactions: "Chưa có giao dịch",
+              noTransactionsDescWithWallet:
+                  "Không có giao dịch nào khớp với bộ lọc hiện tại.",
+              noTransactionsDescWithoutWallet:
+                  "Hãy tạo ví trước. Không thể ghi nhận giao dịch nếu chưa có ví.",
+              createTransaction: "Tạo giao dịch",
+              formDescription:
+                  "Biểu mẫu này map trực tiếp với payload create/update transaction của API.",
+              editTransaction: "Chỉnh sửa giao dịch",
+              createTransactionTitle: "Tạo giao dịch",
+              walletRequired: "Cần chọn ví",
+              walletRequiredDesc: "Hãy chọn ví trước khi lưu giao dịch.",
+              invalidAmount: "Số tiền không hợp lệ",
+              invalidAmountDesc: "Số tiền phải lớn hơn 0.",
+              transactionUpdated: "Đã cập nhật giao dịch",
+              transactionCreated: "Đã tạo giao dịch",
+              saveFailed: "Lưu thất bại",
+              saveFailedDesc: "Không thể lưu giao dịch.",
+              transactionDeleted: "Đã xóa giao dịch",
+              deleteFailed: "Xóa thất bại",
+              deleteFailedDesc: "Không thể xóa giao dịch.",
+              keep: "Giữ lại",
+              delete: "Xóa",
+              deleteTransaction: "Xóa giao dịch",
+              deleteTransactionDesc: (label: string) => `Xóa "${label}"?`,
+              typeExpense: "Chi tiêu",
+              typeIncome: "Thu nhập",
+              selectWallet: "Chọn ví",
+              whatHappened: "Nội dung giao dịch",
+              cancel: "Hủy",
+              saving: "Đang lưu...",
+              updateTransaction: "Cập nhật giao dịch",
+              noWalletFallback: "Không xác định",
+          }
+        : {
+              pageTitle: "Transactions",
+              pageDescription:
+                  "Server-side filters use note, category and wallet params from the transactions API.",
+              newTransaction: "New transaction",
+              pageIncome: "Page income",
+              pageExpense: "Page expense",
+              searchByNote: "Search by note...",
+              allCategories: "All categories",
+              allWallets: "All wallets",
+              reset: "Reset",
+              transactionList: "Transaction list",
+              transactionListDesc: (currentPage: number, totalPages: number, totalRows: number) =>
+                  `Page ${currentPage} of ${totalPages}. Total rows from API: ${totalRows}.`,
+              note: "Note",
+              category: "Category",
+              wallet: "Wallet",
+              date: "Date",
+              type: "Type",
+              amount: "Amount",
+              action: "Action",
+              untitledTransaction: "Untitled transaction",
+              unknown: "Unknown",
+              showingRows: (count: number) => `Showing ${count} rows on this page.`,
+              previous: "Previous",
+              next: "Next",
+              noTransactions: "No transactions",
+              noTransactionsDescWithWallet:
+                  "No transaction matches the current filters.",
+              noTransactionsDescWithoutWallet:
+                  "Create a wallet first. Transactions cannot be recorded without one.",
+              createTransaction: "Create transaction",
+              formDescription:
+                  "This form maps exactly to the create/update transaction API payload.",
+              editTransaction: "Edit transaction",
+              createTransactionTitle: "Create transaction",
+              walletRequired: "Wallet required",
+              walletRequiredDesc: "Select a wallet before saving.",
+              invalidAmount: "Invalid amount",
+              invalidAmountDesc: "Amount must be greater than zero.",
+              transactionUpdated: "Transaction updated",
+              transactionCreated: "Transaction created",
+              saveFailed: "Save failed",
+              saveFailedDesc: "The transaction could not be saved.",
+              transactionDeleted: "Transaction deleted",
+              deleteFailed: "Delete failed",
+              deleteFailedDesc: "Could not delete the transaction.",
+              keep: "Keep",
+              delete: "Delete",
+              deleteTransaction: "Delete transaction",
+              deleteTransactionDesc: (label: string) => `Delete "${label}"?`,
+              typeExpense: "Expense",
+              typeIncome: "Income",
+              selectWallet: "Select wallet",
+              whatHappened: "What happened in this transaction?",
+              cancel: "Cancel",
+              saving: "Saving...",
+              updateTransaction: "Update transaction",
+              noWalletFallback: "Unknown",
+          };
+    const getCategoryLabel = (category: string) => {
+        if (category === "Transfer") {
+            return isVietnamese ? "Chuyển khoản" : "Transfer";
+        }
 
-    const categories = [
-        "Ăn uống",
-        "Di chuyển",
-        "Mua sắm",
-        "Giải trí",
-        "Sức khỏe",
-        "Giáo dục",
-        "Hóa đơn",
-        "Khác",
-    ];
+        const match = categoryOptions.find((item) => item.value === category);
+        if (!match) {
+            return category;
+        }
 
+        return language === "vi" ? match.vi : match.en;
+    };
+
+    const getTransactionTypeLabel = (type: Transaction["type"]) =>
+        transactionTypeText[type][language];
+
+    // Locale-derived error labels are intentionally reduced to stable primitives above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
+            if (!token) {
+                return;
+            }
 
-            const [walletRes, txRes] = await Promise.all([
+            const [walletResponse, transactionResponse] = await Promise.all([
                 walletApi.getWallets(token),
                 transactionApi.getTransactions(
                     {
@@ -87,57 +258,57 @@ const Transactions: React.FC = () => {
                 ),
             ]);
 
-            const walletList = walletRes?.wallets || [];
-            if (walletList.length > 0 && !formValues.walletId) {
-                setFormValues((prev) => ({
-                    ...prev,
+            const walletList = walletResponse?.wallets || [];
+            setWallets(walletList);
+            setTransactions(transactionResponse?.data?.transactions || []);
+            setTotalTransactions(transactionResponse?.data?.total || 0);
+
+            if (!formValues.walletId && walletList.length > 0) {
+                setFormValues((current) => ({
+                    ...current,
                     walletId: walletList[0]._id,
                 }));
             }
-            setWallets(walletList);
-            setTransactions(txRes?.data?.transactions || []);
-            setTotalTransactions(txRes?.data?.total || 0);
-        } catch (e) {
-            message.error("Lỗi tải dữ liệu");
+        } catch (error: any) {
+            toast({
+                title: isVietnamese
+                    ? "Không thể tải giao dịch"
+                    : "Could not load transactions",
+                description: error.message || (isVietnamese ? "Vui lòng thử lại." : "Please retry."),
+                variant: "destructive",
+            });
         } finally {
             setLoading(false);
         }
     }, [
+        formValues.walletId,
+        isVietnamese,
         page,
         pageSize,
+        searchQuery,
         selectedCategory,
         selectedWallet,
-        searchQuery,
-        formValues.walletId,
+        toast,
     ]);
 
     useEffect(() => {
         fetchAll();
-    }, [page, selectedCategory, selectedWallet, searchQuery]);
+    }, [fetchAll]);
 
-    const parseAmount = (raw: any) => {
-        if (typeof raw === "number") return raw;
-        if (typeof raw === "string")
-            return parseFloat(raw.replace(/[^0-9.-]/g, "")) || 0;
-        return 0;
-    };
-
-    const handleOpenModal = (t: Transaction | null = null) => {
-        if (t) {
-            setEditing(t);
+    const handleOpenModal = (transaction: Transaction | null = null) => {
+        if (transaction) {
+            setEditing(transaction);
             setFormValues({
                 type:
-                    t.type === "INCOME" || t.type === "EXPENSE"
-                        ? t.type
-                        : "EXPENSE",
-                amount: parseAmount(t.amount),
-                note: t.note || "",
-                category: t.category,
+                    transaction.type === "INCOME" ? "INCOME" : "EXPENSE",
+                amount: parseAmount(transaction.amount),
+                note: transaction.note || "",
+                category: transaction.category,
                 walletId:
-                    typeof t.walletId === "string"
-                        ? t.walletId
-                        : t.walletId?._id || "",
-                date: t.date,
+                    typeof transaction.walletId === "string"
+                        ? transaction.walletId
+                        : transaction.walletId?._id || "",
+                date: dayjs(transaction.date).format("YYYY-MM-DD"),
             });
         } else {
             setEditing(null);
@@ -145,463 +316,499 @@ const Transactions: React.FC = () => {
                 type: "EXPENSE",
                 amount: 0,
                 note: "",
-                category: "Ăn uống",
+                category: categoryOptions[0].value,
                 walletId: wallets[0]?._id || "",
-                date: dayjs().toISOString(),
+                date: dayjs().format("YYYY-MM-DD"),
             });
         }
         setModalOpen(true);
     };
 
+    const resetFilters = () => {
+        setSearchQuery("");
+        setSelectedCategory("");
+        setSelectedWallet("");
+        setPage(1);
+    };
+
     const handleSubmit = async () => {
         if (!formValues.walletId) {
-            message.warning("Vui lòng chọn ví");
+            toast({
+                title: copy.walletRequired,
+                description: copy.walletRequiredDesc,
+                variant: "destructive",
+            });
             return;
         }
+
         if (formValues.amount <= 0) {
-            message.warning("Vui lòng nhập số tiền hợp lệ");
+            toast({
+                title: copy.invalidAmount,
+                description: copy.invalidAmountDesc,
+                variant: "destructive",
+            });
             return;
         }
 
         setSubmitting(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
+            if (!token) {
+                return;
+            }
+
+            const payload = {
+                ...formValues,
+                date: new Date(`${formValues.date}T12:00:00`).toISOString(),
+            };
 
             if (editing) {
-                await transactionApi.updateTransaction(
-                    editing._id,
-                    formValues,
-                    token,
-                );
-                message.success("Đã cập nhật giao dịch");
+                await transactionApi.updateTransaction(editing._id, payload, token);
+                toast({
+                    title: copy.transactionUpdated,
+                    variant: "success",
+                });
             } else {
-                await transactionApi.createTransaction(formValues, token);
-                message.success("Đã thêm giao dịch mới");
+                await transactionApi.createTransaction(payload, token);
+                toast({
+                    title: copy.transactionCreated,
+                    variant: "success",
+                });
             }
+
             setModalOpen(false);
-            fetchAll();
-        } catch (e: any) {
-            message.error(e.message || "Lỗi lưu giao dịch");
+            await fetchAll();
+        } catch (error: any) {
+            toast({
+                title: copy.saveFailed,
+                description: error.message || copy.saveFailedDesc,
+                variant: "destructive",
+            });
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
+    const handleDelete = async () => {
+        if (!pendingDelete) {
+            return;
+        }
+
+        setSubmitting(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
-            await transactionApi.deleteTransaction(id, token);
-            message.success("Đã xóa giao dịch");
-            fetchAll();
-        } catch (e: any) {
-            message.error(e.message || "Lỗi xóa giao dịch");
+            if (!token) {
+                return;
+            }
+            await transactionApi.deleteTransaction(pendingDelete._id, token);
+            toast({
+                title: copy.transactionDeleted,
+                variant: "success",
+            });
+            setPendingDelete(null);
+            await fetchAll();
+        } catch (error: any) {
+            toast({
+                title: copy.deleteFailed,
+                description: error.message || copy.deleteFailedDesc,
+                variant: "destructive",
+            });
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    if (loading)
+    const totals = useMemo(() => {
+        return transactions.reduce(
+            (result, transaction) => {
+                const amount = parseAmount(transaction.amount);
+                if (transaction.type === "INCOME") {
+                    result.income += amount;
+                } else {
+                    result.expense += amount;
+                }
+                return result;
+            },
+            { income: 0, expense: 0 },
+        );
+    }, [transactions]);
+
+    const totalPages = Math.max(1, Math.ceil(totalTransactions / pageSize));
+
+    if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Spin size="large" />
+            <div className="flex min-h-[420px] items-center justify-center">
+                <Spinner className="h-8 w-8" />
             </div>
         );
+    }
 
     return (
-        <div className="flex-1 space-y-8 animate-in fade-in duration-500">
-            {/* Page Title & Add Button */}
-            <div className="flex justify-between items-end mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight dark:text-white">
-                        Giao dịch
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                        Tra cứu và quản lý tất cả các hoạt động tài chính của
-                        bạn
-                    </p>
-                </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-primary/20"
-                >
-                    <span className="material-symbols-outlined">
-                        add_circle
-                    </span>
-                    <span>Thêm giao dịch</span>
-                </button>
+        <div className="space-y-6">
+            <PageHeader
+                actions={
+                    <Button onClick={() => handleOpenModal()}>
+                        <Plus className="h-4 w-4" />
+                        {copy.newTransaction}
+                    </Button>
+                }
+                description={copy.pageDescription}
+                title={copy.pageTitle}
+            />
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <Card>
+                    <CardContent className="p-5">
+                        <p className="text-sm text-muted-foreground">{copy.pageIncome}</p>
+                        <p className="mt-2 text-2xl font-semibold text-emerald-600">
+                            {formatCurrency(totals.income)}
+                        </p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-5">
+                        <p className="text-sm text-muted-foreground">{copy.pageExpense}</p>
+                        <p className="mt-2 text-2xl font-semibold text-rose-600">
+                            {formatCurrency(totals.expense)}
+                        </p>
+                    </CardContent>
+                </Card>
+                <Card className="md:col-span-2">
+                    <CardContent className="p-5">
+                        <div className="grid gap-3 md:grid-cols-[1.3fr,1fr,1fr,auto]">
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    className="pl-9"
+                                    onChange={(event) => {
+                                        setPage(1);
+                                        setSearchQuery(event.target.value);
+                                    }}
+                                    placeholder={copy.searchByNote}
+                                    value={searchQuery}
+                                />
+                            </div>
+
+                            <Select
+                                onChange={(event) => {
+                                    setPage(1);
+                                    setSelectedCategory(event.target.value);
+                                }}
+                                value={selectedCategory}
+                            >
+                                <option value="">{copy.allCategories}</option>
+                                {categoryOptions.map((category) => (
+                                    <option key={category.value} value={category.value}>
+                                        {language === "vi" ? category.vi : category.en}
+                                    </option>
+                                ))}
+                            </Select>
+
+                            <Select
+                                onChange={(event) => {
+                                    setPage(1);
+                                    setSelectedWallet(event.target.value);
+                                }}
+                                value={selectedWallet}
+                            >
+                                <option value="">{copy.allWallets}</option>
+                                {wallets.map((wallet) => (
+                                    <option key={wallet._id} value={wallet._id}>
+                                        {wallet.name}
+                                    </option>
+                                ))}
+                            </Select>
+
+                            <Button onClick={resetFilters} variant="outline">
+                                <Filter className="h-4 w-4" />
+                                {copy.reset}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
-            {/* Filters Section */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative flex-1 min-w-[240px]">
-                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                            search
-                        </span>
-                        <input
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-primary dark:text-slate-200"
-                            placeholder="Tìm kiếm giao dịch theo ghi chú..."
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-
-                    <Select
-                        className="min-w-[150px]"
-                        placeholder="Hạng mục"
-                        allowClear
-                        value={selectedCategory}
-                        onChange={(v) => setSelectedCategory(v || null)}
-                    >
-                        {categories.map((c) => (
-                            <Select.Option key={c} value={c}>
-                                {c}
-                            </Select.Option>
-                        ))}
-                    </Select>
-
-                    <Select
-                        className="min-w-[150px]"
-                        placeholder="Ví tiền"
-                        allowClear
-                        value={selectedWallet}
-                        onChange={(v) => setSelectedWallet(v || null)}
-                    >
-                        {wallets.map((w) => (
-                            <Select.Option key={w._id} value={w._id}>
-                                {w.name}
-                            </Select.Option>
-                        ))}
-                    </Select>
-
-                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                    <button
-                        className="text-primary text-sm font-semibold hover:underline"
-                        onClick={() => {
-                            setSearchQuery("");
-                            setSelectedCategory(null);
-                            setSelectedWallet(null);
-                        }}
-                    >
-                        Xóa bộ lọc
-                    </button>
-                </div>
-            </div>
-
-            {/* Transaction Table Card (Sync with Dashboard Style) */}
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Mô tả
-                                </th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Hạng mục
-                                </th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Ngày & Giờ
-                                </th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Ví
-                                </th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">
-                                    Số tiền
-                                </th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">
-                                    Thao tác
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {transactions.map((t) => (
-                                <tr
-                                    key={t._id}
-                                    className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer"
-                                    onClick={() => handleOpenModal(t)}
-                                >
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div
-                                                className={`size-10 rounded-lg flex items-center justify-center ${t.type === "INCOME" ? "bg-emerald-100 text-emerald-600" : "bg-orange-100 text-orange-600"} dark:bg-opacity-10 shadow-sm transition-transform group-hover:scale-105`}
+            <Card>
+                <CardHeader>
+                    <CardTitle>{copy.transactionList}</CardTitle>
+                    <CardDescription>
+                        {copy.transactionListDesc(page, totalPages, totalTransactions)}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {transactions.length > 0 ? (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[860px] text-left">
+                                    <thead>
+                                        <tr className="border-b border-border text-sm text-muted-foreground">
+                                            <th className="pb-3 font-medium">{copy.note}</th>
+                                            <th className="pb-3 font-medium">{copy.category}</th>
+                                            <th className="pb-3 font-medium">{copy.wallet}</th>
+                                            <th className="pb-3 font-medium">{copy.date}</th>
+                                            <th className="pb-3 font-medium">{copy.type}</th>
+                                            <th className="pb-3 font-medium text-right">{copy.amount}</th>
+                                            <th className="pb-3 font-medium text-right">{copy.action}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {transactions.map((transaction) => (
+                                            <tr
+                                                key={transaction._id}
+                                                className="border-b border-border/70 text-sm last:border-b-0"
                                             >
-                                                <span className="material-symbols-outlined text-lg">
-                                                    {t.type === "INCOME"
-                                                        ? "payments"
-                                                        : "shopping_cart"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white">
-                                                    {t.note ||
-                                                        "Không có ghi chú"}
-                                                </p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                    ID:{" "}
-                                                    {t._id
-                                                        .slice(-6)
-                                                        .toUpperCase()}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span
-                                            className={`px-3 py-1 text-xs font-bold rounded-full uppercase italic ${t.type === "INCOME" ? "bg-emerald-100 text-emerald-600" : "bg-primary/10 text-primary"}`}
-                                        >
-                                            {t.category}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
-                                        {formatDate(t.date)}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400 font-medium">
-                                        {typeof t.walletId === "string"
-                                            ? t.walletId
-                                            : (t.walletId as any)?.name ||
-                                              "Ví chính"}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <span
-                                            className={`font-bold ${t.type === "INCOME" ? "text-emerald-500" : "text-red-500"}`}
-                                        >
-                                            {t.type === "INCOME" ? "+" : "-"}
-                                            {formatCurrency(
-                                                parseAmount(t.amount),
-                                            )}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <Popconfirm
-                                            title="Bạn có chắc chắn muốn xóa giao dịch này?"
-                                            onConfirm={(e) => {
-                                                e?.stopPropagation();
-                                                handleDelete(t._id);
-                                            }}
-                                            onCancel={(e) =>
-                                                e?.stopPropagation()
-                                            }
-                                            okText="Xóa"
-                                            cancelText="Hủy"
-                                            okButtonProps={{ danger: true }}
-                                        >
-                                            <button
-                                                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                                                onClick={(e) =>
-                                                    e.stopPropagation()
-                                                }
-                                            >
-                                                <span className="material-symbols-outlined">
-                                                    delete
-                                                </span>
-                                            </button>
-                                        </Popconfirm>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                                <td className="py-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-[var(--app-radius-md)] bg-primary-soft text-primary">
+                                                            <ReceiptText className="h-4 w-4" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-foreground">
+                                                                {transaction.note || copy.untitledTransaction}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                ID {transaction._id.slice(-6).toUpperCase()}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 text-muted-foreground">
+                                                    {getCategoryLabel(transaction.category)}
+                                                </td>
+                                                <td className="py-4 text-muted-foreground">
+                                                    {typeof transaction.walletId === "string"
+                                                        ? transaction.walletId
+                                                        : transaction.walletId?.name || copy.noWalletFallback}
+                                                </td>
+                                                <td className="py-4 text-muted-foreground">
+                                                    {formatDate(transaction.date)}
+                                                </td>
+                                                <td className="py-4">
+                                                    <Badge
+                                                        variant={
+                                                            transaction.type === "INCOME"
+                                                                ? "success"
+                                                                : "danger"
+                                                        }
+                                                    >
+                                                        {getTransactionTypeLabel(transaction.type)}
+                                                    </Badge>
+                                                </td>
+                                                <td className="py-4 text-right font-semibold">
+                                                    <span
+                                                        className={
+                                                            transaction.type === "INCOME"
+                                                                ? "text-emerald-600"
+                                                                : "text-rose-600"
+                                                        }
+                                                    >
+                                                        {transaction.type === "INCOME" ? "+" : "-"}
+                                                        {formatCurrency(parseAmount(transaction.amount))}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4">
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            onClick={() => handleOpenModal(transaction)}
+                                                            size="icon"
+                                                            variant="ghost"
+                                                        >
+                                                            <PencilLine className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => setPendingDelete(transaction)}
+                                                            size="icon"
+                                                            variant="ghost"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
 
-                <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
-                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                        Hiển thị {transactions.length} trên {totalTransactions}{" "}
-                        giao dịch
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <button
-                            className={`size-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 ${page === 1 ? "cursor-not-allowed opacity-50" : "hover:bg-slate-100"}`}
-                            onClick={() =>
-                                setPage((prev) => Math.max(1, prev - 1))
+                            <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <p className="text-sm text-muted-foreground">
+                                    {copy.showingRows(transactions.length)}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        disabled={page <= 1}
+                                        onClick={() => setPage((current) => Math.max(1, current - 1))}
+                                        variant="outline"
+                                    >
+                                        {copy.previous}
+                                    </Button>
+                                    <Button
+                                        disabled={page >= totalPages}
+                                        onClick={() =>
+                                            setPage((current) => Math.min(totalPages, current + 1))
+                                        }
+                                        variant="outline"
+                                    >
+                                        {copy.next}
+                                    </Button>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <EmptyState
+                            actionLabel={wallets.length > 0 ? copy.createTransaction : undefined}
+                            description={
+                                wallets.length > 0
+                                    ? copy.noTransactionsDescWithWallet
+                                    : copy.noTransactionsDescWithoutWallet
                             }
-                            disabled={page === 1}
-                        >
-                            <span className="material-symbols-outlined text-lg">
-                                chevron_left
-                            </span>
-                        </button>
+                            icon={ReceiptText}
+                            onAction={wallets.length > 0 ? () => handleOpenModal() : undefined}
+                            title={copy.noTransactions}
+                        />
+                    )}
+                </CardContent>
+            </Card>
 
-                        <span className="px-3 text-sm font-bold dark:text-white">
-                            Trang {page}
-                        </span>
-
-                        <button
-                            className={`size-8 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 ${transactions.length < pageSize ? "cursor-not-allowed opacity-50" : "hover:bg-slate-100"}`}
-                            onClick={() => setPage((prev) => prev + 1)}
-                            disabled={transactions.length < pageSize}
-                        >
-                            <span className="material-symbols-outlined text-lg">
-                                chevron_right
-                            </span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <Modal
-                title={editing ? "Sửa giao dịch" : "Thêm giao dịch mới"}
+            <Dialog
+                description={copy.formDescription}
+                onClose={() => setModalOpen(false)}
                 open={modalOpen}
-                onCancel={() => setModalOpen(false)}
-                onOk={handleSubmit}
-                confirmLoading={submitting}
-                okText={editing ? "Cập nhật" : "Lưu lại"}
-                cancelText="Hủy"
-                centered
-                className="premium-modal"
-                width={600}
-                footer={null}
+                title={editing ? copy.editTransaction : copy.createTransactionTitle}
             >
-                <div className="py-2 space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Loại
-                            </label>
+                <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.type}</label>
                             <Select
-                                className="w-full h-11"
-                                options={[
-                                    { label: "Chi tiêu", value: "EXPENSE" },
-                                    { label: "Thu nhập", value: "INCOME" },
-                                ]}
-                                placeholder="Chọn loại..."
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        type: event.target.value as "INCOME" | "EXPENSE",
+                                    }))
+                                }
                                 value={formValues.type}
-                                onChange={(v) =>
-                                    setFormValues((prev) => ({
-                                        ...prev,
-                                        type: v as any,
+                            >
+                                <option value="EXPENSE">{copy.typeExpense}</option>
+                                <option value="INCOME">{copy.typeIncome}</option>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.amount}</label>
+                            <Input
+                                min={0}
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        amount: Number(event.target.value) || 0,
                                     }))
                                 }
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Số tiền (₫)
-                            </label>
-                            <InputNumber
-                                className="w-full h-11 rounded-xl"
-                                size="large"
-                                placeholder="0"
+                                type="number"
                                 value={formValues.amount}
-                                onChange={(v) =>
-                                    setFormValues((prev) => ({
-                                        ...prev,
-                                        amount: Number(v) || 0,
-                                    }))
-                                }
-                                formatter={(v) =>
-                                    `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                                }
-                                parser={(v) =>
-                                    parseFloat(v!.replace(/\$\s?|(,*)/g, "")) ||
-                                    0
-                                }
                             />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Hạng mục
-                            </label>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.category}</label>
                             <Select
-                                className="w-full h-11"
-                                options={categories.map((c) => ({
-                                    label: c,
-                                    value: c,
-                                }))}
-                                placeholder="Chọn hạng mục..."
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        category: event.target.value,
+                                    }))
+                                }
                                 value={formValues.category}
-                                onChange={(v) =>
-                                    setFormValues((prev) => ({
-                                        ...prev,
-                                        category: v,
-                                    }))
-                                }
-                            />
+                            >
+                                {categoryOptions.map((category) => (
+                                    <option key={category.value} value={category.value}>
+                                        {language === "vi" ? category.vi : category.en}
+                                    </option>
+                                ))}
+                            </Select>
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Ví tiền
-                            </label>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.wallet}</label>
                             <Select
-                                className="w-full h-11"
-                                options={wallets.map((w) => ({
-                                    label: w.name,
-                                    value: w._id,
-                                }))}
-                                placeholder="Chọn ví..."
-                                value={formValues.walletId}
-                                onChange={(v) =>
-                                    setFormValues((prev) => ({
-                                        ...prev,
-                                        walletId: v,
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        walletId: event.target.value,
                                     }))
                                 }
-                            />
+                                value={formValues.walletId}
+                            >
+                                <option value="">{copy.selectWallet}</option>
+                                {wallets.map((wallet) => (
+                                    <option key={wallet._id} value={wallet._id}>
+                                        {wallet.name}
+                                    </option>
+                                ))}
+                            </Select>
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Ngày giao dịch
-                        </label>
-                        <DatePicker
-                            className="w-full h-11 rounded-xl"
-                            format="DD/MM/YYYY"
-                            value={dayjs(formValues.date)}
-                            onChange={(d) =>
-                                setFormValues((prev) => ({
-                                    ...prev,
-                                    date: d
-                                        ? d.toISOString()
-                                        : dayjs().toISOString(),
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.date}</label>
+                        <Input
+                            onChange={(event) =>
+                                setFormValues((current) => ({
+                                    ...current,
+                                    date: event.target.value,
                                 }))
                             }
+                            type="date"
+                            value={formValues.date}
                         />
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Ghi chú
-                        </label>
-                        <Input.TextArea
-                            rows={3}
-                            placeholder="Mô tả nội dung giao dịch..."
-                            className="rounded-xl bg-slate-50 dark:bg-slate-800 border-none"
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.note}</label>
+                        <Textarea
+                            onChange={(event) =>
+                                setFormValues((current) => ({
+                                    ...current,
+                                    note: event.target.value,
+                                }))
+                            }
+                            placeholder={copy.whatHappened}
                             value={formValues.note}
-                            onChange={(e) =>
-                                setFormValues((prev) => ({
-                                    ...prev,
-                                    note: e.target.value,
-                                }))
-                            }
                         />
                     </div>
 
-                    <div className="flex justify-end pt-4 gap-3">
-                        <button
-                            onClick={() => setModalOpen(false)}
-                            className="h-11 px-8 rounded-xl uppercase text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            disabled={submitting}
-                        >
-                            Hủy
-                        </button>
-                        <button
-                            className="bg-primary text-white h-11 px-8 rounded-xl uppercase text-xs font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100"
-                            onClick={handleSubmit}
-                            disabled={submitting}
-                        >
-                            {submitting ? (
-                                <Spin size="small" className="mr-2" />
-                            ) : null}
-                            {editing ? "Cập nhật" : "Lưu lại"}
-                        </button>
+                    <div className="flex justify-end gap-3">
+                        <Button onClick={() => setModalOpen(false)} variant="outline">
+                            {copy.cancel}
+                        </Button>
+                        <Button disabled={submitting} onClick={handleSubmit}>
+                            {submitting
+                                ? copy.saving
+                                : editing
+                                  ? copy.updateTransaction
+                                  : copy.createTransaction}
+                        </Button>
                     </div>
                 </div>
-            </Modal>
+            </Dialog>
+
+            <ConfirmDialog
+                busy={submitting}
+                cancelLabel={copy.keep}
+                confirmLabel={copy.delete}
+                description={
+                    pendingDelete
+                        ? copy.deleteTransactionDesc(
+                              pendingDelete.note || getCategoryLabel(pendingDelete.category),
+                          )
+                        : ""
+                }
+                onClose={() => setPendingDelete(null)}
+                onConfirm={handleDelete}
+                open={!!pendingDelete}
+                title={copy.deleteTransaction}
+                variant="destructive"
+            />
         </div>
     );
 };

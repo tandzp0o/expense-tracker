@@ -1,103 +1,159 @@
-import React, { useState, useEffect } from "react";
-import { Dropdown, Avatar } from "antd";
-import { LogoutOutlined, UserOutlined } from "@ant-design/icons";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+    ChevronDown,
+    LogOut,
+    Menu,
+    Settings,
+    UserRound,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useLocale } from "../contexts/LocaleContext";
+import { Avatar } from "../components/ui/avatar";
+import { Button } from "../components/ui/button";
 import ThemeSwitcher from "../components/ThemeSwitcher";
+import { buildNavigationItems } from "./navigation";
+import { cn } from "../lib/utils";
 
 interface HeaderProps {
     onMenuClick?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
-    const navigate = useNavigate();
     const location = useLocation();
+    const navigate = useNavigate();
     const { logout, currentUser } = useAuth();
-    const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
+    const { language, isVietnamese } = useLocale();
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement | null>(null);
+    const navigationItems = useMemo(
+        () => buildNavigationItems(language),
+        [language],
+    );
 
     useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth <= 1024);
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                menuRef.current &&
+                !menuRef.current.contains(event.target as Node)
+            ) {
+                setMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const getPageTitle = () => {
-        const path = location.pathname.split("/")[1];
-        const titles: Record<string, string> = {
-            dashboard: "Tổng quan tài chính",
-            wallets: "Quản lý nguồn tiền",
-            transactions: "Dòng tiền giao dịch",
-            goals: "Mục tiêu tích lũy",
-            profile: "Tài khoản cá nhân",
-            dishes: "Gợi ý ăn uống",
-            analytics: "Báo cáo chuyên sâu",
-            budgets: "Hạn mức chi tiêu",
-        };
-        return titles[path] || "FinTrack";
-    };
-
-    const getPageIcon = () => {
-        const path = location.pathname.split("/")[1];
-        const icons: Record<string, string> = {
-            dashboard: "dashboard",
-            wallets: "account_balance",
-            transactions: "swap_horiz",
-            goals: "track_changes",
-            profile: "settings",
-            dishes: "restaurant",
-            analytics: "pie_chart",
-            budgets: "payments",
-        };
-        return icons[path] || "dashboard";
-    };
-
-    const userMenuItems = [
-        { key: "profile", icon: <UserOutlined />, label: <span className="font-bold">Hồ sơ cá nhân</span>, onClick: () => navigate("/profile") },
-        { key: "logout", icon: <LogoutOutlined />, label: <span className="font-bold text-rose-500">Đăng xuất</span>, onClick: logout },
-    ];
+    const currentPage = useMemo(
+        () =>
+            navigationItems.find((item) => item.to === location.pathname) || {
+                label: "FinTrack",
+            },
+        [location.pathname, navigationItems],
+    );
 
     return (
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-6 md:px-8 shrink-0 sticky top-0 z-50">
-            <div className="flex items-center gap-4">
-                {isMobile && (
-                    <button onClick={onMenuClick} className="size-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-xl">menu</span>
-                    </button>
-                )}
-                <div className="flex items-center gap-2 text-primary">
-                    <span className="material-symbols-outlined text-xl">{getPageIcon()}</span>
-                    <h2 className="text-lg font-bold">{getPageTitle()}</h2>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-                <div className="hidden lg:block relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" style={{ fontSize: '16px' }}>search</span>
-                    <input className="pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary w-56 dark:text-white" placeholder="Tìm nhanh..." />
-                </div>
-
+        <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
+            <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6">
                 <div className="flex items-center gap-3">
-                    <ThemeSwitcher />
-                    <button className="relative text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
-                        <span className="material-symbols-outlined">notifications</span>
-                        <span className="absolute top-0 right-0 size-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
-                    </button>
+                    <Button
+                        className="md:hidden"
+                        onClick={onMenuClick}
+                        size="icon"
+                        variant="outline"
+                    >
+                        <Menu className="h-4 w-4" />
+                    </Button>
+                    <div>
+                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                            {isVietnamese ? "Không gian làm việc" : "Workspace"}
+                        </p>
+                        <h1 className="text-base font-semibold text-foreground">
+                            {currentPage.label}
+                        </h1>
+                    </div>
+                </div>
 
-                    <Dropdown menu={{ items: userMenuItems }} trigger={["click"]} placement="bottomRight">
-                        <div className="flex items-center gap-3 border-l border-slate-200 dark:border-slate-800 pl-3 cursor-pointer">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-sm font-semibold dark:text-white leading-tight">{currentUser?.displayName || "FinTracker"}</p>
-                                <p className="text-xs text-slate-500">Gói Premium</p>
+                <div className="flex items-center gap-2">
+                    <ThemeSwitcher />
+
+                    <div className="relative" ref={menuRef}>
+                        <button
+                            className="flex items-center gap-3 rounded-[var(--app-radius-lg)] border border-border bg-card px-3 py-2 text-left shadow-sm transition-colors hover:bg-muted/60"
+                            onClick={() => setMenuOpen((current) => !current)}
+                            type="button"
+                        >
+                            <Avatar
+                                alt={currentUser?.displayName}
+                                fallback={currentUser?.displayName || "FT"}
+                                src={(currentUser as any)?.photoURL}
+                            />
+                            <div className="hidden sm:block">
+                                <p className="text-sm font-medium text-foreground">
+                                    {currentUser?.displayName ||
+                                        (isVietnamese
+                                            ? "Người dùng FinTrack"
+                                            : "FinTrack user")}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {currentUser?.email ||
+                                        (isVietnamese
+                                            ? "Đã xác thực"
+                                            : "Authenticated")}
+                                </p>
                             </div>
-                            <div className="size-9 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex items-center justify-center">
-                                {(currentUser as any)?.photoURL ? (
-                                    <img src={(currentUser as any).photoURL} className="w-full h-full object-cover" alt="Avatar" />
-                                ) : (
-                                    <span className="material-symbols-outlined text-slate-400" style={{ fontSize: '18px' }}>person</span>
-                                )}
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        </button>
+
+                        {menuOpen ? (
+                            <div className="absolute right-0 mt-2 w-56 rounded-[var(--app-radius-lg)] border border-border bg-card p-2 shadow-soft">
+                                <Link
+                                    className={cn(
+                                        "flex items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                                    )}
+                                    onClick={() => setMenuOpen(false)}
+                                    to="/profile"
+                                >
+                                    <UserRound className="h-4 w-4" />
+                                    <span>
+                                        {isVietnamese
+                                            ? "Hồ sơ cá nhân"
+                                            : "Profile"}
+                                    </span>
+                                </Link>
+                                <Link
+                                    className={cn(
+                                        "flex items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                                    )}
+                                    onClick={() => setMenuOpen(false)}
+                                    to="/settings"
+                                >
+                                    <Settings className="h-4 w-4" />
+                                    <span>
+                                        {isVietnamese
+                                            ? "Cài đặt hệ thống"
+                                            : "Settings"}
+                                    </span>
+                                </Link>
+                                <button
+                                    className="flex w-full items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                    onClick={async () => {
+                                        setMenuOpen(false);
+                                        await logout();
+                                        navigate("/login");
+                                    }}
+                                    type="button"
+                                >
+                                    <LogOut className="h-4 w-4" />
+                                    <span>
+                                        {isVietnamese
+                                            ? "Đăng xuất"
+                                            : "Sign out"}
+                                    </span>
+                                </button>
                             </div>
-                        </div>
-                    </Dropdown>
+                        ) : null}
+                    </div>
                 </div>
             </div>
         </header>

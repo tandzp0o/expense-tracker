@@ -1,27 +1,47 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import {
-    App,
-    Input,
-    InputNumber,
-    Modal,
-    Spin,
-    Select,
-    Popconfirm,
-} from "antd";
+    ArrowLeftRight,
+    Building2,
+    Car,
+    CreditCard,
+    Home,
+    Plane,
+    Plus,
+    ShoppingCart,
+    Smartphone,
+    Trash2,
+    UtensilsCrossed,
+    Wallet,
+    WalletCards,
+} from "lucide-react";
 import { auth } from "../firebase/config";
-import { walletApi, transactionApi, userApi } from "../services/api";
+import { transactionApi, userApi, walletApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
-import LineChart from "../components/charts/LineChart";
-import SpotlightGuide from "../components/SpotlightGuide";
 import { useAuth } from "../contexts/AuthContext";
-
-const { confirm } = Modal;
+import { useLocale } from "../contexts/LocaleContext";
+import { useToast } from "../contexts/ToastContext";
+import { useTheme } from "../contexts/ThemeContext";
+import { hexToRgba } from "../lib/utils";
+import { PageHeader } from "../components/app/page-header";
+import { MetricCard } from "../components/app/metric-card";
+import { EmptyState } from "../components/app/empty-state";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Dialog } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Select } from "../components/ui/select";
+import { Spinner } from "../components/ui/spinner";
+import SpotlightGuide from "../components/SpotlightGuide";
+import LineChart from "../components/charts/LineChart";
 
 dayjs.locale("vi");
 
-interface Wallet {
+interface WalletItem {
     _id: string;
     name: string;
     accountNumber?: string;
@@ -49,36 +69,301 @@ type GuideConfig = {
     onAction?: () => void;
 };
 
-const Wallets: React.FC = () => {
-    const { message } = App.useApp();
-    const { currentUser, updateUserStatus } = useAuth();
-    const [loading, setLoading] = useState(true);
-    const [wallets, setWallets] = useState<Wallet[]>([]);
-    const [modalOpen, setModalOpen] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-    const [editing, setEditing] = useState<Wallet | null>(null);
-    const [stats, setStats] = useState<any>(null);
-    const [timeRange, setTimeRange] = useState<"MONTH" | "QUARTER" | "YEAR">(
-        "MONTH",
-    );
+const walletIconMap = {
+    account_balance: Building2,
+    payments: Wallet,
+    credit_card: CreditCard,
+    phone_android: Smartphone,
+    wallet: WalletCards,
+    home: Home,
+    directions_car: Car,
+    flight: Plane,
+    shopping_cart: ShoppingCart,
+    restaurant: UtensilsCrossed,
+} as const;
 
-    // Form states for Create/Update
+const iconOptions = [
+    { vi: "Ngân hàng", en: "Bank", value: "account_balance" },
+    { vi: "Tiền mặt", en: "Cash", value: "payments" },
+    { vi: "Thẻ", en: "Card", value: "credit_card" },
+    { vi: "Điện thoại", en: "Phone", value: "phone_android" },
+    { vi: "Ví", en: "Wallet", value: "wallet" },
+    { vi: "Nhà", en: "Home", value: "home" },
+    { vi: "Xe", en: "Car", value: "directions_car" },
+    { vi: "Du lịch", en: "Travel", value: "flight" },
+    { vi: "Mua sắm", en: "Shopping", value: "shopping_cart" },
+    { vi: "Ăn uống", en: "Food", value: "restaurant" },
+] as const;
+
+const walletTypeText = {
+    cash: { vi: "Tiền mặt", en: "Cash" },
+    bank: { vi: "Ngân hàng", en: "Bank" },
+    ewallet: { vi: "Ví điện tử", en: "E-wallet" },
+} as const;
+
+const colorOptions = [
+    "#2563eb",
+    "#0f766e",
+    "#7c3aed",
+    "#dc2626",
+    "#ea580c",
+    "#0891b2",
+    "#475569",
+];
+
+const Wallets: React.FC = () => {
+    const { currentUser, updateUserStatus } = useAuth();
+    const { language, isVietnamese } = useLocale();
+    const { toast } = useToast();
+    const { appearance } = useTheme();
+    const copy = isVietnamese
+        ? {
+              loadFailed: "Không thể tải ví",
+              retry: "Vui lòng thử lại.",
+              walletNameRequired: "Cần nhập tên ví",
+              walletNameRequiredDesc: "Vui lòng nhập tên ví.",
+              walletUpdated: "Đã cập nhật ví",
+              walletCreated: "Đã tạo ví",
+              initialBalanceLocked: "Số dư ban đầu đã bị khóa",
+              initialBalanceLockedDesc:
+                  "Ví này đã có giao dịch. Hãy dùng giao dịch điều chỉnh thay vì sửa số dư ban đầu.",
+              currencyCannotChange: "Không thể đổi tiền tệ",
+              currencyCannotChangeDesc:
+                  "Ví này đã có giao dịch. Hãy tạo ví mới nếu cần dùng loại tiền khác.",
+              saveFailed: "Lưu thất bại",
+              saveFailedDesc: "Không thể lưu ví.",
+              walletArchived: "Ví đã được lưu trữ",
+              walletDeleted: "Đã xóa ví",
+              deleteFailed: "Xóa thất bại",
+              deleteFailedDesc: "Không thể xóa ví.",
+              walletSelectionRequired: "Cần chọn ví",
+              walletSelectionRequiredDesc: "Hãy chọn cả ví nguồn và ví đích.",
+              differentWalletsRequired: "Hai ví phải khác nhau",
+              differentWalletsRequiredDesc: "Ví nguồn và ví đích không được trùng nhau.",
+              invalidTransferAmount: "Số tiền chuyển không hợp lệ",
+              invalidTransferAmountDesc: "Số tiền phải lớn hơn 0.",
+              transferCompleted: "Đã chuyển tiền",
+              transferFailed: "Chuyển tiền thất bại",
+              transferFailedDesc: "Không thể hoàn tất chuyển tiền nội bộ.",
+              firstWalletGuide: "Tạo ví đầu tiên",
+              firstWalletGuideDesc:
+                  "Mở form tạo ví trước. Hướng dẫn sẽ tiếp tục trên các trường trong hộp thoại.",
+              clearNameGuide: "Đặt tên dễ nhận biết",
+              clearNameGuideDesc:
+                  "Ví dụ: Tiền mặt, Techcombank hoặc Momo. Khi bạn nhập tên, hướng dẫn sẽ chuyển bước tiếp theo.",
+              walletTypeGuide: "Chọn đúng loại ví",
+              walletTypeGuideDesc:
+                  "Loại ví ảnh hưởng tới cách hệ thống gom số dư trong báo cáo.",
+              startingBalanceGuide: "Nhập số dư ban đầu",
+              startingBalanceGuideDesc:
+                  "Đây là số tiền hiện đang có trong ví tại thời điểm tạo.",
+              saveGuide: "Lưu để tiếp tục",
+              saveGuideDesc:
+                  "Sau khi lưu ví đầu tiên, ứng dụng sẽ mở khóa giao dịch, ngân sách và mục tiêu.",
+              continue: "Tiếp tục",
+              stepLabel: (step: number) => `Bước ${step}/5`,
+              pageTitle: "Ví tiền",
+              pageDescription:
+                  "Màn ví giữ nguyên luồng tạo, cập nhật, lưu trữ/xóa và chuyển nội bộ theo các API hiện có.",
+              newWallet: "Thêm ví",
+              totalBalance: "Tổng số dư",
+              activeWallets: (count: number) => `${count} ví đang hoạt động`,
+              walletCount: "Số lượng ví",
+              monthOverMonthGrowth: (growth: number) =>
+                  `${growth}% tăng trưởng tài sản theo tháng`,
+              transfersReady: "Sẵn sàng chuyển",
+              transferReadyDesc:
+                  "Chuyển nội bộ được tạo ở client bằng cách ghi 2 giao dịch đối ứng",
+              yes: "Có",
+              needTwoWallets: "Cần 2 ví",
+              hasHistory: "Đã có giao dịch",
+              edit: "Chỉnh sửa",
+              balanceTrend: "Xu hướng số dư",
+              balanceTrendDesc: "Lịch sử 6 tháng từ API thống kê hồ sơ.",
+              internalTransfer: "Chuyển nội bộ",
+              internalTransferDesc:
+                  "Màn này tạo một giao dịch chi và một giao dịch thu vì backend chưa có transfer endpoint riêng.",
+              fromWallet: "Từ ví",
+              toWallet: "Đến ví",
+              selectSource: "Chọn ví nguồn",
+              selectDestination: "Chọn ví đích",
+              amount: "Số tiền",
+              transferNow: "Chuyển ngay",
+              notEnoughWallets: "Chưa đủ ví",
+              notEnoughWalletsDesc:
+                  "Hãy tạo ít nhất 2 ví trước khi dùng chuyển nội bộ.",
+              noWallets: "Chưa có ví",
+              noWalletsDesc:
+                  "Ví là thực thể gốc cho giao dịch, phân tích và theo dõi số dư.",
+              createWallet: "Tạo ví",
+              formDescription:
+                  "Biểu mẫu ví giữ nguyên upload ảnh, icon, màu, loại ví, tiền tệ và các rule nghiệp vụ từ backend.",
+              editWallet: "Chỉnh sửa ví",
+              createWalletTitle: "Tạo ví",
+              cardImage: "Ảnh thẻ",
+              walletPreview: "Xem trước ví",
+              walletName: "Tên ví",
+              walletNamePlaceholder: "Tiền mặt, Techcombank, Momo...",
+              accountNumber: "Số tài khoản",
+              walletType: "Loại ví",
+              currency: "Tiền tệ",
+              icon: "Biểu tượng",
+              auto: "Tự động",
+              accentColor: "Màu nhấn",
+              startingBalance: "Số dư ban đầu",
+              cancel: "Hủy",
+              saving: "Đang lưu...",
+              updateWallet: "Cập nhật ví",
+              keep: "Giữ lại",
+              archive: "Lưu trữ",
+              delete: "Xóa",
+              removeWallet: "Xóa ví",
+              archiveWalletDesc:
+                  "Ví này đã có giao dịch nên sẽ được lưu trữ thay vì xóa cứng.",
+              deleteWalletDesc: (name: string) => `Xóa ví "${name}"?`,
+              confirmTypeChange: "Xác nhận đổi loại ví",
+              changeType: "Đổi loại",
+              changeTypeDesc:
+                  "Đổi loại ví sẽ ảnh hưởng cách các báo cáo lịch sử phân loại ví này. Bạn có muốn tiếp tục không?",
+              balanceSeriesLabel: "Số dư",
+              transferCategory: "Transfer",
+              transferTo: (name?: string) => `Chuyển tới ${name || "ví đích"}`,
+              transferFrom: (name?: string) => `Nhận từ ${name || "ví nguồn"}`,
+          }
+        : {
+              loadFailed: "Could not load wallets",
+              retry: "Please retry.",
+              walletNameRequired: "Wallet name required",
+              walletNameRequiredDesc: "Please enter a wallet name.",
+              walletUpdated: "Wallet updated",
+              walletCreated: "Wallet created",
+              initialBalanceLocked: "Initial balance locked",
+              initialBalanceLockedDesc:
+                  "This wallet already has transactions. Use an adjustment transaction instead of changing initial balance.",
+              currencyCannotChange: "Currency cannot be changed",
+              currencyCannotChangeDesc:
+                  "This wallet already has transactions. Create a new wallet for another currency.",
+              saveFailed: "Save failed",
+              saveFailedDesc: "Wallet could not be saved.",
+              walletArchived: "Wallet archived",
+              walletDeleted: "Wallet deleted",
+              deleteFailed: "Delete failed",
+              deleteFailedDesc: "Wallet could not be removed.",
+              walletSelectionRequired: "Wallet selection required",
+              walletSelectionRequiredDesc: "Choose both source and destination wallets.",
+              differentWalletsRequired: "Different wallets required",
+              differentWalletsRequiredDesc: "Source and destination wallets must be different.",
+              invalidTransferAmount: "Invalid transfer amount",
+              invalidTransferAmountDesc: "Amount must be greater than zero.",
+              transferCompleted: "Transfer completed",
+              transferFailed: "Transfer failed",
+              transferFailedDesc: "Internal transfer could not be completed.",
+              firstWalletGuide: "Create the first wallet",
+              firstWalletGuideDesc:
+                  "Open the wallet form first. The guide will continue on the fields inside the dialog.",
+              clearNameGuide: "Give it a clear name",
+              clearNameGuideDesc:
+                  "Examples: Cash, Techcombank or Momo. Once you type a name, the guide moves ahead.",
+              walletTypeGuide: "Pick the right wallet type",
+              walletTypeGuideDesc:
+                  "This affects how reports group your balances later.",
+              startingBalanceGuide: "Enter the starting balance",
+              startingBalanceGuideDesc:
+                  "This should be the amount currently available in the wallet.",
+              saveGuide: "Save and continue",
+              saveGuideDesc:
+                  "After saving your first wallet, the app unlocks transactions, budgets and goals.",
+              continue: "Continue",
+              stepLabel: (step: number) => `Step ${step}/5`,
+              pageTitle: "Wallets",
+              pageDescription:
+                  "Wallet page keeps create, update, archive/delete and internal transfer flows tied to the existing APIs.",
+              newWallet: "New wallet",
+              totalBalance: "Total balance",
+              activeWallets: (count: number) => `${count} active wallet(s)`,
+              walletCount: "Wallet count",
+              monthOverMonthGrowth: (growth: number) =>
+                  `${growth}% month-over-month asset growth`,
+              transfersReady: "Transfers ready",
+              transferReadyDesc:
+                  "Internal transfer stays client-driven by creating paired transactions",
+              yes: "Yes",
+              needTwoWallets: "Need 2 wallets",
+              hasHistory: "Has history",
+              edit: "Edit",
+              balanceTrend: "Balance trend",
+              balanceTrendDesc: "Six month history from the profile stats API.",
+              internalTransfer: "Internal transfer",
+              internalTransferDesc:
+                  "This creates one expense and one income transaction because the backend has no dedicated transfer endpoint.",
+              fromWallet: "From wallet",
+              toWallet: "To wallet",
+              selectSource: "Select source",
+              selectDestination: "Select destination",
+              amount: "Amount",
+              transferNow: "Transfer now",
+              notEnoughWallets: "Not enough wallets",
+              notEnoughWalletsDesc:
+                  "Create at least two wallets before using internal transfer.",
+              noWallets: "No wallets yet",
+              noWalletsDesc:
+                  "Wallets are the base entity for transactions, analytics and balance tracking.",
+              createWallet: "Create wallet",
+              formDescription:
+                  "Wallet form keeps image upload, icon, color, type, currency and business rules from the backend.",
+              editWallet: "Edit wallet",
+              createWalletTitle: "Create wallet",
+              cardImage: "Card image",
+              walletPreview: "Wallet preview",
+              walletName: "Wallet name",
+              walletNamePlaceholder: "Cash, Techcombank, Momo...",
+              accountNumber: "Account number",
+              walletType: "Wallet type",
+              currency: "Currency",
+              icon: "Icon",
+              auto: "Auto",
+              accentColor: "Accent color",
+              startingBalance: "Starting balance",
+              cancel: "Cancel",
+              saving: "Saving...",
+              updateWallet: "Update wallet",
+              keep: "Keep",
+              archive: "Archive",
+              delete: "Delete",
+              removeWallet: "Remove wallet",
+              archiveWalletDesc:
+                  "This wallet already has transactions, so it will be archived instead of hard deleted.",
+              deleteWalletDesc: (name: string) => `Delete wallet "${name}"?`,
+              confirmTypeChange: "Confirm wallet type change",
+              changeType: "Change type",
+              changeTypeDesc:
+                  "Changing wallet type will affect how historical reports classify this wallet. Continue?",
+              balanceSeriesLabel: "Balance",
+              transferCategory: "Transfer",
+              transferTo: (name?: string) => `Transfer to ${name || "destination wallet"}`,
+              transferFrom: (name?: string) => `Received from ${name || "source wallet"}`,
+          };
+    const getWalletTypeLabel = (type: WalletItem["type"]) => walletTypeText[type][language];
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [wallets, setWallets] = useState<WalletItem[]>([]);
+    const [stats, setStats] = useState<any>(null);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [editing, setEditing] = useState<WalletItem | null>(null);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState("");
+    const [pendingDelete, setPendingDelete] = useState<WalletItem | null>(null);
+    const [confirmTypeChangeOpen, setConfirmTypeChangeOpen] = useState(false);
+    const [guideStep, setGuideStep] = useState<WalletGuideStep | null>(null);
     const [formValues, setFormValues] = useState({
         name: "",
         accountNumber: "",
         initialBalance: 0,
-        imageUrl: "",
         type: "cash" as "cash" | "bank" | "ewallet",
         currency: "VND",
         icon: "",
-        color: "",
+        color: appearance.primaryColor,
     });
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string>("");
-    const [confirmTypeChange, setConfirmTypeChange] = useState(false);
-    const [guideStep, setGuideStep] = useState<WalletGuideStep | null>(null);
-
-    // Form states for Transfer
     const [transferValues, setTransferValues] = useState({
         fromWalletId: "",
         toWalletId: "",
@@ -92,62 +377,67 @@ const Wallets: React.FC = () => {
     const submitButtonRef = useRef<HTMLButtonElement | null>(null);
     const pendingGuideStepRef = useRef<WalletGuideStep | null>(null);
 
-    const hasWallets = wallets.length > 0;
     const onboardingStorageKey = useMemo(
         () =>
-            currentUser?.uid
-                ? `fintrack-wallet-onboarding:${currentUser.uid}`
-                : "",
+            currentUser?.uid ? `fintrack-wallet-onboarding:${currentUser.uid}` : "",
         [currentUser?.uid],
     );
+    const hasWallets = wallets.length > 0;
     const isGuideEligible = !!currentUser?.newUser && !hasWallets;
 
-    const fetchData = async () => {
+    // Locale-derived error labels are intentionally reduced to stable primitives above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchData = useCallback(async () => {
+        setLoading(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
-            const [walletRes, statsRes] = await Promise.all([
+            if (!token) {
+                return;
+            }
+            const [walletResponse, statsResponse] = await Promise.all([
                 walletApi.getWallets(token),
                 userApi.getProfileStats(token),
             ]);
-            const walletList = walletRes?.wallets || [];
+
+            const walletList = walletResponse?.wallets || [];
             setWallets(walletList);
-            // statsRes có thể là stats object hoặc wrapped trong data
-            const statsData = statsRes?.data || statsRes;
-            setStats(statsData);
-            if (walletList.length >= 2 && !transferValues.fromWalletId) {
-                setTransferValues({
-                    fromWalletId: walletList[0]._id,
-                    toWalletId: walletList[1]._id,
-                    amount: 0,
-                });
+            setStats(statsResponse?.data || statsResponse);
+
+            if (walletList.length >= 2) {
+                setTransferValues((current) =>
+                    current.fromWalletId
+                        ? current
+                        : {
+                              fromWalletId: walletList[0]._id,
+                              toWalletId: walletList[1]._id,
+                              amount: 0,
+                          },
+                );
             }
-        } catch (e) {
-            message.error("Lỗi tải dữ liệu ví");
+        } catch (error: any) {
+            toast({
+                title: isVietnamese ? "Không thể tải ví" : "Could not load wallets",
+                description: error.message || (isVietnamese ? "Vui lòng thử lại." : "Please retry."),
+                variant: "destructive",
+            });
         } finally {
             setLoading(false);
         }
-    };
+    }, [isVietnamese, toast]);
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        void fetchData();
+    }, [fetchData]);
 
     useEffect(() => {
         if (!currentUser?.newUser || !hasWallets) {
             return;
         }
-
         updateUserStatus(false);
         if (onboardingStorageKey) {
             window.localStorage.setItem(onboardingStorageKey, "done");
         }
-    }, [
-        currentUser?.newUser,
-        hasWallets,
-        onboardingStorageKey,
-        updateUserStatus,
-    ]);
+    }, [currentUser?.newUser, hasWallets, onboardingStorageKey, updateUserStatus]);
 
     useEffect(() => {
         if (loading || !isGuideEligible || !onboardingStorageKey) {
@@ -156,22 +446,17 @@ const Wallets: React.FC = () => {
 
         const guideState = window.localStorage.getItem(onboardingStorageKey);
         if (!guideState) {
-            setGuideStep((currentStep) => currentStep ?? 0);
+            setGuideStep((current) => current ?? 0);
             return;
         }
-
         setGuideStep(null);
     }, [isGuideEligible, loading, onboardingStorageKey]);
 
     useEffect(() => {
-        if (!isGuideEligible || guideStep !== 1) {
-            return;
-        }
-
-        if (formValues.name.trim()) {
+        if (guideStep === 1 && formValues.name.trim()) {
             setGuideStep(2);
         }
-    }, [formValues.name, guideStep, isGuideEligible]);
+    }, [formValues.name, guideStep]);
 
     const finishOnboarding = (status: "done" | "skip") => {
         if (onboardingStorageKey) {
@@ -181,215 +466,236 @@ const Wallets: React.FC = () => {
     };
 
     const bindTargetRef =
-        (
-            targetRef: React.MutableRefObject<HTMLElement | null>,
-            selector?: string,
-        ) =>
+        (targetRef: React.MutableRefObject<HTMLElement | null>, selector?: string) =>
         (node: HTMLDivElement | null) => {
             if (!node) {
                 targetRef.current = null;
                 return;
             }
-
             targetRef.current = selector
                 ? (node.querySelector(selector) as HTMLElement | null) || node
                 : node;
         };
 
-    const handleOpenModal = (w: Wallet | null = null) => {
-        if (w) {
-            setEditing(w);
-            setFormValues({
-                name: w.name,
-                accountNumber: w.accountNumber || "",
-                initialBalance: w.initialBalance ?? w.balance,
-                imageUrl: w.imageUrl || "",
-                type: w.type || "cash",
-                currency: w.currency || "VND",
-                icon: w.icon || "",
-                color: w.color || "",
-            });
-            setImagePreview(w.imageUrl || "");
-        } else {
-            setEditing(null);
-            setFormValues({
-                name: "",
-                accountNumber: "",
-                initialBalance: 0,
-                imageUrl: "",
-                type: "cash",
-                currency: "VND",
-                icon: "",
-                color: "",
-            });
-            setImagePreview("");
-        }
+    const openCreate = () => {
+        setEditing(null);
+        setFormValues({
+            name: "",
+            accountNumber: "",
+            initialBalance: 0,
+            type: "cash",
+            currency: "VND",
+            icon: "",
+            color: appearance.primaryColor,
+        });
         setImageFile(null);
+        setImagePreview("");
         setModalOpen(true);
 
-        if (!w && isGuideEligible && guideStep === 0) {
+        if (isGuideEligible && guideStep === 0) {
             pendingGuideStepRef.current = 1;
             setGuideStep(null);
-            return;
+        } else {
+            pendingGuideStepRef.current = null;
         }
+    };
 
+    const openEdit = (wallet: WalletItem) => {
+        setEditing(wallet);
+        setFormValues({
+            name: wallet.name,
+            accountNumber: wallet.accountNumber || "",
+            initialBalance: wallet.initialBalance ?? wallet.balance,
+            type: wallet.type,
+            currency: wallet.currency || "VND",
+            icon: wallet.icon || "",
+            color: wallet.color || appearance.primaryColor,
+        });
+        setImageFile(null);
+        setImagePreview(wallet.imageUrl || "");
         pendingGuideStepRef.current = null;
+        setModalOpen(true);
     };
 
     const handleCloseModal = () => {
         pendingGuideStepRef.current = null;
         setModalOpen(false);
-
         if (isGuideEligible) {
             setGuideStep(0);
         }
     };
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setImageFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
+    const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
         }
+        setImageFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => setImagePreview(reader.result as string);
+        reader.readAsDataURL(file);
     };
 
-    const handleRemoveImage = () => {
-        setImageFile(null);
-        setImagePreview("");
-        setFormValues({ ...formValues, imageUrl: "" });
-    };
-
-    const handleSubmit = async () => {
-        if (!formValues.name) {
-            message.warning("Vui lòng nhập tên ví");
+    const submitWallet = async (confirmTypeChange = false) => {
+        if (!formValues.name.trim()) {
+            toast({
+                title: copy.walletNameRequired,
+                description: copy.walletNameRequiredDesc,
+                variant: "destructive",
+            });
             return;
         }
 
         setSubmitting(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
+            if (!token) {
+                return;
+            }
 
             const formData = new FormData();
             formData.append("name", formValues.name);
-            formData.append(
-                "initialBalance",
-                formValues.initialBalance.toString(),
-            );
+            formData.append("initialBalance", String(formValues.initialBalance));
             formData.append("type", formValues.type);
             formData.append("currency", formValues.currency);
-            if (formValues.accountNumber)
+            if (formValues.accountNumber) {
                 formData.append("accountNumber", formValues.accountNumber);
-            if (formValues.icon) formData.append("icon", formValues.icon);
-            if (formValues.color) formData.append("color", formValues.color);
-            if (imageFile) formData.append("image", imageFile);
-            if (confirmTypeChange) formData.append("confirmTypeChange", "true");
+            }
+            if (formValues.icon) {
+                formData.append("icon", formValues.icon);
+            }
+            if (formValues.color) {
+                formData.append("color", formValues.color);
+            }
+            if (imageFile) {
+                formData.append("image", imageFile);
+            }
+            if (confirmTypeChange) {
+                formData.append("confirmTypeChange", "true");
+            }
 
             if (editing) {
-                const response: any = await walletApi.updateWallet(
-                    editing._id,
-                    formData,
-                    token,
-                );
-
-                // Xử lý response theo business rules
-                if (response.requiresAdjustment) {
-                    message.warning(
-                        "Số dư ban đầu không thể chỉnh sửa khi đã có giao dịch.",
-                    );
-                    // TODO: Mở form tạo giao dịch điều chỉnh
-                    return;
-                }
-                if (
-                    response.requiresConfirmation &&
-                    response.field === "type"
-                ) {
-                    confirm({
-                        title: "Xác nhận thay đổi",
-                        content:
-                            "Thay đổi loại ví sẽ ảnh hưởng đến phân loại báo cáo trong lịch sử. Bạn có chắc chắn muốn tiếp tục?",
-                        onOk: async () => {
-                            setConfirmTypeChange(true);
-                            await handleSubmit();
-                            setConfirmTypeChange(false);
-                        },
-                    });
-                    return;
-                }
-                if (response.field === "currency") {
-                    message.error(
-                        "Không thể đổi tiền tệ khi ví đã có giao dịch. Vui lòng tạo ví mới với tiền tệ mong muốn.",
-                    );
-                    return;
-                }
-
-                message.success("Đã cập nhật ví");
+                await walletApi.updateWallet(editing._id, formData, token);
+                toast({
+                    title: copy.walletUpdated,
+                    variant: "success",
+                });
             } else {
                 await walletApi.createWallet(formData, token);
                 if (currentUser?.newUser) {
                     updateUserStatus(false);
                 }
                 finishOnboarding("done");
-                message.success("Đã tạo ví mới");
+                toast({
+                    title: copy.walletCreated,
+                    variant: "success",
+                });
             }
+
+            setConfirmTypeChangeOpen(false);
             setModalOpen(false);
-            fetchData();
-        } catch (e: any) {
-            message.error(e.message || "Lỗi lưu ví");
+            await fetchData();
+        } catch (error: any) {
+            const payload = error.payload || {};
+            if (payload.requiresAdjustment) {
+                toast({
+                    title: copy.initialBalanceLocked,
+                    description: copy.initialBalanceLockedDesc,
+                    variant: "destructive",
+                });
+            } else if (payload.requiresConfirmation && payload.field === "type") {
+                setConfirmTypeChangeOpen(true);
+            } else if (payload.field === "currency") {
+                toast({
+                    title: copy.currencyCannotChange,
+                    description: copy.currencyCannotChangeDesc,
+                    variant: "destructive",
+                });
+            } else {
+                toast({
+                    title: copy.saveFailed,
+                    description: error.message || copy.saveFailedDesc,
+                    variant: "destructive",
+                });
+            }
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
+    const handleDelete = async () => {
+        if (!pendingDelete) {
+            return;
+        }
+        setSubmitting(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
-            const response: any = await walletApi.deleteWallet(id, token);
-
-            if (response.data?.archived) {
-                message.success("Ví đã được lưu trữ (đã có giao dịch)");
-            } else {
-                message.success("Đã xóa ví");
+            if (!token) {
+                return;
             }
-            fetchData();
-        } catch (e: any) {
-            message.error(e.message || "Lỗi xóa ví");
+            const response: any = await walletApi.deleteWallet(pendingDelete._id, token);
+            toast({
+                title: response?.data?.archived ? copy.walletArchived : copy.walletDeleted,
+                description: response?.message,
+                variant: "success",
+            });
+            setPendingDelete(null);
+            await fetchData();
+        } catch (error: any) {
+            toast({
+                title: copy.deleteFailed,
+                description: error.message || copy.deleteFailedDesc,
+                variant: "destructive",
+            });
+        } finally {
+            setSubmitting(false);
         }
     };
 
     const handleTransfer = async () => {
         if (!transferValues.fromWalletId || !transferValues.toWalletId) {
-            message.warning("Vui lòng chọn ví gửi và ví nhận");
+            toast({
+                title: copy.walletSelectionRequired,
+                description: copy.walletSelectionRequiredDesc,
+                variant: "destructive",
+            });
             return;
         }
         if (transferValues.fromWalletId === transferValues.toWalletId) {
-            message.warning("Ví gửi và ví nhận phải khác nhau");
+            toast({
+                title: copy.differentWalletsRequired,
+                description: copy.differentWalletsRequiredDesc,
+                variant: "destructive",
+            });
             return;
         }
         if (transferValues.amount <= 0) {
-            message.warning("Vui lòng nhập số tiền hợp lệ");
+            toast({
+                title: copy.invalidTransferAmount,
+                description: copy.invalidTransferAmountDesc,
+                variant: "destructive",
+            });
             return;
         }
 
+        setSubmitting(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
+            if (!token) {
+                return;
+            }
 
-            // Chuyển tiền nội bộ (thường là 2 giao dịch: 1 EXPENSE và 1 INCOME hoặc 1 API call duy nhất nếu backend hỗ trợ)
-            // Backend hiện tại không có walletApi.transfer, nên ta giả lập bằng 2 giao dịch
             await Promise.all([
                 transactionApi.createTransaction(
                     {
                         type: "EXPENSE",
                         amount: transferValues.amount,
                         walletId: transferValues.fromWalletId,
-                        category: "Chuyển tiền",
-                        note: `Chuyển sang ${wallets.find((w) => w._id === transferValues.toWalletId)?.name}`,
+                        category: copy.transferCategory,
+                        note: copy.transferTo(
+                            wallets.find((wallet) => wallet._id === transferValues.toWalletId)
+                                ?.name,
+                        ),
                         date: new Date().toISOString(),
                     },
                     token,
@@ -399,753 +705,533 @@ const Wallets: React.FC = () => {
                         type: "INCOME",
                         amount: transferValues.amount,
                         walletId: transferValues.toWalletId,
-                        category: "Chuyển tiền",
-                        note: `Nhận từ ${wallets.find((w) => w._id === transferValues.fromWalletId)?.name}`,
+                        category: copy.transferCategory,
+                        note: copy.transferFrom(
+                            wallets.find((wallet) => wallet._id === transferValues.fromWalletId)
+                                ?.name,
+                        ),
                         date: new Date().toISOString(),
                     },
                     token,
                 ),
             ]);
 
-            message.success("Chuyển tiền thành công");
-            setTransferValues((prev) => ({ ...prev, amount: 0 }));
-            fetchData();
-        } catch (e: any) {
-            message.error(e.message || "Lỗi chuyển tiền");
+            toast({
+                title: copy.transferCompleted,
+                variant: "success",
+            });
+            setTransferValues((current) => ({
+                ...current,
+                amount: 0,
+            }));
+            await fetchData();
+        } catch (error: any) {
+            toast({
+                title: copy.transferFailed,
+                description: error.message || copy.transferFailedDesc,
+                variant: "destructive",
+            });
+        } finally {
+            setSubmitting(false);
         }
     };
+
+    const totalBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0);
 
     const guideConfigs: Record<WalletGuideStep, GuideConfig> = {
         0: {
             targetRef: addWalletButtonRef,
-            title: "Bat dau bang cach tao vi dau tien",
-            description:
-                "Bam truc tiep vao nut Them vi moi de mo form. Sau khi form hien ra, huong dan se tiep tuc tren tung truong nhap.",
-            placement: "left" as const,
+            title: copy.firstWalletGuide,
+            description: copy.firstWalletGuideDesc,
+            placement: "left",
         },
         1: {
             targetRef: nameFieldRef,
-            title: "Dat ten de de nhan dien",
-            description:
-                "Nhap ten vi nhu Tien mat, Techcombank hoac Momo. Khi truong nay co noi dung, huong dan se chuyen sang buoc tiep theo.",
-            placement: "top" as const,
-            actionLabel: "Tiep tuc",
+            title: copy.clearNameGuide,
+            description: copy.clearNameGuideDesc,
+            placement: "top",
+            actionLabel: copy.continue,
             onAction: () => setGuideStep(2),
             actionDisabled: !formValues.name.trim(),
         },
         2: {
             targetRef: typeFieldRef,
-            title: "Chon dung loai vi",
-            description:
-                "Hay chon Tien mat, Ngan hang hoac Vi dien tu de bao cao sau nay phan loai dung. Neu ban giu nguyen mac dinh, co the bam Tiep tuc.",
-            placement: "top" as const,
-            actionLabel: "Tiep tuc",
+            title: copy.walletTypeGuide,
+            description: copy.walletTypeGuideDesc,
+            placement: "top",
+            actionLabel: copy.continue,
             onAction: () => setGuideStep(3),
         },
         3: {
             targetRef: balanceFieldRef,
-            title: "Nhap so du khoi tao",
-            description:
-                "Day la so tien hien co trong vi tai thoi diem ban bat dau su dung app. Ban co the nhap 0 neu muon thiet lap sau.",
-            placement: "top" as const,
-            actionLabel: "Tiep tuc",
+            title: copy.startingBalanceGuide,
+            description: copy.startingBalanceGuideDesc,
+            placement: "top",
+            actionLabel: copy.continue,
             onAction: () => setGuideStep(4),
         },
         4: {
             targetRef: submitButtonRef,
-            title: "Luu lai va hoan tat",
-            description:
-                "Khi da xong, bam nut nay de tao vi. Sau do ban se co the bat dau them giao dich, ngan sach va cac muc tieu tiet kiem.",
-            placement: "top" as const,
+            title: copy.saveGuide,
+            description: copy.saveGuideDesc,
+            placement: "top",
         },
-    } as const;
+    };
+
+    const chartData = {
+        labels: stats?.history?.map((item: any) => item.month) || [],
+        datasets: [
+            {
+                label: copy.balanceSeriesLabel,
+                data: stats?.history?.map((item: any) => item.balance) || [],
+                borderColor: appearance.primaryColor,
+                backgroundColor: hexToRgba(appearance.primaryColor, 0.14),
+                fill: true,
+                tension: 0.35,
+            },
+        ],
+    };
 
     const currentGuide =
         guideStep !== null && isGuideEligible ? guideConfigs[guideStep] : null;
 
-    if (loading)
+    if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Spin size="large" />
+            <div className="flex min-h-[420px] items-center justify-center">
+                <Spinner className="h-8 w-8" />
             </div>
         );
+    }
 
     return (
-        <div className="flex-1 animate-in fade-in duration-500">
+        <div className="space-y-6">
             {currentGuide ? (
                 <SpotlightGuide
-                    open={!!currentGuide}
-                    targetRef={currentGuide.targetRef}
-                    title={currentGuide.title}
-                    description={currentGuide.description}
-                    placement={currentGuide.placement}
-                    stepLabel={`Buoc ${(guideStep || 0) + 1}/5`}
-                    actionLabel={currentGuide.actionLabel}
                     actionDisabled={currentGuide.actionDisabled}
+                    actionLabel={currentGuide.actionLabel}
+                    description={currentGuide.description}
                     onAction={currentGuide.onAction}
                     onSkip={() => finishOnboarding("skip")}
+                    open
+                    placement={currentGuide.placement}
+                    stepLabel={copy.stepLabel((guideStep || 0) + 1)}
+                    targetRef={currentGuide.targetRef}
+                    title={currentGuide.title}
                 />
             ) : null}
 
-            {/* Page Header */}
-            <div className="flex justify-between items-end mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight dark:text-white">
-                        Ví của tôi
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">
-                        Quản lý các nguồn tiền và tài sản của bạn
-                    </p>
-                </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    ref={addWalletButtonRef}
-                    className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
-                >
-                    <span className="material-symbols-outlined">add</span>
-                    Thêm ví mới
-                </button>
+            <PageHeader
+                actions={
+                    <Button onClick={openCreate} ref={addWalletButtonRef}>
+                        <Plus className="h-4 w-4" />
+                        {copy.newWallet}
+                    </Button>
+                }
+                description={copy.pageDescription}
+                title={copy.pageTitle}
+            />
+
+            <div className="grid gap-4 md:grid-cols-3">
+                <MetricCard
+                    icon={WalletCards}
+                    subtitle={copy.activeWallets(wallets.length)}
+                    title={copy.totalBalance}
+                    value={formatCurrency(stats?.totalBalance || totalBalance)}
+                />
+                <MetricCard
+                    icon={Building2}
+                    subtitle={copy.monthOverMonthGrowth(stats?.growth || 0)}
+                    title={copy.walletCount}
+                    value={String(wallets.length)}
+                />
+                <MetricCard
+                    icon={ArrowLeftRight}
+                    subtitle={copy.transferReadyDesc}
+                    title={copy.transfersReady}
+                    value={wallets.length >= 2 ? copy.yes : copy.needTwoWallets}
+                />
             </div>
 
-            <div className="grid grid-cols-12 gap-8">
-                {/* Left: Cards Grid & Chart */}
-                <div className="col-span-12 lg:col-span-8 space-y-8">
-                    {/* Cards Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {wallets.map((w, i) => (
-                            <div
-                                key={w._id}
-                                className="relative overflow-hidden p-6 rounded-xl shadow-xl aspect-[1.6/1] flex flex-col justify-between group cursor-pointer hover:scale-[1.02] transition-transform text-white"
-                                style={{
-                                    backgroundColor: w.color || "#4137cd",
-                                }}
-                                onClick={() => handleOpenModal(w)}
-                            >
-                                {/* Wallet Image Overlay */}
-                                {w.imageUrl && (
-                                    <div className="absolute inset-0 opacity-20">
-                                        <img
-                                            src={w.imageUrl}
-                                            alt={w.name}
-                                            className="w-full h-full object-cover"
+            {wallets.length > 0 ? (
+                <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
+                    <div className="space-y-6">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            {wallets.map((wallet) => {
+                                const Icon =
+                                    wallet.icon && wallet.icon in walletIconMap
+                                        ? walletIconMap[wallet.icon as keyof typeof walletIconMap]
+                                        : wallet.type === "bank"
+                                          ? Building2
+                                          : wallet.type === "ewallet"
+                                            ? Smartphone
+                                            : Wallet;
+
+                                return (
+                                    <Card
+                                        key={wallet._id}
+                                        className="overflow-hidden border-border/80"
+                                    >
+                                        <div
+                                            className="p-5 text-white"
+                                            style={{
+                                                background: `linear-gradient(135deg, ${wallet.color || appearance.primaryColor}, rgba(15, 23, 42, 0.95))`,
+                                            }}
+                                        >
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <p className="text-xs uppercase tracking-[0.16em] text-white/70">
+                                                        {getWalletTypeLabel(wallet.type)}
+                                                    </p>
+                                                    <p className="mt-3 text-2xl font-semibold">
+                                                        {formatCurrency(wallet.balance)}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-[var(--app-radius-md)] bg-white/12 p-3">
+                                                    <Icon className="h-5 w-5" />
+                                                </div>
+                                            </div>
+                                            <div className="mt-8 flex items-end justify-between gap-4">
+                                                <div>
+                                                    <p className="text-sm font-medium">{wallet.name}</p>
+                                                    <p className="text-xs text-white/70">
+                                                        {wallet.currency}
+                                                        {wallet.accountNumber
+                                                            ? ` • ${wallet.accountNumber}`
+                                                            : ""}
+                                                    </p>
+                                                </div>
+                                                {wallet.hasTransactions ? (
+                                                    <Badge className="border-white/20 bg-white/10 text-white" variant="outline">
+                                                        {copy.hasHistory}
+                                                    </Badge>
+                                                ) : null}
+                                            </div>
+                                        </div>
+
+                                        {wallet.imageUrl ? (
+                                            <img
+                                                alt={wallet.name}
+                                                className="h-32 w-full object-cover"
+                                                src={wallet.imageUrl}
+                                            />
+                                        ) : null}
+
+                                        <CardContent className="flex items-center justify-between gap-3 p-5">
+                                            <Button onClick={() => openEdit(wallet)} variant="outline">
+                                                {copy.edit}
+                                            </Button>
+                                            <Button
+                                                onClick={() => setPendingDelete(wallet)}
+                                                variant="ghost"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{copy.balanceTrend}</CardTitle>
+                                <CardDescription>
+                                    {copy.balanceTrendDesc}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-[320px]">
+                                    <LineChart
+                                        data={chartData}
+                                        options={{
+                                            maintainAspectRatio: false,
+                                            plugins: {
+                                                legend: {
+                                                    display: false,
+                                                },
+                                            },
+                                        }}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{copy.internalTransfer}</CardTitle>
+                            <CardDescription>
+                                {copy.internalTransferDesc}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {wallets.length >= 2 ? (
+                                <>
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium">{copy.fromWallet}</label>
+                                        <Select
+                                            onChange={(event) =>
+                                                setTransferValues((current) => ({
+                                                    ...current,
+                                                    fromWalletId: event.target.value,
+                                                }))
+                                            }
+                                            value={transferValues.fromWalletId}
+                                        >
+                                            <option value="">{copy.selectSource}</option>
+                                            {wallets.map((wallet) => (
+                                                <option key={wallet._id} value={wallet._id}>
+                                                    {wallet.name}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium">{copy.toWallet}</label>
+                                        <Select
+                                            onChange={(event) =>
+                                                setTransferValues((current) => ({
+                                                    ...current,
+                                                    toWalletId: event.target.value,
+                                                }))
+                                            }
+                                            value={transferValues.toWalletId}
+                                        >
+                                            <option value="">{copy.selectDestination}</option>
+                                            {wallets.map((wallet) => (
+                                                <option key={wallet._id} value={wallet._id}>
+                                                    {wallet.name}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium">{copy.amount}</label>
+                                        <Input
+                                            min={0}
+                                            onChange={(event) =>
+                                                setTransferValues((current) => ({
+                                                    ...current,
+                                                    amount: Number(event.target.value) || 0,
+                                                }))
+                                            }
+                                            type="number"
+                                            value={transferValues.amount}
                                         />
                                     </div>
-                                )}
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-2">
-                                        {w.icon && (
-                                            <span className="material-symbols-outlined text-lg">
-                                                {w.icon}
-                                            </span>
-                                        )}
-                                        <span className="text-sm font-medium opacity-80 uppercase tracking-wide">
-                                            {w.type === "cash"
-                                                ? "Tiền mặt"
-                                                : w.type === "bank"
-                                                  ? "Ngân hàng"
-                                                  : "Ví điện tử"}
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Popconfirm
-                                            title={
-                                                w.hasTransactions
-                                                    ? "Ví này có giao dịch sẽ được lưu trữ thay vì xóa. Tiếp tục?"
-                                                    : "Xóa ví này sẽ xóa tất cả giao dịch liên quan. Tiếp tục?"
-                                            }
-                                            onConfirm={(e) => {
-                                                e?.stopPropagation();
-                                                handleDelete(w._id);
-                                            }}
-                                            onCancel={(e) =>
-                                                e?.stopPropagation()
-                                            }
-                                            okText="Xóa"
-                                            cancelText="Hủy"
-                                            okButtonProps={{ danger: true }}
-                                        >
-                                            <button
-                                                className="size-8 flex items-center justify-center bg-white/10 rounded-full hover:bg-white/20 transition-colors"
-                                                onClick={(e) =>
-                                                    e.stopPropagation()
-                                                }
-                                            >
-                                                <span className="material-symbols-outlined text-sm">
-                                                    delete
-                                                </span>
-                                            </button>
-                                        </Popconfirm>
-                                        <div className="size-8 flex items-center justify-center">
-                                            <span className="material-symbols-outlined">
-                                                contactless
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold mb-1">
-                                        {formatCurrency(w.balance)}
-                                    </p>
-                                    <p className="text-sm opacity-70 tracking-[0.2em]">
-                                        {w.currency}
-                                    </p>
-                                </div>
-                                <div className="flex justify-between items-end">
-                                    <div>
-                                        <p className="text-xs uppercase opacity-50">
-                                            Tên ví
-                                        </p>
-                                        <p className="text-sm font-medium">
-                                            {w.name}
-                                        </p>
-                                    </div>
-                                    <div
-                                        className={`size-8 rounded-full bg-white/20 flex items-center justify-center`}
-                                    >
-                                        <span className="material-symbols-outlined text-sm">
-                                            edit
-                                        </span>
-                                    </div>
-                                </div>
-                                <div
-                                    className={`absolute -right-10 -bottom-10 size-40 rounded-full blur-3xl bg-white/10`}
-                                ></div>
-                            </div>
-                        ))}
-
-                        {/* Empty / Add More Card */}
-                        <div
-                            onClick={() => handleOpenModal()}
-                            className="p-6 rounded-xl bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-slate-400 hover:border-primary hover:text-primary transition-all cursor-pointer group aspect-[1.6/1]"
-                        >
-                            <span className="material-symbols-outlined text-4xl mb-2 group-hover:scale-110 transition-transform">
-                                add_circle
-                            </span>
-                            <span className="text-xs font-bold uppercase tracking-wide">
-                                Thêm nguồn tiền mới
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Balance Trends Chart Area */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:shadow-md">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h3 className="text-lg font-bold dark:text-white">
-                                    Xu hướng số dư
-                                </h3>
-                                <p className="text-xs text-slate-500">
-                                    Thống kê sự thay đổi tài sản của bạn
-                                </p>
-                            </div>
-                            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg gap-1">
-                                <button
-                                    onClick={() => setTimeRange("MONTH")}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeRange === "MONTH" ? "bg-white dark:bg-slate-700 shadow-sm dark:text-white" : "text-slate-500"}`}
-                                >
-                                    Tháng
-                                </button>
-                                <button
-                                    onClick={() => setTimeRange("QUARTER")}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeRange === "QUARTER" ? "bg-white dark:bg-slate-700 shadow-sm dark:text-white" : "text-slate-500"}`}
-                                >
-                                    Quý
-                                </button>
-                                <button
-                                    onClick={() => setTimeRange("YEAR")}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeRange === "YEAR" ? "bg-white dark:bg-slate-700 shadow-sm dark:text-white" : "text-slate-500"}`}
-                                >
-                                    Năm
-                                </button>
-                            </div>
-                        </div>
-                        <div className="h-64">
-                            <LineChart
-                                data={{
-                                    labels: stats?.history?.map(
-                                        (h: any) => h.month,
-                                    ) || ["T1", "T2", "T3", "T4", "T5", "T6"],
-                                    datasets: [
-                                        {
-                                            label: "Số dư",
-                                            data: stats?.history?.map(
-                                                (h: any) => h.balance,
-                                            ) || [0, 0, 0, 0, 0, 0],
-                                            borderColor: "#4137cd",
-                                            tension: 0.4,
-                                            fill: true,
-                                            backgroundColor:
-                                                "rgba(65, 55, 205, 0.05)",
-                                        },
-                                    ],
-                                }}
-                                options={{
-                                    maintainAspectRatio: false,
-                                    plugins: { legend: { display: false } },
-                                    scales: {
-                                        x: {
-                                            grid: {
-                                                display: false,
-                                            },
-                                            ticks: {
-                                                color: "#9ca3af",
-                                            },
-                                        },
-                                        y: {
-                                            grid: {
-                                                display: true,
-                                                color: "#e5e7eb",
-                                                borderDash: [2, 2],
-                                            },
-                                            ticks: {
-                                                color: "#9ca3af",
-                                                callback: (value: any) =>
-                                                    `${Number(value).toLocaleString("vi-VN")}`,
-                                            },
-                                        },
-                                    },
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right: Internal Transfer Area */}
-                <div className="col-span-12 lg:col-span-4 space-y-8">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <h3 className="text-lg font-bold dark:text-white mb-6 uppercase tracking-tight">
-                            Chuyển tiền nội bộ
-                        </h3>
-                        <form className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                                    Từ tài khoản
-                                </label>
-                                <Select
-                                    className="w-full h-11"
-                                    placeholder="Chọn nguồn..."
-                                    options={wallets.map((w) => ({
-                                        label: w.name,
-                                        value: w._id,
-                                    }))}
-                                    value={transferValues.fromWalletId}
-                                    onChange={(v) =>
-                                        setTransferValues((prev) => ({
-                                            ...prev,
-                                            fromWalletId: v,
-                                        }))
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                                    Đến tài khoản
-                                </label>
-                                <Select
-                                    className="w-full h-11"
-                                    placeholder="Chọn đích đến..."
-                                    options={wallets.map((w) => ({
-                                        label: w.name,
-                                        value: w._id,
-                                    }))}
-                                    value={transferValues.toWalletId}
-                                    onChange={(v) =>
-                                        setTransferValues((prev) => ({
-                                            ...prev,
-                                            toWalletId: v,
-                                        }))
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                                    Số tiền (₫)
-                                </label>
-                                <div className="relative">
-                                    <InputNumber
-                                        className="w-full h-11 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center pr-12 text-lg font-bold"
-                                        placeholder="0"
-                                        size="large"
-                                        value={transferValues.amount}
-                                        onChange={(v) =>
-                                            setTransferValues((prev) => ({
-                                                ...prev,
-                                                amount: Number(v) || 0,
-                                            }))
-                                        }
-                                        formatter={(v) =>
-                                            `${v}`.replace(
-                                                /\B(?=(\d{3})+(?!\d))/g,
-                                                ",",
-                                            )
-                                        }
-                                        parser={(v) =>
-                                            parseFloat(
-                                                v!.replace(/\$\s?|(,*)/g, ""),
-                                            ) || 0
-                                        }
-                                    />
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
-                                        VND
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all flex items-center justify-center gap-2 mt-4"
-                                type="button"
-                                onClick={handleTransfer}
-                            >
-                                <span className="material-symbols-outlined">
-                                    send
-                                </span>
-                                Thực hiện giao dịch
-                            </button>
-                            <p className="text-xs text-center text-slate-400 mt-4 leading-relaxed italic">
-                                Giao dịch nội bộ không mất phí và được cập nhật
-                                số dư tức thì.
-                            </p>
-                        </form>
-                    </div>
-
-                    <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative overflow-hidden group">
-                        <div className="relative z-10">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="material-symbols-outlined text-primary">
-                                    verified
-                                </span>
-                                <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                                    Gói tài khoản
-                                </span>
-                            </div>
-                            <h4 className="text-xl font-bold uppercase tracking-tight mb-8">
-                                Premium Active
-                            </h4>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center text-xs">
-                                    <span className="font-bold opacity-60">
-                                        Hạn mức chuyển
-                                    </span>
-                                    <span className="font-bold text-emerald-400">
-                                        Vô hạn
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center text-xs">
-                                    <span className="font-bold opacity-60">
-                                        Phí duy trì
-                                    </span>
-                                    <span className="font-bold text-emerald-400">
-                                        0 ₫
-                                    </span>
-                                </div>
-                                <button className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold uppercase tracking-wide transition-all mt-4 border border-white/5">
-                                    Quản lý dịch vụ
-                                </button>
-                            </div>
-                        </div>
-                        <div className="absolute -top-12 -right-12 size-48 bg-primary/20 blur-[80px] rounded-full group-hover:scale-110 transition-transform duration-1000"></div>
-                    </div>
-                </div>
-            </div>
-
-            <Modal
-                title={editing ? "Cập nhật ví" : "Tạo ví mới"}
-                open={modalOpen}
-                onCancel={handleCloseModal}
-                afterOpenChange={(isOpen) => {
-                    if (!isOpen || pendingGuideStepRef.current === null) {
-                        return;
-                    }
-
-                    setGuideStep(pendingGuideStepRef.current);
-                    pendingGuideStepRef.current = null;
-                }}
-                footer={null}
-                centered
-                className="premium-modal"
-            >
-                <div className="py-2 space-y-6">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Ảnh thẻ ATM
-                        </label>
-                        <div className="space-y-3">
-                            {imagePreview ? (
-                                <div className="relative">
-                                    <img
-                                        src={imagePreview}
-                                        alt="Preview"
-                                        className="w-full h-24 object-cover rounded-lg"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleRemoveImage}
-                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">
-                                            close
-                                        </span>
-                                    </button>
-                                </div>
+                                    <Button disabled={submitting} onClick={handleTransfer}>
+                                        <ArrowLeftRight className="h-4 w-4" />
+                                        {copy.transferNow}
+                                    </Button>
+                                </>
                             ) : (
-                                <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-3">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageChange}
-                                        className="hidden"
-                                        id="wallet-image-upload"
-                                    />
-                                    <label
-                                        htmlFor="wallet-image-upload"
-                                        className="flex flex-col items-center justify-center cursor-pointer text-slate-500 hover:text-primary transition-colors py-2"
-                                    >
-                                        <span className="material-symbols-outlined text-2xl mb-1">
-                                            credit_card
-                                        </span>
-                                        <span className="text-xs font-medium">
-                                            Chọn ảnh thẻ
-                                        </span>
-                                        <span className="text-xs opacity-60">
-                                            PNG, JPG lên đến 5MB
-                                        </span>
-                                    </label>
-                                </div>
+                                <EmptyState
+                                    description={copy.notEnoughWalletsDesc}
+                                    icon={ArrowLeftRight}
+                                    title={copy.notEnoughWallets}
+                                />
                             )}
-                        </div>
-                    </div>
-                    <div
-                        className="space-y-1.5"
-                        ref={bindTargetRef(
-                            nameFieldRef,
-                            "#wallet-guide-name-input",
-                        )}
-                    >
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Tên ví / Tài khoản
-                        </label>
-                        <Input
-                            id="wallet-guide-name-input"
-                            size="large"
-                            placeholder="Ví dụ: Techcombank, Tiền mặt..."
-                            className="rounded-xl h-11"
-                            value={formValues.name}
-                            onChange={(e) => {
-                                const nextName = e.target.value;
-                                setFormValues((prev) => ({
-                                    ...prev,
-                                    name: nextName,
-                                }));
+                        </CardContent>
+                    </Card>
+                </div>
+            ) : (
+                <EmptyState
+                    actionLabel={copy.createWallet}
+                    description={copy.noWalletsDesc}
+                    icon={WalletCards}
+                    onAction={openCreate}
+                    title={copy.noWallets}
+                />
+            )}
 
-                                if (guideStep === 1 && nextName.trim()) {
-                                    setGuideStep(2);
-                                }
-                            }}
-                        />
+            <Dialog
+                description={copy.formDescription}
+                onClose={handleCloseModal}
+                open={modalOpen}
+                title={editing ? copy.editWallet : copy.createWalletTitle}
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.cardImage}</label>
+                        <Input accept="image/*" onChange={handleImageChange} type="file" />
+                        {imagePreview ? (
+                            <img
+                                alt={copy.walletPreview}
+                                className="mt-3 h-36 w-full rounded-[var(--app-radius-lg)] object-cover"
+                                src={imagePreview}
+                            />
+                        ) : null}
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Số tài khoản (Nếu có)
-                        </label>
+
+                    <div ref={bindTargetRef(nameFieldRef, "input")}>
+                        <label className="mb-2 block text-sm font-medium">{copy.walletName}</label>
                         <Input
-                            size="large"
-                            placeholder="**** **** **** 1234"
-                            className="rounded-xl h-11"
-                            value={formValues.accountNumber}
-                            onChange={(e) =>
-                                setFormValues((prev) => ({
-                                    ...prev,
-                                    accountNumber: e.target.value,
+                            onChange={(event) =>
+                                setFormValues((current) => ({
+                                    ...current,
+                                    name: event.target.value,
                                 }))
                             }
+                            placeholder={copy.walletNamePlaceholder}
+                            value={formValues.name}
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div
-                            className="space-y-1.5"
-                            ref={bindTargetRef(
-                                typeFieldRef,
-                                ".ant-select-selector",
-                            )}
-                        >
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Loại ví
-                            </label>
+
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.accountNumber}</label>
+                        <Input
+                            onChange={(event) =>
+                                setFormValues((current) => ({
+                                    ...current,
+                                    accountNumber: event.target.value,
+                                }))
+                            }
+                            value={formValues.accountNumber}
+                        />
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div ref={bindTargetRef(typeFieldRef, "select")}>
+                            <label className="mb-2 block text-sm font-medium">{copy.walletType}</label>
                             <Select
-                                className="w-full h-11"
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        type: event.target.value as "cash" | "bank" | "ewallet",
+                                    }))
+                                }
                                 value={formValues.type}
-                                onChange={(v) => {
-                                    setFormValues((prev) => ({
-                                        ...prev,
-                                        type: v as "cash" | "bank" | "ewallet",
-                                    }));
-
-                                    if (guideStep === 2) {
-                                        setGuideStep(3);
-                                    }
-                                }}
-                                options={[
-                                    { label: "Tiền mặt", value: "cash" },
-                                    { label: "Ngân hàng", value: "bank" },
-                                    { label: "Ví điện tử", value: "ewallet" },
-                                ]}
-                            />
+                            >
+                                <option value="cash">{walletTypeText.cash[language]}</option>
+                                <option value="bank">{walletTypeText.bank[language]}</option>
+                                <option value="ewallet">{walletTypeText.ewallet[language]}</option>
+                            </Select>
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Tiền tệ
-                            </label>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.currency}</label>
                             <Select
-                                className="w-full h-11"
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        currency: event.target.value,
+                                    }))
+                                }
                                 value={formValues.currency}
-                                onChange={(v) =>
-                                    setFormValues((prev) => ({
-                                        ...prev,
-                                        currency: v,
-                                    }))
-                                }
-                                options={[
-                                    {
-                                        label: "VND - Việt Nam Đồng",
-                                        value: "VND",
-                                    },
-                                    { label: "USD - US Dollar", value: "USD" },
-                                    { label: "EUR - Euro", value: "EUR" },
-                                ]}
-                            />
+                            >
+                                <option value="VND">VND</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </Select>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Icon (tùy chọn)
-                            </label>
-                            <Select
-                                className="w-full h-11"
-                                value={formValues.icon}
-                                onChange={(v) =>
-                                    setFormValues((prev) => ({
-                                        ...prev,
-                                        icon: v,
-                                    }))
-                                }
-                                allowClear
-                                placeholder="Chọn icon"
-                                options={[
-                                    {
-                                        label: "🏦 Ngân hàng",
-                                        value: "account_balance",
-                                    },
-                                    { label: "💵 Tiền mặt", value: "payments" },
-                                    {
-                                        label: "💳 Thẻ tín dụng",
-                                        value: "credit_card",
-                                    },
-                                    {
-                                        label: "📱 Ví điện tử",
-                                        value: "phone_android",
-                                    },
-                                    { label: "💰 Ví", value: "wallet" },
-                                    { label: "🏠 Nhà", value: "home" },
-                                    { label: "🚗 Xe", value: "directions_car" },
-                                    { label: "✈️ Du lịch", value: "flight" },
-                                    {
-                                        label: "🛒 Mua sắm",
-                                        value: "shopping_cart",
-                                    },
-                                    {
-                                        label: "🍔 Ăn uống",
-                                        value: "restaurant",
-                                    },
-                                ]}
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Màu sắc (tùy chọn)
-                            </label>
-                            <Select
-                                className="w-full h-11"
-                                value={formValues.color}
-                                onChange={(v) =>
-                                    setFormValues((prev) => ({
-                                        ...prev,
-                                        color: v,
-                                    }))
-                                }
-                                allowClear
-                                placeholder="Chọn màu sắc"
-                                options={[
-                                    {
-                                        label: "🔵 Xanh dương",
-                                        value: "#4137cd",
-                                    },
-                                    { label: "🟢 Xanh lá", value: "#10b981" },
-                                    { label: "🟡 Vàng", value: "#f59e0b" },
-                                    { label: "🔴 Đỏ", value: "#ef4444" },
-                                    { label: "🟣 Tím", value: "#8b5cf6" },
-                                    { label: "🟠 Cam", value: "#f97316" },
-                                    { label: "🩷 Hồng", value: "#ec4899" },
-                                    { label: "⚫ Đen", value: "#1f2937" },
-                                    { label: "⚪ Trắng", value: "#ffffff" },
-                                    { label: "🌫️ Xám", value: "#6b7280" },
-                                ]}
-                            />
-                        </div>
-                    </div>
-                    <div
-                        className="space-y-1.5"
-                        ref={bindTargetRef(
-                            balanceFieldRef,
-                            ".ant-input-number-input",
-                        )}
-                    >
-                        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                            Số dư hiện tại (₫)
-                        </label>
-                        <InputNumber
-                            className="w-full h-11 rounded-xl"
-                            size="large"
-                            placeholder="0"
-                            value={formValues.initialBalance}
-                            onChange={(v) => {
-                                setFormValues((prev) => ({
-                                    ...prev,
-                                    initialBalance: Number(v) || 0,
-                                }));
 
-                                if (guideStep === 3) {
-                                    setGuideStep(4);
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.icon}</label>
+                            <Select
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        icon: event.target.value,
+                                    }))
                                 }
-                            }}
-                            formatter={(v) =>
-                                `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                                value={formValues.icon}
+                            >
+                                <option value="">{copy.auto}</option>
+                                {iconOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {language === "vi" ? option.vi : option.en}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.accentColor}</label>
+                            <div className="flex flex-wrap gap-2">
+                                {colorOptions.map((color) => (
+                                    <button
+                                        key={color}
+                                        className={`h-10 w-10 rounded-[var(--app-radius-md)] border ${
+                                            formValues.color === color
+                                                ? "border-foreground"
+                                                : "border-border"
+                                        }`}
+                                        onClick={() =>
+                                            setFormValues((current) => ({
+                                                ...current,
+                                                color,
+                                            }))
+                                        }
+                                        style={{ backgroundColor: color }}
+                                        type="button"
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div ref={bindTargetRef(balanceFieldRef, 'input[type="number"]')}>
+                        <label className="mb-2 block text-sm font-medium">{copy.startingBalance}</label>
+                        <Input
+                            min={0}
+                            onChange={(event) =>
+                                setFormValues((current) => ({
+                                    ...current,
+                                    initialBalance: Number(event.target.value) || 0,
+                                }))
                             }
-                            parser={(v) =>
-                                parseFloat(v!.replace(/\$\s?|(,*)/g, "")) || 0
-                            }
+                            type="number"
+                            value={formValues.initialBalance}
                         />
                     </div>
-                    <div className="flex justify-end pt-4 gap-3">
-                        <button
-                            onClick={handleCloseModal}
-                            className="h-11 px-8 rounded-xl uppercase text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        >
-                            Bỏ qua
-                        </button>
-                        <button
-                            ref={submitButtonRef}
-                            className="bg-primary text-white h-11 px-8 rounded-xl uppercase text-xs font-bold shadow-lg shadow-primary/20"
-                            onClick={handleSubmit}
+
+                    <div className="flex justify-end gap-3">
+                        <Button onClick={handleCloseModal} variant="outline">
+                            {copy.cancel}
+                        </Button>
+                        <Button
                             disabled={submitting}
+                            onClick={() => void submitWallet(false)}
+                            ref={submitButtonRef}
                         >
-                            {submitting ? (
-                                <Spin size="small" className="mr-2" />
-                            ) : null}
-                            {editing ? "Cập nhật" : "Khởi tạo ví"}
-                        </button>
+                            {submitting
+                                ? copy.saving
+                                : editing
+                                  ? copy.updateWallet
+                                  : copy.createWallet}
+                        </Button>
                     </div>
                 </div>
-            </Modal>
+            </Dialog>
+
+            <ConfirmDialog
+                busy={submitting}
+                cancelLabel={copy.keep}
+                confirmLabel={pendingDelete?.hasTransactions ? copy.archive : copy.delete}
+                description={
+                    pendingDelete?.hasTransactions
+                        ? copy.archiveWalletDesc
+                        : pendingDelete
+                          ? copy.deleteWalletDesc(pendingDelete.name)
+                          : ""
+                }
+                onClose={() => setPendingDelete(null)}
+                onConfirm={handleDelete}
+                open={!!pendingDelete}
+                title={copy.removeWallet}
+                variant="destructive"
+            />
+
+            <ConfirmDialog
+                busy={submitting}
+                cancelLabel={copy.cancel}
+                confirmLabel={copy.changeType}
+                description={copy.changeTypeDesc}
+                onClose={() => setConfirmTypeChangeOpen(false)}
+                onConfirm={() => submitWallet(true)}
+                open={confirmTypeChangeOpen}
+                title={copy.confirmTypeChange}
+            />
         </div>
     );
 };

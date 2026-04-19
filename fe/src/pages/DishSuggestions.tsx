@@ -1,33 +1,28 @@
-import React, { useState, useEffect, useCallback } from "react";
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useEffect, useMemo, useState } from "react";
 import {
-    App as AntdApp,
-    Card,
-    Form,
-    Input,
-    InputNumber,
-    Button,
-    Upload,
-    Select,
-    Tag,
-    Spin,
-    Modal,
-    Image,
-    Space,
-    Carousel,
-} from "antd";
-import {
-    PlusOutlined,
-    EditOutlined,
-    DeleteOutlined,
-    EnvironmentOutlined,
-    ReloadOutlined,
-} from "@ant-design/icons";
+    Dices,
+    MapPin,
+    PencilLine,
+    Plus,
+    Trash2,
+    UtensilsCrossed,
+} from "lucide-react";
+import { auth } from "../firebase/config";
 import { dishApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
-import { auth } from "../firebase/config";
-import "leaflet/dist/leaflet.css";
-
-const { TextArea } = Input;
+import { useLocale } from "../contexts/LocaleContext";
+import { useToast } from "../contexts/ToastContext";
+import { PageHeader } from "../components/app/page-header";
+import { EmptyState } from "../components/app/empty-state";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Card, CardContent } from "../components/ui/card";
+import { Dialog } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Spinner } from "../components/ui/spinner";
+import { Textarea } from "../components/ui/textarea";
 
 interface Dish {
     _id: string;
@@ -40,238 +35,698 @@ interface Dish {
 }
 
 const preferenceOptions = [
-    { label: "Ngọt", value: "ngọt" },
-    { label: "Chua", value: "chua" },
-    { label: "Cay", value: "cay" },
-    { label: "Mặn", value: "mặn" },
-    { label: "Rau", value: "rau" },
-    { label: "Thịt", value: "thịt" },
-    { label: "Hải sản", value: "hải sản" },
-    { label: "Chay", value: "chay" },
-];
+    { value: "ngot", vi: "Ngọt", en: "Sweet" },
+    { value: "chua", vi: "Chua", en: "Sour" },
+    { value: "cay", vi: "Cay", en: "Spicy" },
+    { value: "man", vi: "Mặn", en: "Savory" },
+    { value: "rau", vi: "Rau", en: "Vegetables" },
+    { value: "thit", vi: "Thịt", en: "Meat" },
+    { value: "hai san", vi: "Hải sản", en: "Seafood" },
+    { value: "chay", vi: "Chay", en: "Vegetarian" },
+] as const;
 
 const DishSuggestions: React.FC = () => {
-    const { message: staticMessage } = AntdApp.useApp();
+    const { language, isVietnamese } = useLocale();
+    const { toast } = useToast();
     const [dishes, setDishes] = useState<Dish[]>([]);
-    const [filteredDishes, setFilteredDishes] = useState<Dish[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [editingDish, setEditingDish] = useState<Dish | null>(null);
-    const [form] = Form.useForm();
-    const [imageFiles, setImageFiles] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
+    const [editingDish, setEditingDish] = useState<Dish | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<Dish | null>(null);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [randomDish, setRandomDish] = useState<Dish | null>(null);
+    const [formValues, setFormValues] = useState({
+        name: "",
+        price: 0,
+        description: "",
+        address: "",
+        preferences: [] as string[],
+        existingImages: [] as string[],
+        newImages: [] as File[],
+    });
 
-    const fetchDishes = useCallback(async () => {
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) return;
+    const copy = isVietnamese
+        ? {
+              pageTitle: "Gợi ý món ăn",
+              pageDescription:
+                  "Các thẻ món ăn dùng dishes API và vẫn giữ upload nhiều ảnh cùng ảnh cũ khi chỉnh sửa.",
+              randomPick: "Chọn ngẫu nhiên",
+              newDish: "Thêm món",
+              filterByTaste: "Lọc theo vị:",
+              noDescription: "Chưa có mô tả.",
+              contact: "Liên hệ",
+              imageCount: (count: number) => `${count} ảnh`,
+              noAddress: "Chưa có địa chỉ",
+              edit: "Chỉnh sửa",
+              addFirstDish: "Thêm món đầu tiên",
+              noDishes: "Không tìm thấy món",
+              noDishesDesc: "Không có món nào khớp với bộ lọc vị hiện tại.",
+              formDescription:
+                  "Form data vẫn giữ cả URL ảnh cũ và file ảnh mới được upload.",
+              editDish: "Chỉnh sửa món",
+              createDish: "Tạo món",
+              dishName: "Tên món",
+              price: "Giá",
+              description: "Mô tả",
+              address: "Địa chỉ",
+              tasteTags: "Thẻ hương vị",
+              images: "Hình ảnh",
+              remove: "Xóa",
+              cancel: "Hủy",
+              saving: "Đang lưu...",
+              updateDish: "Cập nhật món",
+              dishNameRequired: "Cần nhập tên món",
+              dishNameRequiredDesc: "Vui lòng nhập tên món.",
+              dishUpdated: "Đã cập nhật món",
+              dishCreated: "Đã tạo món",
+              saveFailed: "Lưu thất bại",
+              saveFailedDesc: "Không thể lưu món ăn.",
+              dishDeleted: "Đã xóa món",
+              deleteFailed: "Xóa thất bại",
+              deleteFailedDesc: "Không thể xóa món ăn.",
+              noDishAvailable: "Không có món phù hợp",
+              noDishAvailableDesc: "Hãy chỉnh bộ lọc vị hoặc thêm nhiều món hơn.",
+              randomDishTitle: "Gợi ý món ngẫu nhiên",
+              randomDishDesc:
+                  "Chọn ngẫu nhiên chỉ dùng danh sách món đang được lọc hiện tại.",
+              keep: "Giữ lại",
+              delete: "Xóa",
+              deleteDish: "Xóa món",
+              deleteDishDesc: (name: string) => `Xóa món "${name}"?`,
+              loadFailed: "Không thể tải món ăn",
+              retry: "Vui lòng thử lại.",
+          }
+        : {
+              pageTitle: "Dish suggestions",
+              pageDescription:
+                  "Dish cards use the dishes API and keep multi-image upload with existing image retention on edit.",
+              randomPick: "Random pick",
+              newDish: "New dish",
+              filterByTaste: "Filter by taste:",
+              noDescription: "No description provided.",
+              contact: "Contact",
+              imageCount: (count: number) => `${count} image(s)`,
+              noAddress: "No address yet",
+              edit: "Edit",
+              addFirstDish: "Add first dish",
+              noDishes: "No dishes found",
+              noDishesDesc: "No dish matches the current taste filters.",
+              formDescription:
+                  "Form data keeps both existing image URLs and newly uploaded image files.",
+              editDish: "Edit dish",
+              createDish: "Create dish",
+              dishName: "Dish name",
+              price: "Price",
+              description: "Description",
+              address: "Address",
+              tasteTags: "Taste tags",
+              images: "Images",
+              remove: "Remove",
+              cancel: "Cancel",
+              saving: "Saving...",
+              updateDish: "Update dish",
+              dishNameRequired: "Dish name required",
+              dishNameRequiredDesc: "Please enter a dish name.",
+              dishUpdated: "Dish updated",
+              dishCreated: "Dish created",
+              saveFailed: "Save failed",
+              saveFailedDesc: "Dish could not be saved.",
+              dishDeleted: "Dish deleted",
+              deleteFailed: "Delete failed",
+              deleteFailedDesc: "Dish could not be deleted.",
+              noDishAvailable: "No dish available",
+              noDishAvailableDesc: "Adjust the taste filters or add more dishes.",
+              randomDishTitle: "Random dish suggestion",
+              randomDishDesc:
+                  "Random pick uses only the currently filtered dish list.",
+              keep: "Keep",
+              delete: "Delete",
+              deleteDish: "Delete dish",
+              deleteDishDesc: (name: string) => `Delete dish "${name}"?`,
+              loadFailed: "Could not load dishes",
+              retry: "Please retry.",
+          };
+    const loadFailedTitle = isVietnamese
+        ? "Không thể tải món ăn"
+        : "Could not load dishes";
+    const retryText = isVietnamese ? "Vui lòng thử lại." : "Please retry.";
+
+    const getPreferenceLabel = (preference: string) => {
+        const match = preferenceOptions.find((item) => item.value === preference);
+        if (!match) {
+            return preference;
+        }
+        return language === "vi" ? match.vi : match.en;
+    };
+
+    const fetchDishes = async () => {
         setLoading(true);
         try {
-            const token = await firebaseUser.getIdToken();
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) {
+                return;
+            }
             const data = await dishApi.getDishes(undefined, token);
-            setDishes(data);
-            setFilteredDishes(data);
+            setDishes(Array.isArray(data) ? data : []);
         } catch (error: any) {
-            staticMessage.error("Lỗi khi tải danh sách món ăn");
-        } finally { setLoading(false); }
-    }, []);
-
-    useEffect(() => {
-        let filtered = dishes;
-        if (selectedPreferences.length > 0) {
-            filtered = filtered.filter(dish => dish.preferences.some(p => selectedPreferences.includes(p)));
+            toast({
+                title: loadFailedTitle,
+                description: error.message || retryText,
+                variant: "destructive",
+            });
+        } finally {
+            setLoading(false);
         }
-        setFilteredDishes(filtered);
+    };
+
+    // Locale-derived error labels are intentionally reduced to stable primitives above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        const loadInitialDishes = async () => {
+            setLoading(true);
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                if (!token) {
+                    return;
+                }
+                const data = await dishApi.getDishes(undefined, token);
+                setDishes(Array.isArray(data) ? data : []);
+            } catch (error: any) {
+                toast({
+                    title: loadFailedTitle,
+                    description: error.message || retryText,
+                    variant: "destructive",
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        void loadInitialDishes();
+    }, [isVietnamese, loadFailedTitle, retryText, toast]);
+
+    const filteredDishes = useMemo(() => {
+        if (selectedPreferences.length === 0) {
+            return dishes;
+        }
+        return dishes.filter((dish) =>
+            dish.preferences.some((preference) =>
+                selectedPreferences.includes(preference),
+            ),
+        );
     }, [dishes, selectedPreferences]);
 
-    useEffect(() => { fetchDishes(); }, [fetchDishes]);
-
-    const getRandomDish = () => {
-        if (filteredDishes.length === 0) return;
-        const random = filteredDishes[Math.floor(Math.random() * filteredDishes.length)];
-        Modal.info({
-            title: 'Gợi ý món ăn hôm nay!',
-            content: (
-                <div className="pt-4 text-center">
-                    <p className="text-xl font-bold text-primary mb-4 italic">"Hôm nay ăn {random.name} nhé?"</p>
-                    {random.imageUrls[0] && <img src={random.imageUrls[0]} className="w-full h-40 object-cover rounded-xl shadow-lg mb-4" />}
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{random.address || 'Hẹn bạn tại quán quen'}</p>
-                </div>
-            ),
-            icon: <span className="material-symbols-outlined text-primary">restaurant</span>,
-            centered: true,
-            okText: 'Tuyệt vời!'
+    const resetForm = () => {
+        setEditingDish(null);
+        setFormValues({
+            name: "",
+            price: 0,
+            description: "",
+            address: "",
+            preferences: [],
+            existingImages: [],
+            newImages: [],
         });
     };
 
     const handleOpenModal = (dish: Dish | null = null) => {
         if (dish) {
             setEditingDish(dish);
-            form.setFieldsValue(dish);
-            // Convert current imageUrls to fileList format for Upload component
-            setImageFiles((dish.imageUrls || []).map((url, i) => ({
-                uid: `existing-${i}`,
-                name: `image-${i}`,
-                status: 'done',
-                url: url,
-                originFileObj: null // Marker for existing image
-            })));
+            setFormValues({
+                name: dish.name,
+                price: dish.price || 0,
+                description: dish.description || "",
+                address: dish.address || "",
+                preferences: dish.preferences || [],
+                existingImages: dish.imageUrls || [],
+                newImages: [],
+            });
         } else {
-            setEditingDish(null);
-            form.resetFields();
-            setImageFiles([]);
+            resetForm();
         }
-        setModalVisible(true);
+        setModalOpen(true);
     };
 
-    const handleSubmit = async (values: any) => {
+    const handleTogglePreference = (preference: string) => {
+        setFormValues((current) => ({
+            ...current,
+            preferences: current.preferences.includes(preference)
+                ? current.preferences.filter((item) => item !== preference)
+                : [...current.preferences, preference],
+        }));
+    };
+
+    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        setFormValues((current) => ({
+            ...current,
+            newImages: [...current.newImages, ...files],
+        }));
+    };
+
+    const handleSubmit = async () => {
+        if (!formValues.name.trim()) {
+            toast({
+                title: copy.dishNameRequired,
+                description: copy.dishNameRequiredDesc,
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setSaving(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
+            if (!token) {
+                return;
+            }
+
             const formData = new FormData();
-            formData.append("name", values.name);
-            formData.append("description", values.description || "");
-            formData.append("price", values.price || "");
-            formData.append("preferences", JSON.stringify(values.preferences || []));
-            formData.append("address", values.address || "");
-
-            // Separate existing images from newly uploaded ones
-            const existingImages = imageFiles
-                .filter(file => !file.originFileObj && file.url)
-                .map(file => file.url);
-            
-            formData.append("existingImages", JSON.stringify(existingImages));
-
-            // Append new files
-            imageFiles.forEach(file => {
-                if (file.originFileObj) {
-                    formData.append("images", file.originFileObj);
-                }
+            formData.append("name", formValues.name);
+            formData.append("description", formValues.description);
+            formData.append("price", formValues.price ? String(formValues.price) : "");
+            formData.append("preferences", JSON.stringify(formValues.preferences));
+            formData.append("address", formValues.address);
+            formData.append(
+                "existingImages",
+                JSON.stringify(formValues.existingImages),
+            );
+            formValues.newImages.forEach((image) => {
+                formData.append("images", image);
             });
 
             if (editingDish) {
                 await dishApi.updateDish(editingDish._id, formData, token);
-                staticMessage.success("Cập nhật món ăn thành công");
+                toast({
+                    title: copy.dishUpdated,
+                    variant: "success",
+                });
             } else {
                 await dishApi.createDish(formData, token);
-                staticMessage.success("Đã thêm món ăn mới");
+                toast({
+                    title: copy.dishCreated,
+                    variant: "success",
+                });
             }
 
-            setModalVisible(false);
-            fetchDishes();
+            setModalOpen(false);
+            resetForm();
+            await fetchDishes();
         } catch (error: any) {
-            console.error("Error saving dish:", error);
-            staticMessage.error("Không thể lưu món ăn");
+            toast({
+                title: copy.saveFailed,
+                description: error.message || copy.saveFailedDesc,
+                variant: "destructive",
+            });
+        } finally {
+            setSaving(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
+    const handleDelete = async () => {
+        if (!pendingDelete) {
+            return;
+        }
+        setSaving(true);
         try {
             const token = await auth.currentUser?.getIdToken();
-            if (!token) return;
-            await dishApi.deleteDish(id, token);
-            staticMessage.success("Đã xóa món ăn");
-            fetchDishes();
+            if (!token) {
+                return;
+            }
+            await dishApi.deleteDish(pendingDelete._id, token);
+            toast({
+                title: copy.dishDeleted,
+                variant: "success",
+            });
+            setPendingDelete(null);
+            await fetchDishes();
         } catch (error: any) {
-            staticMessage.error("Lỗi khi xóa món ăn");
+            toast({
+                title: copy.deleteFailed,
+                description: error.message || copy.deleteFailedDesc,
+                variant: "destructive",
+            });
+        } finally {
+            setSaving(false);
         }
     };
 
-    if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Spin size="large" /></div>;
+    const handleRandomDish = () => {
+        if (filteredDishes.length === 0) {
+            toast({
+                title: copy.noDishAvailable,
+                description: copy.noDishAvailableDesc,
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const nextDish =
+            filteredDishes[Math.floor(Math.random() * filteredDishes.length)];
+        setRandomDish(nextDish);
+    };
+
+    if (loading) {
+        return (
+            <div className="flex min-h-[420px] items-center justify-center">
+                <Spinner className="h-8 w-8" />
+            </div>
+        );
+    }
 
     return (
-        <div className="w-full space-y-8 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight dark:text-white uppercase tracking-[0.05em]">Gợi ý món ăn</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">"Hôm nay ăn gì nhỉ?" - FinTrack sẽ trả lời thay bạn.</p>
-                </div>
-                <div className="flex gap-3">
-                    <Button icon={<ReloadOutlined />} onClick={getRandomDish} className="h-11 px-6 rounded-xl font-bold uppercase text-xs tracking-wide border-2 hover:border-primary hover:text-primary transition-all">Gợi ý ngẫu nhiên</Button>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()} className="h-11 px-6 rounded-xl font-bold uppercase text-xs tracking-wide shadow-lg shadow-primary/20">Thêm món mới</Button>
-                </div>
-            </div>
+        <div className="space-y-6">
+            <PageHeader
+                actions={
+                    <>
+                        <Button onClick={handleRandomDish} variant="outline">
+                            <Dices className="h-4 w-4" />
+                            {copy.randomPick}
+                        </Button>
+                        <Button onClick={() => handleOpenModal()}>
+                            <Plus className="h-4 w-4" />
+                            {copy.newDish}
+                        </Button>
+                    </>
+                }
+                description={copy.pageDescription}
+                title={copy.pageTitle}
+            />
 
-            {/* Filter Bar */}
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-primary/5 shadow-sm flex flex-wrap items-center gap-4">
-                <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Khẩu vị:</span>
-                <Select mode="multiple" placeholder="Lọc theo khẩu vị..." options={preferenceOptions} value={selectedPreferences} onChange={setSelectedPreferences} className="min-w-[200px] flex-1" allowClear />
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wide bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">{filteredDishes.length} Món ăn</div>
-            </div>
+            <Card>
+                <CardContent className="p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="mr-2 text-sm font-medium text-muted-foreground">
+                            {copy.filterByTaste}
+                        </p>
+                        {preferenceOptions.map((preference) => {
+                            const active = selectedPreferences.includes(preference.value);
+                            return (
+                                <button
+                                    key={preference.value}
+                                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                                        active
+                                            ? "border-primary bg-primary-soft text-primary"
+                                            : "border-border text-muted-foreground hover:bg-muted/70"
+                                    }`}
+                                    onClick={() =>
+                                        setSelectedPreferences((current) =>
+                                            current.includes(preference.value)
+                                                ? current.filter((item) => item !== preference.value)
+                                                : [...current, preference.value],
+                                        )
+                                    }
+                                    type="button"
+                                >
+                                    {language === "vi" ? preference.vi : preference.en}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
 
-            {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {filteredDishes.map((dish) => (
-                    <div key={dish._id} className="group bg-white dark:bg-slate-900 rounded-2xl border border-primary/5 shadow-sm hover:shadow-xl transition-all overflow-hidden flex flex-col">
-                        <div className="relative h-48 overflow-hidden">
-                            <Carousel autoplay effect="fade">
-                                {dish.imageUrls.map((url, i) => (
-                                    <div key={i}>
-                                        <img src={url} className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-700" alt={dish.name} />
+            {filteredDishes.length > 0 ? (
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {filteredDishes.map((dish) => (
+                        <Card key={dish._id} className="overflow-hidden">
+                            <div className="aspect-[16/10] bg-muted">
+                                {dish.imageUrls[0] ? (
+                                    <img
+                                        alt={dish.name}
+                                        className="h-full w-full object-cover"
+                                        src={dish.imageUrls[0]}
+                                    />
+                                ) : (
+                                    <div className="flex h-full items-center justify-center bg-primary-soft text-primary">
+                                        <UtensilsCrossed className="h-10 w-10" />
                                     </div>
-                                ))}
-                            </Carousel>
-                            <div className="absolute top-4 right-4 flex gap-2">
-                                <button onClick={() => handleOpenModal(dish)} className="size-8 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center text-slate-600 hover:text-primary transition-colors"><EditOutlined className="text-sm" /></button>
-                                <button onClick={() => handleDelete(dish._id)} className="size-8 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center text-slate-600 hover:text-rose-500 transition-colors"><DeleteOutlined className="text-sm" /></button>
+                                )}
                             </div>
-                            <div className="absolute bottom-4 left-4">
-                                <span className="bg-primary/90 text-white text-xs font-bold uppercase tracking-wide px-3 py-1.5 rounded-lg shadow-lg">
-                                    {dish.price ? formatCurrency(dish.price) : 'Giá liên hệ'}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="p-6 flex-1 flex flex-col">
-                            <h3 className="text-lg font-bold dark:text-white mb-2 group-hover:text-primary transition-colors">{dish.name}</h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 font-medium italic">{dish.description || 'Chưa có mô tả chi tiết cho món ăn này.'}</p>
-                            <div className="mt-auto space-y-4">
-                                <div className="flex flex-wrap gap-1.5">
-                                    {dish.preferences.map(p => (
-                                        <span key={p} className="text-[9px] font-bold uppercase tracking-tighter px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded border border-slate-200 dark:border-slate-700">{p}</span>
+                            <CardContent className="space-y-4 p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-lg font-semibold">{dish.name}</h3>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            {dish.description || copy.noDescription}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-semibold text-primary">
+                                            {dish.price ? formatCurrency(dish.price) : copy.contact}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {copy.imageCount(dish.imageUrls.length)}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    {dish.preferences.map((preference) => (
+                                        <Badge key={preference} variant="outline">
+                                            {getPreferenceLabel(preference)}
+                                        </Badge>
                                     ))}
                                 </div>
-                                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400 pt-4 border-t border-slate-50 dark:border-slate-800">
-                                    <EnvironmentOutlined className="text-primary" />
-                                    <span className="truncate">{dish.address || 'Địa điểm chưa cập nhật'}</span>
+
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <MapPin className="h-4 w-4" />
+                                    <span>{dish.address || copy.noAddress}</span>
                                 </div>
-                            </div>
+
+                                <div className="flex items-center justify-between border-t border-border pt-4">
+                                    <Button
+                                        onClick={() => handleOpenModal(dish)}
+                                        variant="outline"
+                                    >
+                                        <PencilLine className="h-4 w-4" />
+                                        {copy.edit}
+                                    </Button>
+                                    <Button
+                                        onClick={() => setPendingDelete(dish)}
+                                        variant="ghost"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            ) : (
+                <EmptyState
+                    actionLabel={copy.addFirstDish}
+                    description={copy.noDishesDesc}
+                    icon={UtensilsCrossed}
+                    onAction={() => handleOpenModal()}
+                    title={copy.noDishes}
+                />
+            )}
+
+            <Dialog
+                description={copy.formDescription}
+                onClose={() => setModalOpen(false)}
+                open={modalOpen}
+                title={editingDish ? copy.editDish : copy.createDish}
+            >
+                <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.dishName}</label>
+                            <Input
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        name: event.target.value,
+                                    }))
+                                }
+                                value={formValues.name}
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.price}</label>
+                            <Input
+                                min={0}
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        price: Number(event.target.value) || 0,
+                                    }))
+                                }
+                                type="number"
+                                value={formValues.price}
+                            />
                         </div>
                     </div>
-                ))}
-            </div>
 
-            <Modal title={editingDish ? "Chỉnh sửa món ăn" : "Thêm món ăn mới"} open={modalVisible} onCancel={() => setModalVisible(false)} footer={null} width={800} centered>
-                <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ preferences: [] }}>
-                    <div className="grid grid-cols-2 gap-6">
-                        <Form.Item name="name" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Tên món ăn</span>} rules={[{ required: true }]}>
-                            <Input placeholder="Nhập tên món ví dụ: Phở Bò" size="large" className="rounded-xl" />
-                        </Form.Item>
-                        <Form.Item name="price" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Giá ước tính</span>}>
-                            <InputNumber style={{ width: "100%" }} placeholder="VNĐ" size="large" className="rounded-xl" formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} parser={v => parseFloat(v!.replace(/\$\s?|(,*)/g, "")) || 0} />
-                        </Form.Item>
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.description}</label>
+                        <Textarea
+                            onChange={(event) =>
+                                setFormValues((current) => ({
+                                    ...current,
+                                    description: event.target.value,
+                                }))
+                            }
+                            value={formValues.description}
+                        />
                     </div>
-                    <Form.Item name="description" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Mô tả khẩu vị</span>}>
-                        <TextArea rows={3} placeholder="Món ăn này có gì đặc biệt?" className="rounded-xl" />
-                    </Form.Item>
-                    <div className="grid grid-cols-2 gap-6">
-                        <Form.Item name="preferences" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Đặc điểm</span>}>
-                            <Select mode="multiple" placeholder="Chọn vị..." options={preferenceOptions} className="rounded-xl" />
-                        </Form.Item>
-                        <Form.Item name="address" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Địa chỉ</span>}>
-                            <Input placeholder="Số nhà, tên đường..." size="large" className="rounded-xl" />
-                        </Form.Item>
+
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.address}</label>
+                        <Input
+                            onChange={(event) =>
+                                setFormValues((current) => ({
+                                    ...current,
+                                    address: event.target.value,
+                                }))
+                            }
+                            value={formValues.address}
+                        />
                     </div>
-                    <Form.Item label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Hình ảnh món ăn</span>}>
-                        <Upload listType="picture-card" fileList={imageFiles} onChange={({ fileList }) => setImageFiles(fileList)} beforeUpload={() => false} multiple>
-                            <div><PlusOutlined /><div style={{ marginTop: 8 }} className="font-bold text-xs uppercase">Tải ảnh</div></div>
-                        </Upload>
-                    </Form.Item>
-                    <div className="flex justify-end gap-3 pt-6 border-t font-bold">
-                        <Button onClick={() => setModalVisible(false)} className="rounded-xl h-11 px-8 uppercase text-xs tracking-wide">Hủy</Button>
-                        <Button type="primary" htmlType="submit" className="rounded-xl h-11 px-8 uppercase text-xs tracking-wide shadow-lg shadow-primary/20">{editingDish ? "Cập nhật" : "Tạo món ăn"}</Button>
+
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.tasteTags}</label>
+                        <div className="flex flex-wrap gap-2">
+                            {preferenceOptions.map((preference) => {
+                                const active = formValues.preferences.includes(preference.value);
+                                return (
+                                    <button
+                                        key={preference.value}
+                                        className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                                            active
+                                                ? "border-primary bg-primary-soft text-primary"
+                                                : "border-border text-muted-foreground hover:bg-muted/70"
+                                        }`}
+                                        onClick={() => handleTogglePreference(preference.value)}
+                                        type="button"
+                                    >
+                                        {language === "vi" ? preference.vi : preference.en}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
-                </Form>
-            </Modal>
+
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">{copy.images}</label>
+                        <Input accept="image/*" multiple onChange={handleImageUpload} type="file" />
+                        <div className="mt-3 grid grid-cols-3 gap-3">
+                            {formValues.existingImages.map((image) => (
+                                <div key={image} className="relative">
+                                    <img
+                                        alt="Existing dish"
+                                        className="h-24 w-full rounded-[var(--app-radius-lg)] object-cover"
+                                        src={image}
+                                    />
+                                    <button
+                                        className="absolute right-2 top-2 rounded-full bg-slate-950/70 px-2 py-1 text-xs text-white"
+                                        onClick={() =>
+                                            setFormValues((current) => ({
+                                                ...current,
+                                                existingImages: current.existingImages.filter(
+                                                    (item) => item !== image,
+                                                ),
+                                            }))
+                                        }
+                                        type="button"
+                                    >
+                                        {copy.remove}
+                                    </button>
+                                </div>
+                            ))}
+                            {formValues.newImages.map((image) => (
+                                <div key={`${image.name}-${image.lastModified}`} className="relative">
+                                    <img
+                                        alt={image.name}
+                                        className="h-24 w-full rounded-[var(--app-radius-lg)] object-cover"
+                                        src={URL.createObjectURL(image)}
+                                    />
+                                    <button
+                                        className="absolute right-2 top-2 rounded-full bg-slate-950/70 px-2 py-1 text-xs text-white"
+                                        onClick={() =>
+                                            setFormValues((current) => ({
+                                                ...current,
+                                                newImages: current.newImages.filter(
+                                                    (item) =>
+                                                        item.name !== image.name ||
+                                                        item.lastModified !== image.lastModified,
+                                                ),
+                                            }))
+                                        }
+                                        type="button"
+                                    >
+                                        {copy.remove}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3">
+                        <Button onClick={() => setModalOpen(false)} variant="outline">
+                            {copy.cancel}
+                        </Button>
+                        <Button disabled={saving} onClick={handleSubmit}>
+                            {saving
+                                ? copy.saving
+                                : editingDish
+                                  ? copy.updateDish
+                                  : copy.createDish}
+                        </Button>
+                    </div>
+                </div>
+            </Dialog>
+
+            <Dialog
+                description={copy.randomDishDesc}
+                onClose={() => setRandomDish(null)}
+                open={!!randomDish}
+                title={copy.randomDishTitle}
+            >
+                {randomDish ? (
+                    <div className="space-y-4">
+                        {randomDish.imageUrls[0] ? (
+                            <img
+                                alt={randomDish.name}
+                                className="h-56 w-full rounded-[var(--app-radius-xl)] object-cover"
+                                src={randomDish.imageUrls[0]}
+                            />
+                        ) : null}
+                        <div>
+                            <h3 className="text-xl font-semibold">{randomDish.name}</h3>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                {randomDish.description || copy.noDescription}
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {randomDish.preferences.map((preference) => (
+                                <Badge key={preference} variant="outline">
+                                    {getPreferenceLabel(preference)}
+                                </Badge>
+                            ))}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            {randomDish.address || copy.noAddress}
+                        </p>
+                    </div>
+                ) : null}
+            </Dialog>
+
+            <ConfirmDialog
+                busy={saving}
+                cancelLabel={copy.keep}
+                confirmLabel={copy.delete}
+                description={
+                    pendingDelete ? copy.deleteDishDesc(pendingDelete.name) : ""
+                }
+                onClose={() => setPendingDelete(null)}
+                onConfirm={handleDelete}
+                open={!!pendingDelete}
+                title={copy.deleteDish}
+                variant="destructive"
+            />
         </div>
     );
 };

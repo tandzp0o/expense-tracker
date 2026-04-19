@@ -1,27 +1,28 @@
-import React, { useState, useEffect } from "react";
-import { Drawer } from "antd";
-import { useLocation, NavLink } from "react-router-dom";
-import Sidenav from "./Sidenav";
+import React, { useEffect, useState } from "react";
+import { NavLink } from "react-router-dom";
 import Header from "./Header";
+import Sidenav from "./Sidenav";
 import Footer from "./Footer";
-import { useTheme } from "../contexts/ThemeContext";
+import { useLocale } from "../contexts/LocaleContext";
+import { buildMobileNavigationItems } from "./navigation";
+import { Sheet } from "../components/ui/sheet";
+import { cn } from "../lib/utils";
 
 interface MainLayoutProps {
     children: React.ReactNode;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-    const { theme } = useTheme();
-    const [visible, setVisible] = useState(false);
-    const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
-
-    const location = useLocation();
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+    const { language, isVietnamese } = useLocale();
+    const mobileNavigationItems = buildMobileNavigationItems(language);
 
     useEffect(() => {
         const handleResize = () => {
-            setIsMobile(window.innerWidth <= 1024);
-            if (window.innerWidth > 1024) {
-                setVisible(false);
+            setIsMobile(window.innerWidth < 1024);
+            if (window.innerWidth >= 1024) {
+                setMenuOpen(false);
             }
         };
 
@@ -29,102 +30,75 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const openDrawer = () => setVisible(!visible);
-
-    const bottomNavItems = [
-        { to: "/dashboard", icon: "home", label: "Trang chủ" },
-        { to: "/wallets", icon: "account_balance_wallet", label: "Ví" },
-        { to: "/transactions", icon: "add", label: "Thêm", isMiddle: true },
-        { to: "/analytics", icon: "pie_chart", label: "Thống kê" },
-        { to: "/profile", icon: "settings", label: "Cài đặt" },
-    ];
-
     return (
-        <div
-            className={`flex h-screen overflow-hidden ${theme === "dark" ? "dark" : ""}`}
-        >
-            {/* Sidebar Navigation - Desktop */}
-            {!isMobile && (
-                <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
-                    <Sidenav />
+        <div className="app-shell">
+            <div className="mx-auto flex min-h-screen w-full max-w-[1940px] gap-4 px-3 py-3 md:px-4">
+                <aside className="hidden w-[280px] shrink-0 lg:block">
+                    <div className="glass-panel sticky top-3 h-[calc(100vh-1.5rem)] overflow-hidden rounded-[var(--app-radius-xl)] border border-border shadow-soft">
+                        <Sidenav />
+                    </div>
                 </aside>
-            )}
 
-            {/* Mobile Drawer */}
-            {isMobile && (
-                <Drawer
-                    title={false}
-                    placement="left"
-                    closable={false}
-                    onClose={() => setVisible(false)}
-                    open={visible}
-                    width={280}
-                    styles={{ body: { padding: 0 } }}
-                >
-                    <Sidenav onCloseMenu={() => setVisible(false)} />
-                </Drawer>
-            )}
-
-            {/* Main Content */}
-            <main className="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
-                <Header onMenuClick={openDrawer} />
-
-                <div
-                    className={`flex-1 overflow-y-auto p-4 md:p-8 ${isMobile ? "pb-24" : "pb-8"}`}
-                >
-                    <div className="w-full">{children}</div>
-                </div>
-                <Footer />
-
-                {/* Mobile Bottom Navigation */}
-                {isMobile && (
-                    <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-2 pb-6 pt-2 z-20">
-                        <div className="flex justify-around items-center">
-                            {bottomNavItems.map((item) =>
-                                item.isMiddle ? (
-                                    <div
-                                        key={item.to}
-                                        className="relative -top-8"
-                                    >
-                                        <NavLink
-                                            to="/transactions"
-                                            className="size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/40 flex items-center justify-center transform active:scale-95 transition-transform"
-                                        >
-                                            <span className="material-symbols-outlined text-3xl font-bold">
-                                                add
-                                            </span>
-                                        </NavLink>
-                                    </div>
-                                ) : (
-                                    <NavLink
-                                        key={item.to}
-                                        to={item.to}
-                                        className={({ isActive }) =>
-                                            `flex flex-col items-center gap-1 transition-colors ${isActive ? "text-primary" : "text-slate-400 dark:text-slate-500"}`
-                                        }
-                                    >
-                                        <span
-                                            className={`material-symbols-outlined ${location.pathname === item.to ? "font-variation-fill" : ""}`}
-                                        >
-                                            {item.icon}
-                                        </span>
-                                        <span className="text-[10px] font-bold">
-                                            {item.label}
-                                        </span>
-                                    </NavLink>
-                                ),
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="glass-panel overflow-hidden rounded-[var(--app-radius-xl)] border border-border shadow-soft">
+                        <Header onMenuClick={() => setMenuOpen(true)} />
+                        <main
+                            className={cn(
+                                "min-h-[calc(100vh-120px)] px-4 py-5 md:px-6 md:py-6",
+                                isMobile ? "pb-24" : "pb-6",
                             )}
-                        </div>
-                    </nav>
-                )}
-            </main>
-            <style>
-                {`
-                    .font-variation-fill {
-                        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-                    }
-                `}
-            </style>
+                        >
+                            <div className="mx-auto w-full max-w-[1600px]">
+                                {children}
+                                <Footer />
+                            </div>
+                        </main>
+                    </div>
+                </div>
+            </div>
+
+            <Sheet
+                description={
+                    isVietnamese
+                        ? "Điều hướng giữa các phân hệ tài chính."
+                        : "Navigate between your finance modules."
+                }
+                onClose={() => setMenuOpen(false)}
+                open={menuOpen}
+                side="left"
+                title={isVietnamese ? "Điều hướng" : "Navigation"}
+            >
+                <Sidenav onCloseMenu={() => setMenuOpen(false)} />
+            </Sheet>
+
+            {isMobile ? (
+                <nav className="fixed bottom-3 left-3 right-3 z-30 rounded-[var(--app-radius-xl)] border border-border bg-card/96 px-3 py-2 shadow-soft backdrop-blur-xl lg:hidden">
+                    <div className="grid grid-cols-5 gap-1">
+                        {mobileNavigationItems.map((item) => {
+                            const Icon = item.icon;
+                            return (
+                                <NavLink
+                                    key={item.to}
+                                    to={item.to}
+                                    className={({ isActive }) =>
+                                        cn(
+                                            "flex flex-col items-center justify-center gap-1 rounded-[var(--app-radius-md)] px-2 py-2 text-[11px] font-medium transition-all",
+                                            "isPrimary" in item && item.isPrimary
+                                                ? "bg-primary text-primary-foreground shadow-sm"
+                                                : isActive
+                                                  ? "bg-primary-soft text-primary"
+                                                  : "text-muted-foreground",
+                                        )
+                                    }
+                                >
+                                    <Icon className="h-4 w-4" />
+                                    <span>{item.label}</span>
+                                </NavLink>
+                            );
+                        })}
+                    </div>
+                </nav>
+            ) : null}
         </div>
     );
 };

@@ -8,6 +8,7 @@ import React, {
     useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useLocale } from "../contexts/LocaleContext";
 
 type Placement = "top" | "bottom" | "left" | "right";
 
@@ -62,6 +63,7 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
     onSkip,
     highlightPadding = 14,
 }) => {
+    const { isVietnamese } = useLocale();
     const bubbleRef = useRef<HTMLDivElement | null>(null);
     const arrowMarkerId = useId().replace(/:/g, "-");
     const [mounted, setMounted] = useState(false);
@@ -282,7 +284,7 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
             />
 
             <div
-                className="fixed rounded-[28px] border-2 border-white/90 shadow-[0_0_0_9999px_rgba(15,23,42,0.12),0_0_40px_rgba(255,255,255,0.35)] pointer-events-none"
+                className="pointer-events-none fixed rounded-[var(--app-radius-xl)] border-2 border-white/90 shadow-[0_0_0_9999px_rgba(15,23,42,0.12),0_0_40px_rgba(255,255,255,0.35)]"
                 style={{
                     top: highlightRect?.top || 0,
                     left: highlightRect?.left || 0,
@@ -322,19 +324,19 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
 
             <div
                 ref={bubbleRef}
-                className="pointer-events-auto fixed w-[320px] rounded-[28px] border border-white/15 bg-slate-950/95 p-5 text-white shadow-2xl backdrop-blur-md"
+                className="pointer-events-auto fixed w-[320px] rounded-[var(--app-radius-xl)] border border-white/15 bg-slate-950/95 p-5 text-white shadow-2xl backdrop-blur-md"
                 style={bubbleStyle}
             >
                 <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-300">
-                        {stepLabel || "Huong dan"}
+                        {stepLabel || (isVietnamese ? "Hướng dẫn" : "Guide")}
                     </div>
                     <button
                         className="rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-300 transition-colors hover:text-white"
                         onClick={onSkip}
                         type="button"
                     >
-                        Skip
+                        {isVietnamese ? "Bỏ qua" : "Skip"}
                     </button>
                 </div>
 
@@ -347,12 +349,12 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
 
                 {onAction ? (
                     <button
-                        className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-bold text-slate-900 transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="mt-5 inline-flex h-11 items-center justify-center rounded-[var(--app-radius-md)] bg-white px-5 text-sm font-bold text-slate-900 transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
                         disabled={actionDisabled}
                         onClick={onAction}
                         type="button"
                     >
-                        {actionLabel || "Tiep tuc"}
+                        {actionLabel || (isVietnamese ? "Tiếp tục" : "Continue")}
                     </button>
                 ) : null}
             </div>

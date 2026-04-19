@@ -1,30 +1,25 @@
 import React from "react";
+import { useLocale } from "../contexts/LocaleContext";
 
 const Footer: React.FC = () => {
-  const currentYear = new Date().getFullYear();
+    const { isVietnamese } = useLocale();
 
-  return (
-    <footer className="mx-auto py-8 border-t border-slate-100 dark:border-slate-800/50">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-                <span className="text-primary font-bold">FinTrack</span>
-                <span className="opacity-60">© {currentYear}</span>
+    return (
+        <footer className="mt-6 border-t border-border px-1 py-6 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <p>
+                    {isVietnamese
+                        ? "FinTrack dùng để quản lý dòng tiền, ngân sách, mục tiêu, hồ sơ và cài đặt."
+                        : "FinTrack manages cashflow, budgets, goals, profile and settings."}
+                </p>
+                <p>
+                    {isVietnamese
+                        ? "Giao diện được xây trên bộ primitive theo pattern shadcn."
+                        : "Interface built on reusable shadcn-style primitives."}
+                </p>
             </div>
-            
-            <div className="flex items-center gap-6">
-                <a href="#" className="hover:text-primary transition-colors">Chính sách</a>
-                <a href="#" className="hover:text-primary transition-colors">Điều khoản</a>
-                <a href="#" className="size-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center hover:bg-primary hover:text-white transition-all">
-                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>support_agent</span>
-                </a>
-            </div>
-
-            <div className="text-slate-400">
-                Developed by <span className="text-primary font-medium">FinTrack Team</span>
-            </div>
-        </div>
-    </footer>
-  );
+        </footer>
+    );
 };
 
 export default Footer;

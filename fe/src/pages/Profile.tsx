@@ -1,9 +1,28 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { App, Form, Input, Avatar, Upload, Spin } from "antd";
-import { useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    CalendarDays,
+    Mail,
+    MapPin,
+    PencilLine,
+    Phone,
+    Upload,
+} from "lucide-react";
 import { auth } from "../firebase/config";
-import { formatCurrency } from "../utils/formatters";
-import { userApi, transactionApi, API_URL } from "../services/api";
+import { API_URL, transactionApi, userApi } from "../services/api";
+import { formatCurrency, formatDate } from "../utils/formatters";
+import { useToast } from "../contexts/ToastContext";
+import { useLocale } from "../contexts/LocaleContext";
+import { useTheme } from "../contexts/ThemeContext";
+import { hexToRgba } from "../lib/utils";
+import { PageHeader } from "../components/app/page-header";
+import { MetricCard } from "../components/app/metric-card";
+import { Avatar } from "../components/ui/avatar";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Spinner } from "../components/ui/spinner";
+import { Textarea } from "../components/ui/textarea";
+import LineChart from "../components/charts/LineChart";
 
 interface UserProfile {
     displayName: string;
@@ -34,29 +53,43 @@ interface ProfileStats {
 }
 
 const Profile: React.FC = () => {
-    const { message } = App.useApp();
+    const { toast } = useToast();
+    const { isVietnamese } = useLocale();
+    const { appearance } = useTheme();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [stats, setStats] = useState<ProfileStats | null>(null);
     const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
     const [isEditing, setIsEditing] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [form] = Form.useForm();
-    const navigate = useNavigate();
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [formValues, setFormValues] = useState({
+        displayName: "",
+        phone: "",
+        address: "",
+        bio: "",
+    });
 
     const loadProfile = useCallback(async () => {
-        const user = auth.currentUser;
-        if (!user) return;
         setLoading(true);
         try {
+            const user = auth.currentUser;
+            if (!user) {
+                return;
+            }
             const token = await user.getIdToken();
-            const [profileData, statsData, transResponse] = await Promise.all([
+            const [profileData, statsData, transactionResponse] = await Promise.all([
                 userApi.getProfile(token),
                 userApi.getProfileStats(token),
-                transactionApi.getTransactions({ limit: 5 }, token)
+                transactionApi.getTransactions({ limit: 5, page: 1 }, token),
             ]);
 
             const fullProfile: UserProfile = {
-                displayName: profileData.displayName || user.displayName || "Thành viên FinTrack",
+                displayName:
+                    profileData.displayName ||
+                    user.displayName ||
+                    (isVietnamese
+                        ? "Thành viên FinTrack"
+                        : "FinTrack member"),
                 email: profileData.email || user.email || "",
                 phone: profileData.phone || "",
                 bio: profileData.bio || "",
@@ -69,240 +102,467 @@ const Profile: React.FC = () => {
                 goalsCompleted: profileData.goalsCompleted || 0,
                 goalsActive: profileData.goalsActive || 0,
             };
+
             setProfile(fullProfile);
             setStats(statsData);
-            setRecentTransactions(transResponse?.data?.transactions || []);
-            form.setFieldsValue(fullProfile);
-        } catch (error) { 
-            console.error(error);
-            message.error("Lỗi khi tải hồ sơ"); 
+            setRecentTransactions(transactionResponse?.data?.transactions || []);
+            setFormValues({
+                displayName: fullProfile.displayName,
+                phone: fullProfile.phone || "",
+                address: fullProfile.address || "",
+                bio: fullProfile.bio || "",
+            });
+        } catch (error: any) {
+            toast({
+                title: isVietnamese
+                    ? "Không thể tải hồ sơ"
+                    : "Could not load profile",
+                description:
+                    error.message ||
+                    (isVietnamese ? "Vui lòng thử lại." : "Please retry."),
+                variant: "destructive",
+            });
+        } finally {
+            setLoading(false);
         }
-        finally { setLoading(false); }
-    }, [form]);
+    }, [isVietnamese, toast]);
 
-    useEffect(() => { loadProfile(); }, [loadProfile]);
-    
     useEffect(() => {
-        if (isEditing && profile) {
-            form.setFieldsValue(profile);
-        }
-    }, [isEditing, profile, form]);
+        void loadProfile();
+    }, [loadProfile]);
 
-    if (loading && !profile) return <div className="flex items-center justify-center min-h-[400px]"><Spin size="large" /></div>;
-    if (!profile) return null;
+    const handleSaveProfile = async () => {
+        setSaving(true);
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) {
+                return;
+            }
+            await userApi.updateProfile(formValues, token);
+            toast({
+                title: isVietnamese ? "Đã cập nhật hồ sơ" : "Profile updated",
+                variant: "success",
+            });
+            setIsEditing(false);
+            await loadProfile();
+        } catch (error: any) {
+            toast({
+                title: isVietnamese ? "Cập nhật thất bại" : "Update failed",
+                description:
+                    error.message ||
+                    (isVietnamese
+                        ? "Không thể cập nhật hồ sơ."
+                        : "Profile could not be updated."),
+                variant: "destructive",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleAvatarUpload = async (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+        setSaving(true);
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) {
+                return;
+            }
+            const formData = new FormData();
+            formData.append("avatar", file);
+            await userApi.uploadAvatar(formData, token);
+            toast({
+                title: isVietnamese
+                    ? "Đã cập nhật ảnh đại diện"
+                    : "Avatar updated",
+                variant: "success",
+            });
+            await loadProfile();
+        } catch (error: any) {
+            toast({
+                title: isVietnamese ? "Tải ảnh thất bại" : "Upload failed",
+                description:
+                    error.message ||
+                    (isVietnamese
+                        ? "Không thể tải ảnh đại diện."
+                        : "Avatar could not be uploaded."),
+                variant: "destructive",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const chartData = useMemo(
+        () => ({
+            labels: stats?.history?.map((item) => item.month) || [],
+            datasets: [
+                {
+                    label: isVietnamese ? "Số dư" : "Balance",
+                    data: stats?.history?.map((item) => item.balance) || [],
+                    borderColor: appearance.primaryColor,
+                    backgroundColor: hexToRgba(appearance.primaryColor, 0.14),
+                    fill: true,
+                    tension: 0.35,
+                },
+            ],
+        }),
+        [appearance.primaryColor, isVietnamese, stats?.history],
+    );
+
+    if (loading || !profile) {
+        return (
+            <div className="flex min-h-[420px] items-center justify-center">
+                <Spinner className="h-8 w-8" />
+            </div>
+        );
+    }
+
+    const copy = isVietnamese
+        ? {
+              title: "Hồ sơ cá nhân",
+              description:
+                  "Quản lý thông tin tài khoản, thống kê hồ sơ và các giao dịch gần đây.",
+              memberSince: "Tham gia từ",
+              uploading: "Đang tải ảnh...",
+              changeAvatar: "Đổi ảnh đại diện",
+              email: "Email",
+              phone: "Số điện thoại",
+              address: "Địa chỉ",
+              notSet: "Chưa cập nhật",
+              cancelEditing: "Hủy chỉnh sửa",
+              editProfile: "Chỉnh sửa hồ sơ",
+              totalBalance: "Tổng tài sản",
+              monthlyIncome: "Thu nhập tháng này",
+              monthlyExpense: "Chi tiêu tháng này",
+              completedGoals: "Mục tiêu hoàn thành",
+              vsPreviousMonth: "so với tháng trước",
+              currentMonthIncome: "Thu nhập của tháng hiện tại",
+              currentMonthExpense: "Chi tiêu của tháng hiện tại",
+              activeGoals: (count: number) => `${count} mục tiêu đang hoạt động`,
+              editSection: "Chỉnh sửa hồ sơ",
+              editSectionDesc:
+                  "Chỉ hiển thị các trường mà API hồ sơ hiện hỗ trợ cập nhật.",
+              displayName: "Tên hiển thị",
+              bio: "Giới thiệu",
+              saveProfile: "Lưu hồ sơ",
+              saving: "Đang lưu...",
+              balanceHistory: "Lịch sử số dư",
+              balanceHistoryDesc:
+                  "Biểu đồ 6 tháng lấy từ endpoint thống kê hồ sơ.",
+              recentTransactions: "Giao dịch gần đây",
+              recentTransactionsDesc:
+                  "5 giao dịch mới nhất được tải riêng cho màn hồ sơ.",
+              noRecentTransactions: "Chưa có giao dịch gần đây.",
+          }
+        : {
+              title: "Profile",
+              description:
+                  "Manage account information, profile stats and recent transactions.",
+              memberSince: "Member since",
+              uploading: "Uploading...",
+              changeAvatar: "Change avatar",
+              email: "Email",
+              phone: "Phone",
+              address: "Address",
+              notSet: "Not set",
+              cancelEditing: "Cancel editing",
+              editProfile: "Edit profile",
+              totalBalance: "Total balance",
+              monthlyIncome: "Monthly income",
+              monthlyExpense: "Monthly expense",
+              completedGoals: "Completed goals",
+              vsPreviousMonth: "vs previous month",
+              currentMonthIncome: "Current month income",
+              currentMonthExpense: "Current month expense",
+              activeGoals: (count: number) => `${count} active goal(s)`,
+              editSection: "Edit profile",
+              editSectionDesc:
+                  "Only fields supported by the profile API are shown here.",
+              displayName: "Display name",
+              bio: "Bio",
+              saveProfile: "Save profile",
+              saving: "Saving...",
+              balanceHistory: "Balance history",
+              balanceHistoryDesc:
+                  "Six month chart loaded from the profile stats endpoint.",
+              recentTransactions: "Recent transactions",
+              recentTransactionsDesc:
+                  "Latest five transactions loaded specifically for the profile screen.",
+              noRecentTransactions: "No recent transactions.",
+          };
 
     return (
-        <div className="w-full animate-in fade-in duration-500">
-            {/* Gradient Header */}
-            <div className="h-64 premium-gradient relative overflow-hidden -mx-8 -mt-8 mb-0">
-                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
-                <div className="max-w-6xl mx-auto px-8 pt-12 text-white relative z-10">
-                    <h1 className="text-2xl font-bold mb-2">Hồ sơ người dùng</h1>
-                    <p className="text-white/80">Chào mừng trở lại, quản lý tài chính của bạn thật dễ dàng.</p>
-                </div>
-            </div>
+        <div className="space-y-6">
+            <PageHeader
+                description={copy.description}
+                title={copy.title}
+            />
 
-
-            {/* Profile Content */}
-            <div className="max-w-6xl mx-auto px-0 -mt-24 pb-20 relative z-10">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Col: User Card */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-8 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-800 text-center">
-                            <div className="relative inline-block group">
-                                <Avatar size={128} src={profile.avatar?.startsWith('/') ? `${API_URL}${profile.avatar}` : profile.avatar} className="border-4 border-white dark:border-slate-800 shadow-lg" />
-                                <Upload 
-                                    showUploadList={false}
-                                    customRequest={async ({ file }) => {
-                                        const t = await auth.currentUser?.getIdToken();
-                                        if (t) {
-                                            const formData = new FormData();
-                                            formData.append('avatar', file as File);
-                                            try {
-                                                await userApi.uploadAvatar(formData, t);
-                                                message.success("Cập nhật ảnh đại diện thành công!");
-                                                loadProfile();
-                                            } catch (err: any) {
-                                                message.error(err.message || "Lỗi khi tải ảnh");
-                                            }
-                                        }
-                                    }}
-                                >
-                                    <button className="absolute bottom-1 right-1 size-10 bg-primary text-white rounded-full border-4 border-white dark:border-slate-800 flex items-center justify-center hover:scale-110 transition-transform">
-                                        <span className="material-symbols-outlined text-sm">edit</span>
-                                    </button>
-                                </Upload>
-                            </div>
-                            <h2 className="mt-6 text-2xl font-bold dark:text-white">{profile.displayName}</h2>
-                            <p className="text-slate-500 dark:text-slate-400 mb-6">
-                                Thành viên từ {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString("vi-VN", { month: 'long', year: 'numeric' }) : '2023'}
-                            </p>
-                            <div className="space-y-4 text-left border-t border-slate-100 dark:border-slate-800 pt-6">
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-slate-400">mail</span>
-                                    <div>
-                                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Email</p>
-                                        <p className="text-sm font-medium dark:text-white">{profile.email}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-slate-400">phone_iphone</span>
-                                    <div>
-                                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Số điện thoại</p>
-                                        <p className="text-sm font-medium dark:text-white">{profile.phone || 'Chưa cập nhật'}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-slate-400">location_on</span>
-                                    <div>
-                                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Địa chỉ</p>
-                                        <p className="text-sm font-medium dark:text-white">{profile.address || 'Chưa cập nhật'}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <button onClick={() => setIsEditing(!isEditing)} className="w-full mt-8 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                                {isEditing ? 'Hủy chỉnh sửa' : 'Chỉnh sửa hồ sơ'}
-                            </button>
+            <div className="grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
+                <Card className="overflow-hidden">
+                    <div className="h-28 bg-[linear-gradient(135deg,var(--app-primary-soft-strong),rgba(15,23,42,0.85))]" />
+                    <CardContent className="-mt-12 space-y-6 p-6">
+                        <div className="flex items-end gap-4">
+                            <Avatar
+                                alt={profile.displayName}
+                                className="h-24 w-24 border-4 border-card text-xl"
+                                fallback={profile.displayName}
+                                src={
+                                    profile.avatar?.startsWith("/")
+                                        ? `${API_URL}${profile.avatar}`
+                                        : profile.avatar
+                                }
+                            />
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--app-radius-md)] border border-border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted/60">
+                                <Upload className="h-4 w-4" />
+                                <span>
+                                    {saving ? copy.uploading : copy.changeAvatar}
+                                </span>
+                                <input
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleAvatarUpload}
+                                    type="file"
+                                />
+                            </label>
                         </div>
+
+                        <div>
+                            <h2 className="text-2xl font-semibold">{profile.displayName}</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {copy.memberSince}{" "}
+                                {profile.createdAt
+                                    ? new Date(profile.createdAt).toLocaleDateString(
+                                          isVietnamese ? "vi-VN" : "en-US",
+                                          {
+                                              month: "long",
+                                              year: "numeric",
+                                          },
+                                      )
+                                    : isVietnamese
+                                      ? "gần đây"
+                                      : "recently"}
+                            </p>
+                        </div>
+
+                        <div className="space-y-4 border-t border-border pt-4 text-sm">
+                            <div className="flex items-start gap-3">
+                                <Mail className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                <div>
+                                    <p className="font-medium">{copy.email}</p>
+                                    <p className="text-muted-foreground">{profile.email}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <Phone className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                <div>
+                                    <p className="font-medium">{copy.phone}</p>
+                                    <p className="text-muted-foreground">
+                                        {profile.phone || copy.notSet}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                <div>
+                                    <p className="font-medium">{copy.address}</p>
+                                    <p className="text-muted-foreground">
+                                        {profile.address || copy.notSet}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button
+                            className="w-full"
+                            onClick={() => setIsEditing((current) => !current)}
+                            variant={isEditing ? "outline" : "default"}
+                        >
+                            <PencilLine className="h-4 w-4" />
+                            {isEditing ? copy.cancelEditing : copy.editProfile}
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                <div className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <MetricCard
+                            icon={CalendarDays}
+                            subtitle={`${stats?.growth || 0}% ${copy.vsPreviousMonth}`}
+                            title={copy.totalBalance}
+                            value={formatCurrency(stats?.totalBalance || profile.totalBalance)}
+                        />
+                        <MetricCard
+                            icon={CalendarDays}
+                            subtitle={copy.currentMonthIncome}
+                            title={copy.monthlyIncome}
+                            value={formatCurrency(stats?.monthlyIncome || 0)}
+                        />
+                        <MetricCard
+                            icon={CalendarDays}
+                            subtitle={copy.currentMonthExpense}
+                            title={copy.monthlyExpense}
+                            value={formatCurrency(stats?.monthlyExpense || 0)}
+                        />
+                        <MetricCard
+                            icon={CalendarDays}
+                            subtitle={copy.activeGoals(profile.goalsActive)}
+                            title={copy.completedGoals}
+                            value={String(profile.goalsCompleted)}
+                        />
                     </div>
 
-                    {/* Right Col: Stats */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {isEditing ? (
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-                                <h3 className="text-xl font-bold mb-8 dark:text-white">Cập nhật thông tin</h3>
-                                <Form form={form} layout="vertical" onFinish={async (v) => {
-                                    try {
-                                        const t = await auth.currentUser?.getIdToken();
-                                        if (t) {
-                                            await userApi.updateProfile(v, t);
-                                            message.success("Đã lưu!");
-                                            setIsEditing(false);
-                                            loadProfile();
+                    {isEditing ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{copy.editSection}</CardTitle>
+                                <CardDescription>
+                                    {copy.editSectionDesc}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium">
+                                            {copy.displayName}
+                                        </label>
+                                        <Input
+                                            onChange={(event) =>
+                                                setFormValues((current) => ({
+                                                    ...current,
+                                                    displayName: event.target.value,
+                                                }))
+                                            }
+                                            value={formValues.displayName}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium">
+                                            {copy.phone}
+                                        </label>
+                                        <Input
+                                            onChange={(event) =>
+                                                setFormValues((current) => ({
+                                                    ...current,
+                                                    phone: event.target.value,
+                                                }))
+                                            }
+                                            value={formValues.phone}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium">
+                                        {copy.address}
+                                    </label>
+                                    <Input
+                                        onChange={(event) =>
+                                            setFormValues((current) => ({
+                                                ...current,
+                                                address: event.target.value,
+                                            }))
                                         }
-                                    } catch (err: any) {
-                                        message.error(err.message || "Lỗi khi cập nhật hồ sơ");
-                                    }
-                                }} className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <Form.Item name="displayName" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Tên hiển thị</span>}>
-                                            <Input size="large" className="rounded-xl h-11" />
-                                        </Form.Item>
-                                        <Form.Item name="phone" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Số điện thoại</span>}>
-                                            <Input size="large" className="rounded-xl h-11" />
-                                        </Form.Item>
-                                    </div>
-                                    <Form.Item name="address" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Địa chỉ</span>}>
-                                        <Input size="large" className="rounded-xl h-11" />
-                                    </Form.Item>
-                                    <Form.Item name="bio" label={<span className="text-xs font-bold uppercase tracking-wide text-slate-500">Ghi chú cá nhân</span>}>
-                                        <Input.TextArea rows={4} className="rounded-xl" />
-                                    </Form.Item>
-                                    <button type="submit" className="bg-primary text-white h-11 px-8 rounded-xl font-bold text-xs uppercase tracking-wide shadow-lg shadow-primary/20">Xác nhận thay đổi</button>
-                                </Form>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Financial Summary Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="size-12 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                                                <span className="material-symbols-outlined">payments</span>
-                                            </div>
-                                            <span className={`${(stats?.growth || 0) >= 0 ? 'text-emerald-500' : 'text-red-500'} text-xs font-bold flex items-center gap-1`}>
-                                                <span className="material-symbols-outlined text-xs">{(stats?.growth || 0) >= 0 ? 'trending_up' : 'trending_down'}</span> 
-                                                {(stats?.growth || 0) >= 0 ? '+' : ''}{stats?.growth || 0}%
-                                            </span>
-                                        </div>
-                                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Tổng tài sản</p>
-                                        <h3 className="text-2xl font-bold mt-1 dark:text-white">{formatCurrency(stats?.totalBalance || profile.totalBalance)}</h3>
-                                    </div>
-                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="size-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                                <span className="material-symbols-outlined">savings</span>
-                                            </div>
-                                            <span className="text-primary text-xs font-bold flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-xs">event</span> Tháng này
-                                            </span>
-                                        </div>
-                                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Tiết kiệm tháng này</p>
-                                        <h3 className="text-2xl font-bold mt-1 dark:text-white">{formatCurrency((stats?.monthlyIncome || 0) - (stats?.monthlyExpense || 0))}</h3>
-                                    </div>
+                                        value={formValues.address}
+                                    />
                                 </div>
-
-                                {/* Growth Chart */}
-                                <div className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-                                    <div className="flex items-center justify-between mb-8">
-                                        <h3 className="font-bold text-xl dark:text-white">Phân tích tăng trưởng</h3>
-                                        <div className="flex gap-2">
-                                            <button className="px-4 py-1.5 rounded-lg text-sm bg-primary text-white font-medium">6 Tháng</button>
-                                        </div>
-                                    </div>
-                                    <div className="h-64 flex items-end justify-between gap-2 px-4">
-                                        {(() => {
-                                            const history = stats?.history || [];
-                                            const balances = history.map(x => x.balance);
-                                            const maxBalance = balances.length > 0 ? Math.max(...balances, 1) : 1;
-                                            
-                                            return history.map((h, i) => {
-                                                const height = (h.balance / maxBalance) * 100;
-                                                return (
-                                                    <div key={i} className={`w-full rounded-t-lg relative group ${i === history.length - 1 ? 'bg-primary' : 'bg-slate-100 dark:bg-slate-800'}`} 
-                                                        style={{ height: `${Math.max(5, height)}%` }}>
-                                                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                                                            {formatCurrency(h.balance)}
-                                                        </div>
-                                                        <div className={`absolute inset-0 bg-primary/20 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-                                                    </div>
-                                                );
-                                            });
-                                        })()}
-                                    </div>
-                                    <div className="flex justify-between mt-4 px-4 text-xs font-bold text-slate-400 uppercase tracking-wide">
-                                        {(stats?.history || []).map((h, i) => <span key={i}>{h.month}</span>)}
-                                    </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium">
+                                        {copy.bio}
+                                    </label>
+                                    <Textarea
+                                        onChange={(event) =>
+                                            setFormValues((current) => ({
+                                                ...current,
+                                                bio: event.target.value,
+                                            }))
+                                        }
+                                        value={formValues.bio}
+                                    />
                                 </div>
-
-                                {/* Recent Transactions (Template Style) */}
-                                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-                                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                                        <h3 className="font-bold text-xl dark:text-white">Giao dịch gần đây</h3>
-                                        <button onClick={() => navigate('/transactions')} className="text-primary text-sm font-bold hover:underline">Xem tất cả</button>
+                                <div className="flex justify-end">
+                                    <Button disabled={saving} onClick={handleSaveProfile}>
+                                        {saving ? copy.saving : copy.saveProfile}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>{copy.balanceHistory}</CardTitle>
+                                    <CardDescription>
+                                        {copy.balanceHistoryDesc}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="h-[300px]">
+                                        <LineChart
+                                            data={chartData}
+                                            options={{
+                                                maintainAspectRatio: false,
+                                                plugins: {
+                                                    legend: {
+                                                        display: false,
+                                                    },
+                                                },
+                                            }}
+                                        />
                                     </div>
-                                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                        {recentTransactions.length > 0 ? (
-                                            recentTransactions.map((t) => (
-                                                <div key={t._id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className={`size-10 rounded-full flex items-center justify-center ${
-                                                            t.type === 'INCOME' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
-                                                        }`}>
-                                                            <span className="material-symbols-outlined text-sm">
-                                                                {t.type === 'INCOME' ? 'work' : 'shopping_cart'}
-                                                            </span>
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold dark:text-white capitalize">{t.category}</p>
-                                                            <p className="text-xs text-slate-500">
-                                                                {new Date(t.date).toLocaleDateString("vi-VN", { day: 'numeric', month: 'long', year: 'numeric' })}
-                                                            </p>
-                                                        </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>{copy.recentTransactions}</CardTitle>
+                                    <CardDescription>
+                                        {copy.recentTransactionsDesc}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    {recentTransactions.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {recentTransactions.map((transaction) => (
+                                                <div
+                                                    key={transaction._id}
+                                                    className="flex items-center justify-between rounded-[var(--app-radius-lg)] border border-border px-4 py-3"
+                                                >
+                                                    <div>
+                                                        <p className="font-medium">
+                                                            {transaction.note || transaction.category}
+                                                        </p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {formatDate(transaction.date)}
+                                                        </p>
                                                     </div>
-                                                    <span className={`font-bold ${t.type === 'INCOME' ? 'text-emerald-500' : 'text-red-500'}`}>
-                                                        {t.type === 'INCOME' ? '+' : '-'} {formatCurrency(t.amount)}
+                                                    <span
+                                                        className={
+                                                            transaction.type === "INCOME"
+                                                                ? "font-semibold text-emerald-600"
+                                                                : "font-semibold text-rose-600"
+                                                        }
+                                                    >
+                                                        {transaction.type === "INCOME" ? "+" : "-"}
+                                                        {formatCurrency(Number(transaction.amount))}
                                                     </span>
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <div className="p-8 text-center text-slate-400">Không có giao dịch gần đây</div>
-                                        )}
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                            {copy.noRecentTransactions}
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

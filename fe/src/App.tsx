@@ -1,25 +1,13 @@
 import React from "react";
 import {
     BrowserRouter as Router,
-    Routes,
-    Route,
     Navigate,
     Outlet,
+    Route,
+    Routes,
     useLocation,
-} from "react-router-dom"; // <-- Import useLocation
-import { ConfigProvider, Spin, App as AntApp } from "antd";
-import viVN from "antd/locale/vi_VN";
-// import "antd/dist/reset.css";
-// import "./App.less";
-// import "./assets/styles/main.css";
-// import "./assets/styles/themeOverrides.css";
-// import "./assets/styles/responsive.css";
-// import "./assets/styles/ekash_new.css";
-
-// Layouts
+} from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
-
-// Pages
 import Dashboard from "./pages/Dashboard";
 import Wallets from "./pages/Wallets";
 import Budgets from "./pages/Budgets";
@@ -27,53 +15,47 @@ import Goals from "./pages/Goals";
 import Transactions from "./pages/Transactions";
 import DishSuggestions from "./pages/DishSuggestions";
 import Profile from "./pages/Profile";
-import { Login } from "./components";
 import Analytics from "./pages/Analytics";
-
-// Auth context
+import Settings from "./pages/Settings";
+import { Login } from "./components";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { ToastProvider } from "./contexts/ToastContext";
+import { LocaleProvider, useLocale } from "./contexts/LocaleContext";
+import { Spinner } from "./components/ui/spinner";
 
-// Theme context
-import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
-
-// Theme wrapper component
-const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({
-    children,
-}) => {
-    const { antdTheme } = useTheme();
-
-    return (
-        <ConfigProvider locale={viVN} theme={antdTheme}>
-            {children}
-        </ConfigProvider>
-    );
-};
+const FullscreenLoader = ({ label }: { label: string }) => (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="glass-panel flex items-center gap-3 rounded-[var(--app-radius-lg)] border border-border px-5 py-4 shadow-soft">
+            <Spinner />
+            <span className="text-sm text-muted-foreground">{label}</span>
+        </div>
+    </div>
+);
 
 const ProtectedRoute = () => {
     const { currentUser, loading } = useAuth();
     const location = useLocation();
+    const { isVietnamese } = useLocale();
 
     if (loading) {
         return (
-            <div
-                style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "100vh",
-                }}
-            >
-                <Spin size="large" />
-            </div>
+            <FullscreenLoader
+                label={
+                    isVietnamese
+                        ? "Đang tải phiên đăng nhập..."
+                        : "Loading your session..."
+                }
+            />
         );
     }
 
     if (!currentUser) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
+        return <Navigate replace state={{ from: location }} to="/login" />;
     }
 
     if (currentUser.newUser && location.pathname !== "/wallets") {
-        return <Navigate to="/wallets" replace />;
+        return <Navigate replace to="/wallets" />;
     }
 
     return (
@@ -83,113 +65,71 @@ const ProtectedRoute = () => {
     );
 };
 
-// Debug component to check if routing works
-const DebugRoute = () => {
-    console.log("🔍 DebugRoute - Component rendered!");
-    return (
-        <div style={{ padding: 20, background: "red", color: "white" }}>
-            DEBUG: Route matched!
-        </div>
-    );
-};
-
-// Login route wrapper - redirect if already authenticated
 const LoginRoute = () => {
-    console.log("🔍 LoginRoute - Component START rendering!");
-
     const { currentUser, loading } = useAuth();
-
-    console.log("🔍 LoginRoute - Auth state:", {
-        loading,
-        currentUser: !!currentUser,
-    });
-    console.log("🔍 LoginRoute - currentUser:", currentUser);
+    const { isVietnamese } = useLocale();
 
     if (loading) {
-        console.log("⏳ LoginRoute - Still loading auth state...");
         return (
-            <div
-                style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "100vh",
-                    flexDirection: "column",
-                    gap: 20,
-                }}
-            >
-                <Spin size="large" />
-                <div>Loading auth state...</div>
-            </div>
+            <FullscreenLoader
+                label={
+                    isVietnamese
+                        ? "Đang kiểm tra tài khoản..."
+                        : "Checking your account..."
+                }
+            />
         );
     }
 
     if (currentUser) {
-        console.log(
-            "✅ LoginRoute - User authenticated, redirecting to dashboard...",
-        );
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate replace to="/dashboard" />;
     }
 
-    console.log("❌ LoginRoute - User not authenticated, showing login form");
     return <Login />;
 };
 
 function App() {
     return (
         <Router>
-            <ThemeProvider>
-                <AuthProvider>
-                    <AntApp>
-                        <ThemeWrapper>
+            <LocaleProvider>
+                <ThemeProvider>
+                    <ToastProvider>
+                        <AuthProvider>
                             <Routes>
-                                <Route path="/login" element={<LoginRoute />} />
-
-                                {/* Route redirect từ root về dashboard */}
+                                <Route element={<LoginRoute />} path="/login" />
                                 <Route
+                                    element={<Navigate replace to="/dashboard" />}
                                     path="/"
-                                    element={
-                                        <Navigate to="/dashboard" replace />
-                                    }
                                 />
 
-                                {/* Main routes */}
                                 <Route element={<ProtectedRoute />}>
+                                    <Route element={<Dashboard />} path="/dashboard" />
                                     <Route
-                                        path="/dashboard"
-                                        element={<Dashboard />}
-                                    />
-                                    <Route
-                                        path="/transactions"
                                         element={<Transactions />}
+                                        path="/transactions"
                                     />
+                                    <Route element={<Budgets />} path="/budgets" />
+                                    <Route element={<Goals />} path="/goals" />
                                     <Route
-                                        path="/budgets"
-                                        element={<Budgets />}
-                                    />
-                                    <Route path="/goals" element={<Goals />} />
-                                    <Route
-                                        path="/analytics"
                                         element={<Analytics />}
+                                        path="/analytics"
                                     />
+                                    <Route element={<Wallets />} path="/wallets" />
                                     <Route
-                                        path="/wallets"
-                                        element={<Wallets />}
-                                    />
-                                    <Route
-                                        path="/dishes"
                                         element={<DishSuggestions />}
+                                        path="/dishes"
                                     />
+                                    <Route element={<Profile />} path="/profile" />
                                     <Route
-                                        path="/profile"
-                                        element={<Profile />}
+                                        element={<Settings />}
+                                        path="/settings"
                                     />
                                 </Route>
                             </Routes>
-                        </ThemeWrapper>
-                    </AntApp>
-                </AuthProvider>
-            </ThemeProvider>
+                        </AuthProvider>
+                    </ToastProvider>
+                </ThemeProvider>
+            </LocaleProvider>
         </Router>
     );
 }

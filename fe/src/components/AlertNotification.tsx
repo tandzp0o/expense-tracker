@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, message } from "antd";
+import { ConfirmDialog } from "./ui/confirm-dialog";
 
 interface AlertNotificationProps {
     visible: boolean;
@@ -18,53 +18,20 @@ const AlertNotification: React.FC<AlertNotificationProps> = ({
     onCancel,
     title,
     content,
-    confirmText = "Xác nhận",
-    cancelText = "Hủy",
+    confirmText = "Confirm",
+    cancelText = "Cancel",
     type = "warning",
-}) => {
-    return (
-        <Modal
-            open={visible}
-            onCancel={onCancel}
-            footer={[
-                <button
-                    key="cancel"
-                    onClick={onCancel}
-                    style={{
-                        backgroundColor:
-                            type === "error" ? "#cfceceff" : "#faad14",
-                        color: "black",
-                        border: "none",
-                        padding: "8px 16px",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        marginRight: "10px",
-                    }}
-                >
-                    {cancelText}
-                </button>,
-                <button
-                    key="confirm"
-                    onClick={onConfirm}
-                    style={{
-                        backgroundColor:
-                            type === "error" ? "#ff4d4f" : "#faad14",
-                        color: "white",
-                        border: "none",
-                        padding: "8px 16px",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                    }}
-                >
-                    {confirmText}
-                </button>,
-            ]}
-            title={title}
-            width={400}
-        >
-            <p style={{ fontSize: 16, lineHeight: 1.5 }}>{content}</p>
-        </Modal>
-    );
-};
+}) => (
+    <ConfirmDialog
+        cancelLabel={cancelText}
+        confirmLabel={confirmText}
+        description={content}
+        onClose={onCancel}
+        onConfirm={onConfirm}
+        open={visible}
+        title={title}
+        variant={type === "error" ? "destructive" : "default"}
+    />
+);
 
 export default AlertNotification;
