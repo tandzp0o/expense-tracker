@@ -4,14 +4,7 @@ import Wallet from "../models/Wallet";
 import Budget from "../models/Budget";
 import Goal from "../models/Goal";
 import { Types } from "mongoose";
-import {
-    buildTransactionCacheTag,
-    getTransactionCacheState,
-    touchTransactionCacheState,
-} from "../utils/transaction-cache";
-
-const TRANSACTION_LIST_CACHE_CONTROL =
-    "private, max-age=60, stale-while-revalidate=300";
+import { touchTransactionCacheState } from "../utils/transaction-cache";
 
 const parsePositiveInt = (value: unknown, fallback: number) => {
     const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -49,16 +42,6 @@ const buildTransactionQuery = (userId: string, reqQuery: any) => {
     }
 
     return query;
-};
-
-const buildTransactionQueryKey = (query: Record<string, unknown>) => {
-    const pairs = Object.entries(query)
-        .filter(([, value]) => value !== undefined && value !== null && value !== "")
-        .sort(([left], [right]) => left.localeCompare(right));
-
-    return new URLSearchParams(
-        pairs.map(([key, value]) => [key, String(value)]),
-    ).toString();
 };
 
 export const createTransaction = async (req: any, res: Response) => {
@@ -352,26 +335,9 @@ export const getTransactions = async (req: any, res: Response) => {
         const pageNumber = parsePositiveInt(req.query.page, 1);
         const pageSize = parsePositiveInt(req.query.limit, 10);
         const query = buildTransactionQuery(userId, req.query);
-        const queryKey = buildTransactionQueryKey({
-            ...req.query,
-            page: pageNumber,
-            limit: pageSize,
-        });
-        const cacheState = await getTransactionCacheState(userId);
 
         res.vary("Authorization");
-        res.set("Cache-Control", TRANSACTION_LIST_CACHE_CONTROL);
-        res.set(
-            "ETag",
-            buildTransactionCacheTag(cacheState.version, queryKey),
-        );
-        if (cacheState.updatedAt) {
-            res.set("Last-Modified", cacheState.updatedAt.toUTCString());
-        }
-
-        if (req.fresh) {
-            return res.status(304).end();
-        }
+        res.set("Cache-Control", "private, no-store, max-age=0");
 
         const skip = (pageNumber - 1) * pageSize;
         const [summaryData, transactions] = await Promise.all([

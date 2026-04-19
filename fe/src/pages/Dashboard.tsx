@@ -22,6 +22,7 @@ import {
 import { auth } from "../firebase/config";
 import { goalApi, transactionApi, walletApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
+import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
 import { useTheme } from "../contexts/ThemeContext";
@@ -272,6 +273,7 @@ const DashboardStatCard: React.FC<{
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const { isVietnamese } = useLocale();
   const { toast } = useToast();
   const { appearance } = useTheme();
@@ -287,6 +289,7 @@ const Dashboard: React.FC = () => {
     useState<TransactionFilter>("ALL");
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const fetchRequestRef = useRef(0);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
   const [transactionPanelHeight, setTransactionPanelHeight] = useState<
     number | null
@@ -494,10 +497,21 @@ const Dashboard: React.FC = () => {
   );
 
   const fetchData = useCallback(async () => {
+    const activeUserId = currentUser?.uid;
+    if (!activeUserId) {
+      setWallets([]);
+      setTransactions([]);
+      setGoals([]);
+      setLoading(false);
+      return;
+    }
+
+    const requestId = fetchRequestRef.current + 1;
+    fetchRequestRef.current = requestId;
     setLoading(true);
     try {
       const firebaseUser = auth.currentUser;
-      if (!firebaseUser) {
+      if (!firebaseUser || firebaseUser.uid !== activeUserId) {
         return;
       }
 
@@ -522,23 +536,41 @@ const Dashboard: React.FC = () => {
         goalApi.getGoals(token),
       ]);
 
+      if (fetchRequestRef.current !== requestId) {
+        return;
+      }
+
       setWallets(walletsRes?.wallets || []);
       setTransactions(transactionRes?.data?.transactions || []);
       setGoals(Array.isArray(goalsRes) ? goalsRes : goalsRes?.data || []);
     } catch (error: any) {
+      if (fetchRequestRef.current !== requestId) {
+        return;
+      }
+
       toast({
         title: copy.loadFailed,
         description: error?.message || copy.loadFailedDesc,
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (fetchRequestRef.current === requestId) {
+        setLoading(false);
+      }
     }
-  }, [copy.loadFailed, copy.loadFailedDesc, toast]);
+  }, [copy.loadFailed, copy.loadFailedDesc, currentUser?.uid, toast]);
 
   useEffect(() => {
     dayjs.locale(dayjsLocale);
   }, [dayjsLocale]);
+
+  useEffect(() => {
+    setSelectedWallet("all");
+    setPendingDelete(null);
+    setWallets([]);
+    setTransactions([]);
+    setGoals([]);
+  }, [currentUser?.uid]);
 
   useEffect(() => {
     void fetchData();
