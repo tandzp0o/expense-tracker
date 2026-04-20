@@ -236,6 +236,13 @@ const Transactions: React.FC = () => {
 
     const getTransactionTypeLabel = (type: Transaction["type"]) =>
         transactionTypeText[type][language];
+    const getWalletName = (walletId: Transaction["walletId"]) => {
+        if (typeof walletId !== "string") {
+            return walletId?.name || copy.noWalletFallback;
+        }
+
+        return wallets.find((wallet) => wallet._id === walletId)?.name || walletId;
+    };
 
     // Locale-derived error labels are intentionally reduced to stable primitives above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -524,7 +531,7 @@ const Transactions: React.FC = () => {
                                 ))}
                             </Select>
 
-                            <Button onClick={resetFilters} variant="outline">
+                            <Button className="w-full md:w-auto" onClick={resetFilters} variant="outline">
                                 <Filter className="h-4 w-4" />
                                 {copy.reset}
                             </Button>
@@ -543,7 +550,91 @@ const Transactions: React.FC = () => {
                 <CardContent>
                     {transactions.length > 0 ? (
                         <>
-                            <div className="overflow-x-auto">
+                            <div className="space-y-3 md:hidden">
+                                {transactions.map((transaction) => {
+                                    const amount = parseAmount(transaction.amount);
+                                    const isIncome = transaction.type === "INCOME";
+                                    const walletName = getWalletName(transaction.walletId);
+
+                                    return (
+                                        <div
+                                            key={transaction._id}
+                                            className="rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex min-w-0 items-start gap-3">
+                                                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] bg-primary-soft text-primary">
+                                                        <ReceiptText className="h-4 w-4" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="truncate font-medium text-foreground">
+                                                            {transaction.note || copy.untitledTransaction}
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            ID {transaction._id.slice(-6).toUpperCase()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Badge variant={isIncome ? "success" : "danger"}>
+                                                    {getTransactionTypeLabel(transaction.type)}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="mt-4 grid gap-2 text-sm">
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-muted-foreground">{copy.category}</span>
+                                                    <span className="text-right text-foreground">
+                                                        {getCategoryLabel(transaction.category)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-muted-foreground">{copy.wallet}</span>
+                                                    <span className="text-right text-foreground">
+                                                        {walletName}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-muted-foreground">{copy.date}</span>
+                                                    <span className="text-right text-foreground">
+                                                        {formatDate(transaction.date)}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 flex items-center justify-between gap-3">
+                                                <span
+                                                    className={
+                                                        isIncome
+                                                            ? "text-base font-semibold text-emerald-600"
+                                                            : "text-base font-semibold text-rose-600"
+                                                    }
+                                                >
+                                                    {isIncome ? "+" : "-"}
+                                                    {formatCurrency(amount)}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        onClick={() => handleOpenModal(transaction)}
+                                                        size="icon"
+                                                        variant="ghost"
+                                                    >
+                                                        <PencilLine className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        onClick={() => setPendingDelete(transaction)}
+                                                        size="icon"
+                                                        variant="ghost"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="hidden overflow-x-auto md:block">
                                 <table className="w-full min-w-[860px] text-left">
                                     <thead>
                                         <tr className="border-b border-border text-sm text-muted-foreground">
@@ -581,9 +672,7 @@ const Transactions: React.FC = () => {
                                                     {getCategoryLabel(transaction.category)}
                                                 </td>
                                                 <td className="py-4 text-muted-foreground">
-                                                    {typeof transaction.walletId === "string"
-                                                        ? transaction.walletId
-                                                        : transaction.walletId?.name || copy.noWalletFallback}
+                                                    {getWalletName(transaction.walletId)}
                                                 </td>
                                                 <td className="py-4 text-muted-foreground">
                                                     {formatDate(transaction.date)}
@@ -639,8 +728,9 @@ const Transactions: React.FC = () => {
                                 <p className="text-sm text-muted-foreground">
                                     {copy.showingRows(transactions.length)}
                                 </p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                     <Button
+                                        className="w-full sm:w-auto"
                                         disabled={page <= 1}
                                         onClick={() => setPage((current) => Math.max(1, current - 1))}
                                         variant="outline"
@@ -648,6 +738,7 @@ const Transactions: React.FC = () => {
                                         {copy.previous}
                                     </Button>
                                     <Button
+                                        className="w-full sm:w-auto"
                                         disabled={page >= totalPages}
                                         onClick={() =>
                                             setPage((current) => Math.min(totalPages, current + 1))
@@ -782,11 +873,11 @@ const Transactions: React.FC = () => {
                         />
                     </div>
 
-                    <div className="flex justify-end gap-3">
-                        <Button onClick={() => setModalOpen(false)} variant="outline">
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <Button className="w-full sm:w-auto" onClick={() => setModalOpen(false)} variant="outline">
                             {copy.cancel}
                         </Button>
-                        <Button disabled={submitting} onClick={handleSubmit}>
+                        <Button className="w-full sm:w-auto" disabled={submitting} onClick={handleSubmit}>
                             {submitting
                                 ? copy.saving
                                 : editing

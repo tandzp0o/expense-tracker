@@ -82,7 +82,7 @@ const LoginRoute = () => {
     }
 
     if (currentUser) {
-        return <Navigate replace to="/dashboard" />;
+        return <Navigate replace to={currentUser.newUser ? "/wallets" : "/dashboard"} />;
     }
 
     return <Login />;

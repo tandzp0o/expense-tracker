@@ -10,6 +10,8 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { useLocale } from "../contexts/LocaleContext";
+import { useTheme } from "../contexts/ThemeContext";
+import { hexToRgba } from "../lib/utils";
 
 type Placement = "top" | "bottom" | "left" | "right";
 
@@ -48,9 +50,13 @@ type Boundary = {
 };
 
 const VIEWPORT_MARGIN = 24;
+const MOBILE_BREAKPOINT = 768;
 const DEFAULT_BUBBLE_WIDTH = 360;
 const DEFAULT_BUBBLE_HEIGHT = 220;
 const BUBBLE_GAP = 120;
+const MOBILE_BUBBLE_GAP = 96;
+const MOBILE_ARROW_BUBBLE_OFFSET = 24;
+const MOBILE_ARROW_TARGET_OFFSET = 18;
 const HORIZONTAL_PLACEMENT_LIFT = 18;
 const FOCUSABLE_SELECTOR = [
     "button:not([disabled])",
@@ -106,6 +112,7 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
     highlightPadding = 14,
 }) => {
     const { isVietnamese } = useLocale();
+    const { appearance } = useTheme();
     const bubbleRef = useRef<HTMLDivElement | null>(null);
     const primaryActionRef = useRef<HTMLButtonElement | null>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -114,6 +121,7 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
     const [entered, setEntered] = useState(false);
     const [rect, setRect] = useState<Rect | null>(null);
     const [bubbleSize, setBubbleSize] = useState<Size | null>(null);
+    const [viewportSize, setViewportSize] = useState<Size | null>(null);
     const [boundaryRect, setBoundaryRect] = useState<Boundary | null>(null);
 
     const titleId = `${baseId}-title`;
@@ -130,6 +138,20 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
     const actionAriaLabel = isVietnamese
         ? "Chuyển sang bước tiếp theo"
         : "Continue to the next step";
+
+    const viewportWidth = viewportSize?.width || DEFAULT_BUBBLE_WIDTH + VIEWPORT_MARGIN * 2;
+    const viewportHeight =
+        viewportSize?.height || DEFAULT_BUBBLE_HEIGHT + VIEWPORT_MARGIN * 2;
+    const isMobile = viewportWidth < MOBILE_BREAKPOINT;
+    const bubbleGap = isMobile ? MOBILE_BUBBLE_GAP : BUBBLE_GAP;
+    const fallbackBubbleWidth = Math.max(
+        Math.min(
+            isMobile ? 420 : DEFAULT_BUBBLE_WIDTH,
+            viewportWidth - VIEWPORT_MARGIN * 2,
+        ),
+        240,
+    );
+    const fallbackBubbleHeight = isMobile ? 208 : DEFAULT_BUBBLE_HEIGHT;
 
     useEffect(() => {
         setMounted(true);
@@ -152,6 +174,16 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
     }, [open]);
 
     const measureLayout = useEffectEvent(() => {
+        const nextViewport = {
+            width: window.innerWidth,
+            height: window.innerHeight,
+        };
+        setViewportSize((currentViewport) =>
+            isSameSize(currentViewport, nextViewport)
+                ? currentViewport
+                : nextViewport,
+        );
+
         const targetElement = targetRef.current;
         if (!targetElement) {
             setRect((currentRect) => (currentRect ? null : currentRect));
@@ -211,6 +243,7 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
         if (!open) {
             setRect(null);
             setBubbleSize(null);
+            setViewportSize(null);
             setBoundaryRect(null);
             return;
         }
@@ -336,15 +369,13 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                 previousFocusRef.current.focus({ preventScroll: true });
             }
         };
-    }, [open]);
+    }, [open, rect]);
 
     const highlightRect = useMemo(() => {
-        if (!rect) {
+        if (!rect || !viewportSize) {
             return null;
         }
 
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
         const left = clamp(rect.left - highlightPadding, 0, viewportWidth);
         const top = clamp(rect.top - highlightPadding, 0, viewportHeight);
         const right = clamp(
@@ -364,34 +395,32 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
             width: Math.max(right - left, 0),
             height: Math.max(bottom - top, 0),
         };
-    }, [highlightPadding, rect]);
+    }, [highlightPadding, rect, viewportHeight, viewportSize, viewportWidth]);
 
     const effectivePlacement = useMemo(() => {
         if (!highlightRect) {
             return placement;
         }
 
-        if (placement === "left" || placement === "right") {
+        if (!isMobile && (placement === "left" || placement === "right")) {
             return placement;
         }
 
         const targetCenterY = highlightRect.top + highlightRect.height / 2;
         const verticalBoundaryMidpoint = boundaryRect
             ? boundaryRect.top + boundaryRect.height / 2
-            : window.innerHeight / 2;
+            : viewportHeight / 2;
 
         return targetCenterY <= verticalBoundaryMidpoint ? "bottom" : "top";
-    }, [boundaryRect, highlightRect, placement]);
+    }, [boundaryRect, highlightRect, isMobile, placement, viewportHeight]);
 
     const bubbleStyle = useMemo(() => {
         if (!highlightRect) {
             return null;
         }
 
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const bubbleWidth = bubbleSize?.width || DEFAULT_BUBBLE_WIDTH;
-        const bubbleHeight = bubbleSize?.height || DEFAULT_BUBBLE_HEIGHT;
+        const bubbleWidth = bubbleSize?.width || fallbackBubbleWidth;
+        const bubbleHeight = bubbleSize?.height || fallbackBubbleHeight;
         const highlightCenterX = highlightRect.left + highlightRect.width / 2;
         const highlightCenterY = highlightRect.top + highlightRect.height / 2;
         const highlightRight = highlightRect.left + highlightRect.width;
@@ -401,30 +430,39 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
         let left = highlightRect.left;
 
         if (effectivePlacement === "top") {
-            top = highlightRect.top - bubbleHeight - BUBBLE_GAP;
+            top = highlightRect.top - bubbleHeight - bubbleGap;
             left = highlightCenterX - bubbleWidth / 2;
         }
 
         if (effectivePlacement === "bottom") {
-            top = highlightBottom + BUBBLE_GAP;
+            top = highlightBottom + bubbleGap;
             left = highlightCenterX - bubbleWidth / 2;
         }
 
         if (effectivePlacement === "left") {
             top = highlightCenterY - bubbleHeight / 2 - HORIZONTAL_PLACEMENT_LIFT;
-            left = highlightRect.left - bubbleWidth - BUBBLE_GAP;
+            left = highlightRect.left - bubbleWidth - bubbleGap;
         }
 
         if (effectivePlacement === "right") {
             top = highlightCenterY - bubbleHeight / 2 - HORIZONTAL_PLACEMENT_LIFT;
-            left = highlightRight + BUBBLE_GAP;
+            left = highlightRight + bubbleGap;
         }
 
         return {
             top: clamp(top, VIEWPORT_MARGIN, viewportHeight - bubbleHeight - VIEWPORT_MARGIN),
             left: clamp(left, VIEWPORT_MARGIN, viewportWidth - bubbleWidth - VIEWPORT_MARGIN),
         };
-    }, [bubbleSize, effectivePlacement, highlightRect]);
+    }, [
+        bubbleGap,
+        bubbleSize,
+        effectivePlacement,
+        fallbackBubbleHeight,
+        fallbackBubbleWidth,
+        highlightRect,
+        viewportHeight,
+        viewportWidth,
+    ]);
 
     const bubbleBounds = useMemo(() => {
         if (!bubbleStyle) {
@@ -434,18 +472,18 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
         return {
             top: bubbleStyle.top,
             left: bubbleStyle.left,
-            width: bubbleSize?.width || DEFAULT_BUBBLE_WIDTH,
-            height: bubbleSize?.height || DEFAULT_BUBBLE_HEIGHT,
+            width: bubbleSize?.width || fallbackBubbleWidth,
+            height: bubbleSize?.height || fallbackBubbleHeight,
         };
-    }, [bubbleSize, bubbleStyle]);
+    }, [bubbleSize, bubbleStyle, fallbackBubbleHeight, fallbackBubbleWidth]);
 
     const arrowPath = useMemo(() => {
         if (!bubbleStyle || !bubbleBounds || !highlightRect) {
             return null;
         }
 
-        const outsideOffset = 20;
-        const targetOutsideOffset = 14;
+        const outsideOffset = isMobile ? MOBILE_ARROW_BUBBLE_OFFSET : 20;
+        const targetOutsideOffset = isMobile ? MOBILE_ARROW_TARGET_OFFSET : 14;
 
         let startX = bubbleStyle.left + bubbleBounds.width / 2;
         let startY = bubbleStyle.top + bubbleBounds.height / 2;
@@ -500,15 +538,38 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                 : dy >= 0
                   ? -1
                   : 1;
-        const sway = clamp(distance * 0.1, 16, 34) * swayDirection;
-        const handle = clamp(distance * 0.1, 16, 28);
-        const exit = clamp(distance * 0.16, 18, 30);
-        const approach = clamp(distance * 0.14, 16, 28);
+
+        if (isMobile) {
+            const exit = clamp(distance * 0.22, 20, 34);
+            const approach = clamp(distance * 0.18, 18, 30);
+            const arc = clamp(distance * 0.18, 18, 34) * swayDirection;
+            const c1x = startX + outwardX * exit + dx * 0.22 + normalX * arc;
+            const c1y = startY + outwardY * exit + dy * 0.22 + normalY * arc;
+            const c2x = endX - mainX * approach + normalX * arc * 0.3;
+            const c2y = endY - mainY * approach + normalY * arc * 0.3;
+
+            return `M ${startX.toFixed(2)} ${startY.toFixed(2)} C ${c1x.toFixed(
+                2,
+            )} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(
+                2,
+            )}, ${endX.toFixed(2)} ${endY.toFixed(2)}`;
+        }
+
+        const sway = clamp(
+            distance * 0.1,
+            12,
+            34,
+        ) * swayDirection;
+        const handle = clamp(distance * 0.1, 14, 28);
+        const exit = clamp(distance * 0.16, 16, 30);
+        const approach = clamp(distance * 0.14, 14, 28);
 
         const firstTurnX = startX + dx * 0.28 + normalX * sway;
         const firstTurnY = startY + dy * 0.24 + normalY * sway;
-        const secondTurnX = startX + dx * 0.72 - normalX * sway * 0.55;
-        const secondTurnY = startY + dy * 0.76 - normalY * sway * 0.55;
+        const secondTurnX =
+            startX + dx * 0.72 - normalX * sway * 0.55;
+        const secondTurnY =
+            startY + dy * 0.76 - normalY * sway * 0.55;
 
         const c1x = startX + outwardX * exit + normalX * sway * 0.08;
         const c1y = startY + outwardY * exit + normalY * sway * 0.08;
@@ -536,14 +597,24 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
         )} ${secondTurnY.toFixed(2)} C ${c5x.toFixed(2)} ${c5y.toFixed(
             2,
         )}, ${c6x.toFixed(2)} ${c6y.toFixed(2)}, ${endX.toFixed(2)} ${endY.toFixed(2)}`;
-    }, [bubbleBounds, bubbleStyle, effectivePlacement, highlightRect]);
+    }, [bubbleBounds, bubbleStyle, effectivePlacement, highlightRect, isMobile]);
 
-    if (!mounted || !open || !rect || !highlightRect || !bubbleStyle) {
+    if (!mounted || !open || !rect || !highlightRect || !bubbleStyle || !viewportSize) {
         return null;
     }
 
     return createPortal(
         <div className="pointer-events-none fixed inset-0 z-[2000]">
+            <button
+                aria-label={skipAriaLabel}
+                className="pointer-events-auto fixed right-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-[5] inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/35 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300/90 backdrop-blur-md transition-colors duration-150 hover:border-white/20 hover:bg-slate-950/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 sm:right-6 sm:top-6"
+                onClick={onSkip}
+                style={{ opacity: entered ? 1 : 0 }}
+                type="button"
+            >
+                {resolvedSkipLabel}
+            </button>
+
             <div
                 className="pointer-events-auto fixed left-0 right-0 top-0 bg-slate-950/80 transition-opacity duration-200 ease-out"
                 style={{
@@ -603,14 +674,14 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                         <marker
                             id={arrowMarkerId}
                             markerUnits="userSpaceOnUse"
-                            markerWidth="8"
-                            markerHeight="8"
-                            refX="7"
-                            refY="4"
+                            markerWidth={isMobile ? "7" : "8"}
+                            markerHeight={isMobile ? "7" : "8"}
+                            refX={isMobile ? "6.2" : "7"}
+                            refY={isMobile ? "3.5" : "4"}
                             orient="auto"
                         >
                             <path
-                                d="M 0 0 L 8 4 L 0 8 z"
+                                d={isMobile ? "M 0 0 L 7 3.5 L 0 7 z" : "M 0 0 L 8 4 L 0 8 z"}
                                 fill="rgba(255,255,255,0.95)"
                             />
                         </marker>
@@ -624,7 +695,7 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                         strokeDashoffset="3"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth="3.4"
+                        strokeWidth={isMobile ? 3 : 3.4}
                     />
                 </svg>
             ) : null}
@@ -633,10 +704,12 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                 ref={bubbleRef}
                 aria-describedby={descriptionId}
                 aria-labelledby={titleId}
-                className="pointer-events-auto fixed w-[360px] max-w-[calc(100vw-48px)] rounded-[calc(var(--app-radius-xl)+10px)] border border-white/15 bg-slate-950/95 p-6 text-white shadow-[0_26px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out"
+                className="pointer-events-auto fixed max-w-[calc(100vw-48px)] overflow-y-auto rounded-[calc(var(--app-radius-xl)+10px)] border border-white/15 bg-slate-950/95 p-4 text-white shadow-[0_26px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out sm:p-6"
                 role="dialog"
                 style={{
                     ...bubbleStyle,
+                    width: fallbackBubbleWidth,
+                    maxHeight: viewportHeight - VIEWPORT_MARGIN * 2,
                     opacity: entered ? 1 : 0,
                     transform: entered
                         ? "translate3d(0,0,0)"
@@ -644,11 +717,21 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                 }}
                 tabIndex={-1}
             >
-                <div className="space-y-3">
-                    <div className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan-300">
+                <div className="space-y-3 sm:space-y-3.5">
+                    <div
+                        className="inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.24em]"
+                        style={{
+                            backgroundColor: hexToRgba(appearance.primaryColor, 0.22),
+                            color: "var(--app-primary-foreground)",
+                            boxShadow: `inset 0 0 0 1px ${hexToRgba(
+                                appearance.primaryColor,
+                                0.42,
+                            )}`,
+                        }}
+                    >
                         {resolvedStepLabel}
                     </div>
-                    <h3 className="text-xl font-bold leading-tight" id={titleId}>
+                    <h3 className="text-lg font-bold leading-tight sm:text-xl" id={titleId}>
                         {title}
                     </h3>
                     <p className="text-sm leading-6 text-slate-200" id={descriptionId}>
@@ -656,11 +739,11 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                     </p>
                 </div>
 
-                <div className="mt-6 flex flex-wrap items-center gap-3">
+                <div className="mt-5 flex flex-col-reverse gap-2.5 sm:mt-6 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                     {onAction ? (
                         <button
                             aria-label={actionAriaLabel}
-                            className="inline-flex h-11 items-center justify-center rounded-[var(--app-radius-md)] bg-white px-5 text-sm font-bold text-slate-950 transition-transform duration-150 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-11 w-full items-center justify-center rounded-[var(--app-radius-md)] bg-white px-5 text-sm font-bold text-slate-950 transition-transform duration-150 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                             disabled={actionDisabled}
                             onClick={onAction}
                             ref={primaryActionRef}
@@ -669,15 +752,6 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                             {resolvedActionLabel}
                         </button>
                     ) : null}
-
-                    <button
-                        aria-label={skipAriaLabel}
-                        className="inline-flex h-10 items-center justify-center rounded-[var(--app-radius-md)] border border-white/15 px-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300 transition-colors duration-150 hover:border-white/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                        onClick={onSkip}
-                        type="button"
-                    >
-                        {resolvedSkipLabel}
-                    </button>
                 </div>
             </div>
         </div>,

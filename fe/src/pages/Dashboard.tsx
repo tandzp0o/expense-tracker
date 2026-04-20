@@ -1018,8 +1018,8 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         actions={
-          <div className="flex flex-row-reverse gap-3 lg:items-end">
-            <div className="flex flex-wrap gap-3">
+          <div className="flex w-full flex-col gap-3 lg:items-end">
+            <div className="grid gap-3 sm:flex sm:flex-wrap sm:justify-end">
               <Button onClick={() => navigate("/analytics")} variant="outline">
                 <Download className="h-4 w-4" />
                 {copy.reportButton}
@@ -1030,9 +1030,9 @@ const Dashboard: React.FC = () => {
               </Button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-2">
+            <div className="grid gap-2 rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-2 sm:grid-cols-2">
               <Select
-                className="min-w-[9rem]"
+                className="w-full sm:min-w-[9rem]"
                 onChange={(event) =>
                   setSelectedPeriod(event.target.value as PeriodFilter)
                 }
@@ -1044,7 +1044,7 @@ const Dashboard: React.FC = () => {
               </Select>
 
               <Select
-                className="min-w-[11rem]"
+                className="w-full sm:min-w-[11rem]"
                 onChange={(event) => setSelectedWallet(event.target.value)}
                 value={selectedWallet}
               >

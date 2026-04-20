@@ -57,7 +57,7 @@ interface WalletItem {
     updatedAt: string;
 }
 
-type WalletGuideStep = 0 | 1 | 2 | 3 | 4;
+type WalletGuideStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 type GuideConfig = {
     targetRef: React.RefObject<HTMLElement | null>;
@@ -116,6 +116,16 @@ const colorOptions = [
     "#475569",
 ];
 
+const WALLET_GUIDE_STEP_COUNT = 9;
+
+const formatWholeNumberInput = (value: number) =>
+    value > 0 ? new Intl.NumberFormat("vi-VN").format(value) : "";
+
+const parseWholeNumberInput = (value: string) => {
+    const digits = value.replace(/[^\d]/g, "");
+    return digits ? Number(digits) : 0;
+};
+
 const Wallets: React.FC = () => {
     const { currentUser, updateUserStatus } = useAuth();
     const { language, isVietnamese } = useLocale();
@@ -153,12 +163,21 @@ const Wallets: React.FC = () => {
               firstWalletGuide: "Tạo ví đầu tiên",
               firstWalletGuideDesc:
                   "Mở form tạo ví trước. Hướng dẫn sẽ tiếp tục trên các trường trong hộp thoại.",
+              imageGuide: "Thêm ảnh nếu bạn muốn",
+              imageGuideDesc:
+                  "Bạn có thể tải ảnh thêm cho ví này để dễ nhận ra hơn. Không bắt buộc, nên bạn có thể bước tiếp ngay.",
               clearNameGuide: "Đặt tên dễ nhận biết",
               clearNameGuideDesc:
-                  "Ví dụ: Tiền mặt, Techcombank hoặc Momo. Khi bạn nhập tên, hướng dẫn sẽ chuyển bước tiếp theo.",
+                  "Ví dụ: Tiền mặt, Techcombank hoặc Momo. Nhập xong rồi bấm Tiếp tục để sang bước sau.",
               walletTypeGuide: "Chọn đúng loại ví",
               walletTypeGuideDesc:
                   "Loại ví ảnh hưởng tới cách hệ thống gom số dư trong báo cáo.",
+              currencyGuide: "Chọn loại tiền tệ",
+              currencyGuideDesc:
+                  "Chọn đúng tiền tệ ngay từ đầu để các báo cáo và giao dịch không bị sai định dạng.",
+              iconGuide: "Chọn biểu tượng",
+              iconGuideDesc:
+                  "Bạn có thể gõ tên biểu tượng, dán tên có sẵn hoặc chọn một giá trị gợi ý.",
               startingBalanceGuide: "Nhập số dư ban đầu",
               startingBalanceGuideDesc:
                   "Đây là số tiền hiện đang có trong ví tại thời điểm tạo.",
@@ -166,7 +185,7 @@ const Wallets: React.FC = () => {
               saveGuideDesc:
                   "Sau khi lưu ví đầu tiên, ứng dụng sẽ mở khóa giao dịch, ngân sách và mục tiêu.",
               continue: "Tiếp tục",
-              stepLabel: (step: number) => `Bước ${step}/5`,
+              stepLabel: (step: number) => `Bước ${step}/${WALLET_GUIDE_STEP_COUNT}`,
               pageTitle: "Ví tiền",
               pageDescription:
                   "Màn ví giữ nguyên luồng tạo, cập nhật, lưu trữ/xóa và chuyển nội bộ theo các API hiện có.",
@@ -214,8 +233,12 @@ const Wallets: React.FC = () => {
               currency: "Tiền tệ",
               icon: "Biểu tượng",
               auto: "Tự động",
+              iconPlaceholder: "Ví dụ: wallet, credit_card, phone_android...",
+              iconHint:
+                  "Bạn có thể gõ hoặc dán tên biểu tượng. Danh sách gợi ý sẽ xuất hiện khi bạn nhập.",
               accentColor: "Màu nhấn",
               startingBalance: "Số dư ban đầu",
+              startingBalancePlaceholder: "Ví dụ: 1.000.000",
               cancel: "Hủy",
               saving: "Đang lưu...",
               updateWallet: "Cập nhật ví",
@@ -266,12 +289,21 @@ const Wallets: React.FC = () => {
               firstWalletGuide: "Create the first wallet",
               firstWalletGuideDesc:
                   "Open the wallet form first. The guide will continue on the fields inside the dialog.",
+              imageGuide: "Add an image if you want",
+              imageGuideDesc:
+                  "You can upload an image to make this wallet easier to recognize. It is optional, so you can continue right away.",
               clearNameGuide: "Give it a clear name",
               clearNameGuideDesc:
-                  "Examples: Cash, Techcombank or Momo. Once you type a name, the guide moves ahead.",
+                  "Examples: Cash, Techcombank or Momo. Once the name looks right, press Continue to move on.",
               walletTypeGuide: "Pick the right wallet type",
               walletTypeGuideDesc:
                   "This affects how reports group your balances later.",
+              currencyGuide: "Choose the wallet currency",
+              currencyGuideDesc:
+                  "Pick the correct currency from the start so reports and transactions stay consistent.",
+              iconGuide: "Choose an icon",
+              iconGuideDesc:
+                  "You can type an icon name, paste one from elsewhere, or use one of the suggested values.",
               startingBalanceGuide: "Enter the starting balance",
               startingBalanceGuideDesc:
                   "This should be the amount currently available in the wallet.",
@@ -279,7 +311,7 @@ const Wallets: React.FC = () => {
               saveGuideDesc:
                   "After saving your first wallet, the app unlocks transactions, budgets and goals.",
               continue: "Continue",
-              stepLabel: (step: number) => `Step ${step}/5`,
+              stepLabel: (step: number) => `Step ${step}/${WALLET_GUIDE_STEP_COUNT}`,
               pageTitle: "Wallets",
               pageDescription:
                   "Wallet page keeps create, update, archive/delete and internal transfer flows tied to the existing APIs.",
@@ -327,8 +359,12 @@ const Wallets: React.FC = () => {
               currency: "Currency",
               icon: "Icon",
               auto: "Auto",
+              iconPlaceholder: "Example: wallet, credit_card, phone_android...",
+              iconHint:
+                  "Type or paste an icon name. Suggested values appear as you type.",
               accentColor: "Accent color",
               startingBalance: "Starting balance",
+              startingBalancePlaceholder: "Example: 1.000.000",
               cancel: "Cancel",
               saving: "Saving...",
               updateWallet: "Update wallet",
@@ -351,6 +387,22 @@ const Wallets: React.FC = () => {
     const guideOpenFormLabel = isVietnamese
         ? "M\u1edf form \u2192"
         : "Open form ->";
+    const onboardingNoticeTitle = isVietnamese
+        ? "Ví tiền: lần đầu bạn truy cập app, hãy tạo 1 ví đầu tiên"
+        : "Wallets: create your first wallet on your first visit";
+    const onboardingNoticeDescription = isVietnamese
+        ? "Bạn đang ở chế độ người dùng mới, nên các tab khác sẽ tạm khóa cho đến khi tạo ví đầu tiên. Chỉ cần tạo một ví để mở khóa giao dịch, ngân sách, mục tiêu và các báo cáo."
+        : "You are currently in new user mode, so the other tabs stay locked until your first wallet is created. Create one wallet to unlock transactions, budgets, goals, and reports.";
+    const onboardingBadgeLabel = isVietnamese ? "Người dùng mới" : "New user";
+    const onboardingPageDescription = isVietnamese
+        ? "Lần đầu truy cập app? Hãy tạo ví đầu tiên để mở khóa toàn bộ tính năng."
+        : "First time in the app? Create your first wallet to unlock the rest of the experience.";
+    const accountNumberGuideTitle = isVietnamese
+        ? "Thêm số tài khoản nếu cần"
+        : "Add an account number if needed";
+    const accountNumberGuideDescription = isVietnamese
+        ? "Bước này không bắt buộc. Bạn có thể nhập số tài khoản, số thẻ hoặc 4 số cuối để dễ phân biệt ví."
+        : "This step is optional. You can enter an account number, card number, or just the last four digits to identify the wallet faster.";
     const getWalletTypeLabel = (type: WalletItem["type"]) => walletTypeText[type][language];
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -372,6 +424,7 @@ const Wallets: React.FC = () => {
         icon: "",
         color: appearance.primaryColor,
     });
+    const [initialBalanceInput, setInitialBalanceInput] = useState("");
     const [transferValues, setTransferValues] = useState({
         fromWalletId: "",
         toWalletId: "",
@@ -379,8 +432,12 @@ const Wallets: React.FC = () => {
     });
 
     const addWalletButtonRef = useRef<HTMLButtonElement | null>(null);
+    const imageFieldRef = useRef<HTMLElement | null>(null);
     const nameFieldRef = useRef<HTMLElement | null>(null);
+    const accountNumberFieldRef = useRef<HTMLElement | null>(null);
     const typeFieldRef = useRef<HTMLElement | null>(null);
+    const currencyFieldRef = useRef<HTMLElement | null>(null);
+    const iconFieldRef = useRef<HTMLElement | null>(null);
     const balanceFieldRef = useRef<HTMLElement | null>(null);
     const submitButtonRef = useRef<HTMLButtonElement | null>(null);
     const pendingGuideStepRef = useRef<WalletGuideStep | null>(null);
@@ -388,6 +445,13 @@ const Wallets: React.FC = () => {
     const onboardingStorageKey = useMemo(
         () =>
             currentUser?.uid ? `fintrack-wallet-onboarding:${currentUser.uid}` : "",
+        [currentUser?.uid],
+    );
+    const onboardingSessionSkipKey = useMemo(
+        () =>
+            currentUser?.uid
+                ? `fintrack-wallet-onboarding-session:${currentUser.uid}`
+                : "",
         [currentUser?.uid],
     );
     const hasWallets = wallets.length > 0;
@@ -433,6 +497,13 @@ const Wallets: React.FC = () => {
 
         return window.localStorage.getItem(onboardingStorageKey);
     }, [onboardingStorageKey]);
+    const getGuideSessionSkipState = useCallback(() => {
+        if (!onboardingSessionSkipKey || typeof window === "undefined") {
+            return null;
+        }
+
+        return window.sessionStorage.getItem(onboardingSessionSkipKey);
+    }, [onboardingSessionSkipKey]);
 
     // Locale-derived error labels are intentionally reduced to stable primitives above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -482,8 +553,15 @@ const Wallets: React.FC = () => {
         logGuide("Guide state snapshot", {
             onboardingStorageKey,
             persistedState: getGuideState(),
+            sessionSkipState: getGuideSessionSkipState(),
         });
-    }, [getGuideState, logGuide, onboardingStorageKey]);
+    }, [
+        getGuideSessionSkipState,
+        getGuideState,
+        logGuide,
+        onboardingSessionSkipKey,
+        onboardingStorageKey,
+    ]);
 
     useEffect(() => {
         if (!currentUser?.newUser || !hasWallets) {
@@ -494,10 +572,14 @@ const Wallets: React.FC = () => {
         if (onboardingStorageKey) {
             window.localStorage.setItem(onboardingStorageKey, "done");
         }
+        if (onboardingSessionSkipKey) {
+            window.sessionStorage.removeItem(onboardingSessionSkipKey);
+        }
     }, [
         currentUser?.newUser,
         hasWallets,
         logGuide,
+        onboardingSessionSkipKey,
         onboardingStorageKey,
         updateUserStatus,
     ]);
@@ -512,17 +594,17 @@ const Wallets: React.FC = () => {
             return;
         }
 
+        const sessionSkipState = getGuideSessionSkipState();
+        if (sessionSkipState === "skip") {
+            logGuide("Guide bootstrap blocked for this session");
+            return;
+        }
+
         let guideState = getGuideState();
         if (guideState === "done") {
             logGuide("Detected stale persisted done state for eligible user, resetting it");
             window.localStorage.removeItem(onboardingStorageKey);
             guideState = null;
-        }
-
-        if (guideState === "skip") {
-            logGuide(
-                "Persisted skip state found, but guide will restart until the first wallet exists",
-            );
         }
 
         let frameId = 0;
@@ -558,6 +640,7 @@ const Wallets: React.FC = () => {
 
         logGuide("Starting guide bootstrap", {
             persistedState: guideState,
+            sessionSkipState,
         });
         frameId = window.requestAnimationFrame(ensureGuideStarts);
 
@@ -566,6 +649,7 @@ const Wallets: React.FC = () => {
             window.cancelAnimationFrame(frameId);
         };
     }, [
+        getGuideSessionSkipState,
         getGuideState,
         isGuideEligible,
         loading,
@@ -599,18 +683,34 @@ const Wallets: React.FC = () => {
 
         const getPendingTarget = (step: WalletGuideStep) => {
             if (step === 1) {
-                return nameFieldRef.current;
+                return imageFieldRef.current;
             }
 
             if (step === 2) {
-                return typeFieldRef.current;
+                return nameFieldRef.current;
             }
 
             if (step === 3) {
-                return balanceFieldRef.current;
+                return accountNumberFieldRef.current;
             }
 
             if (step === 4) {
+                return typeFieldRef.current;
+            }
+
+            if (step === 5) {
+                return currencyFieldRef.current;
+            }
+
+            if (step === 6) {
+                return iconFieldRef.current;
+            }
+
+            if (step === 7) {
+                return balanceFieldRef.current;
+            }
+
+            if (step === 8) {
                 return submitButtonRef.current;
             }
 
@@ -654,17 +754,25 @@ const Wallets: React.FC = () => {
         return () => {
             window.cancelAnimationFrame(frameId);
         };
-    }, [logGuide, modalOpen, setGuideStepWithLog]);
-
-    useEffect(() => {
-        if (guideStep === 1 && formValues.name.trim()) {
-            setGuideStepWithLog(2, "name entered");
-        }
-    }, [formValues.name, guideStep, setGuideStepWithLog]);
+    }, [
+        accountNumberFieldRef,
+        currencyFieldRef,
+        iconFieldRef,
+        imageFieldRef,
+        logGuide,
+        modalOpen,
+        setGuideStepWithLog,
+    ]);
 
     const finishOnboarding = (status: "done" | "skip") => {
-        if (onboardingStorageKey) {
+        if (status === "done" && onboardingStorageKey) {
             window.localStorage.setItem(onboardingStorageKey, status);
+        }
+        if (status === "skip" && onboardingSessionSkipKey) {
+            window.sessionStorage.setItem(onboardingSessionSkipKey, "skip");
+        }
+        if (status === "done" && onboardingSessionSkipKey) {
+            window.sessionStorage.removeItem(onboardingSessionSkipKey);
         }
         logGuide("Finishing onboarding", {
             status,
@@ -693,10 +801,14 @@ const Wallets: React.FC = () => {
 
     const openCreate = (source: "empty-state" | "guide-cta" | "header" = "header") => {
         const persistedGuideState = getGuideState();
+        const sessionSkipState = getGuideSessionSkipState();
         const shouldContinueGuide =
-            isGuideEligible && persistedGuideState !== "done";
+            isGuideEligible &&
+            persistedGuideState !== "done" &&
+            sessionSkipState !== "skip";
         logGuide("Open create wallet requested", {
             persistedGuideState,
+            sessionSkipState,
             shouldContinueGuide,
             source,
         });
@@ -711,6 +823,7 @@ const Wallets: React.FC = () => {
             icon: "",
             color: appearance.primaryColor,
         });
+        setInitialBalanceInput("");
         setImageFile(null);
         setImagePreview("");
         setModalOpen(true);
@@ -735,6 +848,9 @@ const Wallets: React.FC = () => {
             icon: wallet.icon || "",
             color: wallet.color || appearance.primaryColor,
         });
+        setInitialBalanceInput(
+            formatWholeNumberInput(wallet.initialBalance ?? wallet.balance),
+        );
         setImageFile(null);
         setImagePreview(wallet.imageUrl || "");
         pendingGuideStepRef.current = null;
@@ -761,6 +877,19 @@ const Wallets: React.FC = () => {
         reader.onloadend = () => setImagePreview(reader.result as string);
         reader.readAsDataURL(file);
     };
+    const handleInitialBalanceChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const numericValue = parseWholeNumberInput(event.target.value);
+
+        setInitialBalanceInput(
+            numericValue > 0 ? formatWholeNumberInput(numericValue) : "",
+        );
+        setFormValues((current) => ({
+            ...current,
+            initialBalance: numericValue,
+        }));
+    };
 
     const submitWallet = async (confirmTypeChange = false) => {
         if (!formValues.name.trim()) {
@@ -774,6 +903,7 @@ const Wallets: React.FC = () => {
 
         setSubmitting(true);
         try {
+            const normalizedIcon = formValues.icon.trim();
             const token = await auth.currentUser?.getIdToken();
             if (!token) {
                 return;
@@ -787,8 +917,8 @@ const Wallets: React.FC = () => {
             if (formValues.accountNumber) {
                 formData.append("accountNumber", formValues.accountNumber);
             }
-            if (formValues.icon) {
-                formData.append("icon", formValues.icon);
+            if (normalizedIcon) {
+                formData.append("icon", normalizedIcon);
             }
             if (formValues.color) {
                 formData.append("color", formValues.color);
@@ -974,31 +1104,63 @@ const Wallets: React.FC = () => {
             onAction: () => openCreate("guide-cta"),
         },
         1: {
+            targetRef: imageFieldRef,
+            title: copy.imageGuide,
+            description: copy.imageGuideDesc,
+            placement: "top",
+            actionLabel: copy.continue,
+            onAction: () => setGuideStepWithLog(2, "step 1 CTA"),
+        },
+        2: {
             targetRef: nameFieldRef,
             title: copy.clearNameGuide,
             description: copy.clearNameGuideDesc,
             placement: "top",
             actionLabel: copy.continue,
-            onAction: () => setGuideStepWithLog(2, "step 1 CTA"),
+            onAction: () => setGuideStepWithLog(3, "step 2 CTA"),
             actionDisabled: !formValues.name.trim(),
         },
-        2: {
-            targetRef: typeFieldRef,
-            title: copy.walletTypeGuide,
-            description: copy.walletTypeGuideDesc,
-            placement: "top",
-            actionLabel: copy.continue,
-            onAction: () => setGuideStepWithLog(3, "step 2 CTA"),
-        },
         3: {
-            targetRef: balanceFieldRef,
-            title: copy.startingBalanceGuide,
-            description: copy.startingBalanceGuideDesc,
+            targetRef: accountNumberFieldRef,
+            title: accountNumberGuideTitle,
+            description: accountNumberGuideDescription,
             placement: "top",
             actionLabel: copy.continue,
             onAction: () => setGuideStepWithLog(4, "step 3 CTA"),
         },
         4: {
+            targetRef: typeFieldRef,
+            title: copy.walletTypeGuide,
+            description: copy.walletTypeGuideDesc,
+            placement: "top",
+            actionLabel: copy.continue,
+            onAction: () => setGuideStepWithLog(5, "step 4 CTA"),
+        },
+        5: {
+            targetRef: currencyFieldRef,
+            title: copy.currencyGuide,
+            description: copy.currencyGuideDesc,
+            placement: "top",
+            actionLabel: copy.continue,
+            onAction: () => setGuideStepWithLog(6, "step 5 CTA"),
+        },
+        6: {
+            targetRef: iconFieldRef,
+            title: copy.iconGuide,
+            description: copy.iconGuideDesc,
+            placement: "top",
+            actionLabel: copy.continue,
+            onAction: () => setGuideStepWithLog(7, "step 6 CTA"),
+        },
+        7: {
+            targetRef: balanceFieldRef,
+            title: copy.startingBalanceGuide,
+            description: copy.startingBalanceGuideDesc,
+            placement: "top",
+            actionLabel: copy.continue,
+            onAction: () => setGuideStepWithLog(8, "step 7 CTA"),
+        },
+        8: {
             targetRef: submitButtonRef,
             title: copy.saveGuide,
             description: copy.saveGuideDesc,
@@ -1048,6 +1210,49 @@ const Wallets: React.FC = () => {
                 />
             ) : null}
 
+            {currentUser?.newUser ? (
+                <div
+                    className="rounded-[var(--app-radius-xl)] border px-4 py-4 sm:px-5"
+                    style={{
+                        borderColor: hexToRgba(appearance.primaryColor, 0.28),
+                        backgroundColor: hexToRgba(appearance.primaryColor, 0.1),
+                        boxShadow: `0 10px 30px ${hexToRgba(
+                            appearance.primaryColor,
+                            0.08,
+                        )}`,
+                    }}
+                >
+                    <div className="flex items-start gap-3">
+                        <div
+                            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--app-radius-md)]"
+                            style={{
+                                backgroundColor: hexToRgba(
+                                    appearance.primaryColor,
+                                    0.14,
+                                ),
+                                color: appearance.primaryColor,
+                            }}
+                        >
+                            <WalletCards className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                            <p
+                                className="text-xs font-semibold uppercase tracking-[0.2em]"
+                                style={{ color: appearance.primaryColor }}
+                            >
+                                {onboardingBadgeLabel}
+                            </p>
+                            <h2 className="mt-2 text-lg font-semibold text-foreground">
+                                {onboardingNoticeTitle}
+                            </h2>
+                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                {onboardingNoticeDescription}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
             <PageHeader
                 actions={
                     <Button onClick={() => openCreate("header")} ref={addWalletButtonRef}>
@@ -1055,7 +1260,11 @@ const Wallets: React.FC = () => {
                         {copy.newWallet}
                     </Button>
                 }
-                description={copy.pageDescription}
+                description={
+                    currentUser?.newUser
+                        ? onboardingPageDescription
+                        : copy.pageDescription
+                }
                 title={copy.pageTitle}
             />
 
@@ -1247,7 +1456,7 @@ const Wallets: React.FC = () => {
                                             value={transferValues.amount}
                                         />
                                     </div>
-                                    <Button disabled={submitting} onClick={handleTransfer}>
+                                    <Button className="w-full sm:w-auto" disabled={submitting} onClick={handleTransfer}>
                                         <ArrowLeftRight className="h-4 w-4" />
                                         {copy.transferNow}
                                     </Button>
@@ -1279,7 +1488,7 @@ const Wallets: React.FC = () => {
                 title={editing ? copy.editWallet : copy.createWalletTitle}
             >
                 <div className="space-y-4">
-                    <div>
+                    <div ref={bindTargetRef(imageFieldRef, 'input[type="file"]')}>
                         <label className="mb-2 block text-sm font-medium">{copy.cardImage}</label>
                         <Input accept="image/*" onChange={handleImageChange} type="file" />
                         {imagePreview ? (
@@ -1305,7 +1514,7 @@ const Wallets: React.FC = () => {
                         />
                     </div>
 
-                    <div>
+                    <div ref={bindTargetRef(accountNumberFieldRef, "input")}>
                         <label className="mb-2 block text-sm font-medium">{copy.accountNumber}</label>
                         <Input
                             onChange={(event) =>
@@ -1335,7 +1544,7 @@ const Wallets: React.FC = () => {
                                 <option value="ewallet">{walletTypeText.ewallet[language]}</option>
                             </Select>
                         </div>
-                        <div>
+                        <div ref={bindTargetRef(currencyFieldRef, "select")}>
                             <label className="mb-2 block text-sm font-medium">{copy.currency}</label>
                             <Select
                                 onChange={(event) =>
@@ -1354,24 +1563,32 @@ const Wallets: React.FC = () => {
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
-                        <div>
+                        <div ref={bindTargetRef(iconFieldRef, "input")}>
                             <label className="mb-2 block text-sm font-medium">{copy.icon}</label>
-                            <Select
+                            <Input
+                                list="wallet-icon-suggestions"
                                 onChange={(event) =>
                                     setFormValues((current) => ({
                                         ...current,
                                         icon: event.target.value,
                                     }))
                                 }
+                                placeholder={copy.iconPlaceholder}
                                 value={formValues.icon}
-                            >
+                            />
+                            <datalist id="wallet-icon-suggestions">
                                 <option value="">{copy.auto}</option>
                                 {iconOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {language === "vi" ? option.vi : option.en}
-                                    </option>
+                                    <option
+                                        key={option.value}
+                                        label={language === "vi" ? option.vi : option.en}
+                                        value={option.value}
+                                    />
                                 ))}
-                            </Select>
+                            </datalist>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                {copy.iconHint}
+                            </p>
                         </div>
                         <div>
                             <label className="mb-2 block text-sm font-medium">{copy.accentColor}</label>
@@ -1398,26 +1615,22 @@ const Wallets: React.FC = () => {
                         </div>
                     </div>
 
-                    <div ref={bindTargetRef(balanceFieldRef, 'input[type="number"]')}>
+                    <div ref={bindTargetRef(balanceFieldRef, "input")}>
                         <label className="mb-2 block text-sm font-medium">{copy.startingBalance}</label>
                         <Input
-                            min={0}
-                            onChange={(event) =>
-                                setFormValues((current) => ({
-                                    ...current,
-                                    initialBalance: Number(event.target.value) || 0,
-                                }))
-                            }
-                            type="number"
-                            value={formValues.initialBalance}
+                            inputMode="numeric"
+                            onChange={handleInitialBalanceChange}
+                            placeholder={copy.startingBalancePlaceholder}
+                            value={initialBalanceInput}
                         />
                     </div>
 
-                    <div className="flex justify-end gap-3">
-                        <Button onClick={handleCloseModal} variant="outline">
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <Button className="w-full sm:w-auto" onClick={handleCloseModal} variant="outline">
                             {copy.cancel}
                         </Button>
                         <Button
+                            className="w-full sm:w-auto"
                             disabled={submitting}
                             onClick={() => void submitWallet(false)}
                             ref={submitButtonRef}

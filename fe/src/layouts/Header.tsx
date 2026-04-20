@@ -1,12 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-    ChevronDown,
-    LogOut,
-    Menu,
-    Settings,
-    UserRound,
-} from "lucide-react";
+import { ChevronDown, LogOut, Menu, Settings, UserRound } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { Avatar } from "../components/ui/avatar";
@@ -31,6 +25,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         () => buildNavigationItems(language),
         [language],
     );
+    const navigationLocked = !!currentUser?.newUser;
+    const lockedNavigationHint = isVietnamese
+        ? "Tạo ví đầu tiên để mở khóa Hồ sơ và Cài đặt."
+        : "Create your first wallet to unlock Profile and Settings.";
+    const menuItemClassName =
+        "flex items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm transition-colors";
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -41,6 +41,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 setMenuOpen(false);
             }
         };
+
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
@@ -67,42 +68,42 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     return (
         <header
             className={cn(
-                "sticky top-0 z-40 px-3 transition-[padding] duration-200 md:px-4",
+                "sticky top-0 z-40 px-2.5 transition-[padding] duration-200 sm:px-3 md:px-4",
                 isScrolled ? "pt-3" : "pt-1 md:pt-2",
             )}
         >
             <div
                 className={cn(
-                    "app-header-shell mx-auto flex h-[72px] w-full max-w-[1600px] items-center justify-between gap-4 px-4 md:px-6",
+                    "app-header-shell mx-auto flex h-[64px] w-full max-w-[1600px] items-center justify-between gap-2 px-3 sm:h-[72px] sm:gap-4 sm:px-4 md:px-6",
                     isScrolled && "is-scrolled",
                 )}
             >
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                     <Button
-                        className="md:hidden"
+                        className="shrink-0 md:hidden"
                         onClick={onMenuClick}
                         size="icon"
                         variant="outline"
                     >
                         <Menu className="h-4 w-4" />
                     </Button>
-                    <div>
-                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    <div className="min-w-0">
+                        <p className="hidden text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground sm:block">
                             {isVietnamese ? "Không gian làm việc" : "Workspace"}
                         </p>
-                        <h1 className="text-base font-semibold text-foreground">
+                        <h1 className="truncate text-sm font-semibold text-foreground sm:text-base">
                             {currentPage.label}
                         </h1>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="ml-2 flex shrink-0 items-center gap-1.5 sm:gap-2">
                     <ThemeSwitcher />
 
                     <div className="relative" ref={menuRef}>
                         <button
                             className={cn(
-                                "app-header-user-trigger flex items-center gap-3 rounded-[var(--app-radius-lg)] px-3 py-2 text-left transition-colors",
+                                "app-header-user-trigger flex items-center gap-2 rounded-[var(--app-radius-lg)] px-2.5 py-2 text-left transition-colors sm:gap-3 sm:px-3",
                                 isScrolled && "is-scrolled",
                             )}
                             onClick={() => setMenuOpen((current) => !current)}
@@ -113,7 +114,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                                 fallback={currentUser?.displayName || "FT"}
                                 src={currentUser?.avatar || currentUser?.photoURL || undefined}
                             />
-                            <div className="hidden sm:block">
+                            <div className="hidden max-w-[11rem] md:block">
                                 <p className="text-sm font-medium text-foreground">
                                     {currentUser?.displayName ||
                                         (isVietnamese
@@ -127,39 +128,80 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                                             : "Authenticated")}
                                 </p>
                             </div>
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            <ChevronDown className="hidden h-4 w-4 text-muted-foreground sm:block" />
                         </button>
 
                         {menuOpen ? (
-                            <div className="glass-panel absolute right-0 mt-3 w-56 rounded-[var(--app-radius-lg)] border border-border/80 bg-card/95 p-2 shadow-soft backdrop-blur-xl">
-                                <Link
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                                    )}
-                                    onClick={() => setMenuOpen(false)}
-                                    to="/profile"
-                                >
-                                    <UserRound className="h-4 w-4" />
-                                    <span>
-                                        {isVietnamese
-                                            ? "Hồ sơ cá nhân"
-                                            : "Profile"}
-                                    </span>
-                                </Link>
-                                <Link
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                                    )}
-                                    onClick={() => setMenuOpen(false)}
-                                    to="/settings"
-                                >
-                                    <Settings className="h-4 w-4" />
-                                    <span>
-                                        {isVietnamese
-                                            ? "Cài đặt hệ thống"
-                                            : "Settings"}
-                                    </span>
-                                </Link>
+                            <div className="glass-panel absolute right-0 mt-3 w-[min(14rem,calc(100vw-1.5rem))] rounded-[var(--app-radius-lg)] border border-border/80 bg-card/95 p-2 shadow-soft backdrop-blur-xl sm:w-56">
+                                {navigationLocked ? (
+                                    <>
+                                        <button
+                                            aria-disabled="true"
+                                            className={cn(
+                                                menuItemClassName,
+                                                "w-full cursor-not-allowed text-muted-foreground/50",
+                                            )}
+                                            disabled
+                                            type="button"
+                                        >
+                                            <UserRound className="h-4 w-4" />
+                                            <span>
+                                                {isVietnamese
+                                                    ? "Hồ sơ cá nhân"
+                                                    : "Profile"}
+                                            </span>
+                                        </button>
+                                        <button
+                                            aria-disabled="true"
+                                            className={cn(
+                                                menuItemClassName,
+                                                "w-full cursor-not-allowed text-muted-foreground/50",
+                                            )}
+                                            disabled
+                                            type="button"
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                            <span>
+                                                {isVietnamese
+                                                    ? "Cài đặt hệ thống"
+                                                    : "Settings"}
+                                            </span>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link
+                                            className={cn(
+                                                menuItemClassName,
+                                                "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                            )}
+                                            onClick={() => setMenuOpen(false)}
+                                            to="/profile"
+                                        >
+                                            <UserRound className="h-4 w-4" />
+                                            <span>
+                                                {isVietnamese
+                                                    ? "Hồ sơ cá nhân"
+                                                    : "Profile"}
+                                            </span>
+                                        </Link>
+                                        <Link
+                                            className={cn(
+                                                menuItemClassName,
+                                                "text-muted-foreground hover:bg-muted hover:text-foreground",
+                                            )}
+                                            onClick={() => setMenuOpen(false)}
+                                            to="/settings"
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                            <span>
+                                                {isVietnamese
+                                                    ? "Cài đặt hệ thống"
+                                                    : "Settings"}
+                                            </span>
+                                        </Link>
+                                    </>
+                                )}
                                 <button
                                     className="flex w-full items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
                                     onClick={async () => {
@@ -176,6 +218,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                                             : "Sign out"}
                                     </span>
                                 </button>
+                                {navigationLocked ? (
+                                    <p className="px-3 pb-1 pt-2 text-xs leading-5 text-muted-foreground">
+                                        {lockedNavigationHint}
+                                    </p>
+                                ) : null}
                             </div>
                         ) : null}
                     </div>

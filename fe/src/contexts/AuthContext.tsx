@@ -85,6 +85,19 @@ const verifyTokenWithBackend = async (token: string): Promise<BackendAppUser> =>
 const getPreferredValue = (...values: Array<string | null | undefined>) =>
     values.find((value) => typeof value === "string" && value.trim().length > 0) || null;
 
+const clearWalletGuideSessionFlags = () => {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.sessionStorage.key(index);
+        if (key?.startsWith("fintrack-wallet-onboarding-session:")) {
+            window.sessionStorage.removeItem(key);
+        }
+    }
+};
+
 const buildAppUser = (
     backendUser: BackendAppUser,
     firebaseUser: FirebaseUser,
@@ -162,6 +175,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     console.log(
                         "AuthContext - No firebase user, setting currentUser to null",
                     );
+                    clearWalletGuideSessionFlags();
                     previousUserIdRef.current = null;
                     clearApiCaches();
                     setCurrentUser(null);
@@ -189,6 +203,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const logout = async () => {
         try {
+            clearWalletGuideSessionFlags();
             clearApiCaches();
             await firebaseSignOut(auth);
             previousUserIdRef.current = null;

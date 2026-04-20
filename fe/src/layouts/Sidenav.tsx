@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { buildNavigationItems } from "./navigation";
 import { cn } from "../lib/utils";
@@ -13,10 +14,20 @@ interface SidenavProps {
 const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { currentUser } = useAuth();
     const { language, isVietnamese } = useLocale();
     const navigationItems = buildNavigationItems(language);
+    const navigationLocked = !!currentUser?.newUser;
+    const navigationLockHint = isVietnamese
+        ? "Tạo ví đầu tiên để mở khóa các màn hình khác."
+        : "Create your first wallet to unlock the other sections.";
+    const isItemLocked = (target: string) =>
+        navigationLocked && target !== "/wallets";
 
     const handleNavigate = (target: string) => {
+        if (isItemLocked(target)) {
+            return;
+        }
         navigate(target);
         onCloseMenu?.();
     };
@@ -26,7 +37,9 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
             <div className="border-b border-border px-5 py-5">
                 <button
                     className="flex items-center gap-3"
-                    onClick={() => handleNavigate("/dashboard")}
+                    onClick={() =>
+                        handleNavigate(navigationLocked ? "/wallets" : "/dashboard")
+                    }
                     type="button"
                 >
                     <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[var(--app-radius-md)] shadow-sm">
@@ -50,6 +63,23 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
             <nav className="flex-1 space-y-1 px-4 py-5">
                 {navigationItems.map((item) => {
                     const Icon = item.icon;
+                    const locked = isItemLocked(item.to);
+
+                    if (locked) {
+                        return (
+                            <button
+                                key={item.to}
+                                aria-disabled="true"
+                                className="flex w-full cursor-not-allowed items-center gap-3 rounded-[var(--app-radius-lg)] px-4 py-3 text-sm font-medium text-muted-foreground/50"
+                                disabled
+                                type="button"
+                            >
+                                <Icon className="h-4 w-4" />
+                                <span>{item.label}</span>
+                            </button>
+                        );
+                    }
+
                     return (
                         <NavLink
                             key={item.to}
@@ -83,12 +113,21 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                                 : "Open the transaction form quickly to update cashflow."}
                         </p>
                     </div>
-                    <Button className="w-full justify-between" onClick={() => handleNavigate("/transactions")}>
+                    <Button
+                        className="w-full justify-between"
+                        disabled={navigationLocked}
+                        onClick={() => handleNavigate("/transactions")}
+                    >
                         <span>
                             {isVietnamese ? "Tạo giao dịch" : "Create transaction"}
                         </span>
                         <ArrowRight className="h-4 w-4" />
                     </Button>
+                    {navigationLocked ? (
+                        <p className="mt-3 text-xs text-muted-foreground">
+                            {navigationLockHint}
+                        </p>
+                    ) : null}
                 </div>
 
                 <p className="mt-4 text-xs text-muted-foreground">

@@ -328,9 +328,16 @@ const ThemeSwitcher: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =
 
     return (
         <>
-            <Button onClick={() => setOpen(true)} variant="outline">
+            <Button
+                aria-label={isVietnamese ? "Mo cai dat giao dien" : "Open appearance settings"}
+                className="shrink-0"
+                onClick={() => setOpen(true)}
+                variant="outline"
+            >
                 <Palette className="h-4 w-4" />
+                <span className="hidden sm:inline">
                 <span>{isVietnamese ? "Giao diện" : "Appearance"}</span>
+                </span>
             </Button>
 
             <Sheet
