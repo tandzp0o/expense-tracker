@@ -397,6 +397,32 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
         };
     }, [highlightPadding, rect, viewportHeight, viewportSize, viewportWidth]);
 
+    const highlightRenderRect = useMemo(() => {
+        if (!highlightRect) {
+            return null;
+        }
+
+        const top = clamp(Math.floor(highlightRect.top), 0, viewportHeight);
+        const left = clamp(Math.floor(highlightRect.left), 0, viewportWidth);
+        const right = clamp(
+            Math.ceil(highlightRect.left + highlightRect.width),
+            0,
+            viewportWidth,
+        );
+        const bottom = clamp(
+            Math.ceil(highlightRect.top + highlightRect.height),
+            0,
+            viewportHeight,
+        );
+
+        return {
+            top,
+            left,
+            width: Math.max(right - left, 0),
+            height: Math.max(bottom - top, 0),
+        };
+    }, [highlightRect, viewportHeight, viewportWidth]);
+
     const effectivePlacement = useMemo(() => {
         if (!highlightRect) {
             return placement;
@@ -599,7 +625,15 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
         )}, ${c6x.toFixed(2)} ${c6y.toFixed(2)}, ${endX.toFixed(2)} ${endY.toFixed(2)}`;
     }, [bubbleBounds, bubbleStyle, effectivePlacement, highlightRect, isMobile]);
 
-    if (!mounted || !open || !rect || !highlightRect || !bubbleStyle || !viewportSize) {
+    if (
+        !mounted ||
+        !open ||
+        !rect ||
+        !highlightRect ||
+        !highlightRenderRect ||
+        !bubbleStyle ||
+        !viewportSize
+    ) {
         return null;
     }
 
@@ -618,33 +652,33 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
             <div
                 className="pointer-events-auto fixed left-0 right-0 top-0 bg-slate-950/80 transition-opacity duration-200 ease-out"
                 style={{
-                    height: highlightRect.top,
+                    height: highlightRenderRect.top,
                     opacity: entered ? 1 : 0,
                 }}
             />
             <div
                 className="pointer-events-auto fixed left-0 bg-slate-950/80 transition-opacity duration-200 ease-out"
                 style={{
-                    top: highlightRect.top,
-                    width: highlightRect.left,
-                    height: highlightRect.height,
+                    top: highlightRenderRect.top,
+                    width: highlightRenderRect.left,
+                    height: highlightRenderRect.height,
                     opacity: entered ? 1 : 0,
                 }}
             />
             <div
                 className="pointer-events-auto fixed bg-slate-950/80 transition-opacity duration-200 ease-out"
                 style={{
-                    top: highlightRect.top,
-                    left: highlightRect.left + highlightRect.width,
+                    top: highlightRenderRect.top,
+                    left: highlightRenderRect.left + highlightRenderRect.width,
                     right: 0,
-                    height: highlightRect.height,
+                    height: highlightRenderRect.height,
                     opacity: entered ? 1 : 0,
                 }}
             />
             <div
                 className="pointer-events-auto fixed bottom-0 left-0 right-0 bg-slate-950/80 transition-opacity duration-200 ease-out"
                 style={{
-                    top: highlightRect.top + highlightRect.height,
+                    top: highlightRenderRect.top + highlightRenderRect.height,
                     opacity: entered ? 1 : 0,
                 }}
             />
@@ -652,10 +686,10 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
             <div
                 className="pointer-events-none fixed border-2 border-white/95 transition-all duration-200 ease-out"
                 style={{
-                    top: highlightRect.top,
-                    left: highlightRect.left,
-                    width: highlightRect.width,
-                    height: highlightRect.height,
+                    top: highlightRenderRect.top,
+                    left: highlightRenderRect.left,
+                    width: highlightRenderRect.width,
+                    height: highlightRenderRect.height,
                     borderRadius: "calc(var(--app-radius-xl) + 6px)",
                     boxShadow:
                         "0 0 0 1px rgba(255,255,255,0.28), 0 0 24px rgba(255,255,255,0.26)",
