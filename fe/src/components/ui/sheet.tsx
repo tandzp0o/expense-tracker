@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
 import { cn } from "../../lib/utils";
 
 interface SheetProps {
@@ -22,6 +23,8 @@ export const Sheet: React.FC<SheetProps> = ({
     children,
     className,
 }) => {
+    useLockBodyScroll(open);
+
     useEffect(() => {
         if (!open) {
             return;
@@ -40,10 +43,10 @@ export const Sheet: React.FC<SheetProps> = ({
     }
 
     return createPortal(
-        <div className="fixed inset-0 z-[1700]">
+        <div className="fixed inset-0 z-[1700] overscroll-none">
             <button
                 aria-label="Close panel"
-                className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+                className="absolute inset-0 touch-none bg-slate-950/45 backdrop-blur-sm"
                 onClick={onClose}
                 type="button"
             />
@@ -73,7 +76,7 @@ export const Sheet: React.FC<SheetProps> = ({
                         <X className="h-4 w-4" />
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-5">{children}</div>
+                <div className="flex-1 overflow-y-auto overscroll-contain p-5">{children}</div>
             </div>
         </div>,
         document.body,

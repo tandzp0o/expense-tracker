@@ -4,9 +4,14 @@
     "description": "Quản lý tài chính cá nhân",
     "icons": [
         {
-            "src": "logo.png",
-            "sizes": "64x64 32x32 24x24 16x16",
-            "type": "image/png"
+            "src": "favicon.ico",
+            "sizes": "16x16 24x24 32x32 48x48",
+            "type": "image/x-icon"
+        },
+        {
+            "src": "apple-touch-icon.png",
+            "type": "image/png",
+            "sizes": "180x180"
         },
         {
             "src": "logo192.png",

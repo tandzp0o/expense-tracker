@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useLockBodyScroll } from "../../hooks/useLockBodyScroll";
 import { cn } from "../../lib/utils";
 
 interface DialogProps {
@@ -20,6 +21,8 @@ export const Dialog: React.FC<DialogProps> = ({
     children,
     className,
 }) => {
+    useLockBodyScroll(open);
+
     useEffect(() => {
         if (!open) {
             return;
@@ -38,10 +41,10 @@ export const Dialog: React.FC<DialogProps> = ({
     }
 
     return createPortal(
-        <div className="fixed inset-0 z-[1800] flex items-end justify-center p-3 pt-10 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-[1800] flex items-end justify-center overscroll-none p-3 pt-10 sm:items-center sm:p-4">
             <button
                 aria-label="Close dialog"
-                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm sm:bg-slate-950/50"
+                className="absolute inset-0 touch-none bg-slate-950/60 backdrop-blur-sm sm:bg-slate-950/50"
                 onClick={onClose}
                 type="button"
             />
@@ -73,7 +76,7 @@ export const Dialog: React.FC<DialogProps> = ({
                         <X className="h-4 w-4" />
                     </button>
                 </div>
-                <div className="overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-4 sm:p-6">
+                <div className="overflow-y-auto overscroll-contain px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-4 sm:p-6">
                     {children}
                 </div>
             </div>

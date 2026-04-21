@@ -43,6 +43,7 @@
     html {
         font-size: var(--app-font-size);
         scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
     }
 
     body {
@@ -78,6 +79,14 @@
 
     #root {
         min-height: 100vh;
+    }
+}
+
+@supports (-webkit-touch-callout: none) {
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
     }
 }
 
