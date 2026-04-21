@@ -1,5 +1,12 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import {
+    GoogleAuthProvider,
+    UserCredential,
+    createUserWithEmailAndPassword,
+    getAuth,
+    signInWithEmailAndPassword,
+    signInWithPopup,
+} from "firebase/auth";
 
 const firebaseConfig = {
     apiKey: "AIzaSyArwJdRgoFQPMAZTqhY8EVa0g2q-7UxHqo",
@@ -11,24 +18,26 @@ const firebaseConfig = {
     measurementId: "G-6XXB6C2YLE",
 };
 
-// Khởi tạo Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Hàm đăng nhập bằng Google
 export const signInWithGoogle = async () => {
-    try {
-        const result = await signInWithPopup(auth, googleProvider);
-        // Lấy ID token từ user
-        const idToken = await result.user.getIdToken();
-        console.log(
-            "ID Token:",
-            idToken ? `${idToken.substring(0, 20)}...` : "Không có token"
-        );
-        return idToken;
-    } catch (error) {
-        console.error("Lỗi đăng nhập:", error);
-        throw error;
-    }
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user.getIdToken();
+};
+
+export const signInWithEmailPassword = async (
+    email: string,
+    password: string,
+) => {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    return result.user.getIdToken();
+};
+
+export const registerWithEmailPassword = async (
+    email: string,
+    password: string,
+): Promise<UserCredential> => {
+    return createUserWithEmailAndPassword(auth, email, password);
 };

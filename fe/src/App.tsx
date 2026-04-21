@@ -17,7 +17,7 @@ import DishSuggestions from "./pages/DishSuggestions";
 import Profile from "./pages/Profile";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
-import { Login } from "./components";
+import { Login, Register } from "./components";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -65,7 +65,7 @@ const ProtectedRoute = () => {
     );
 };
 
-const LoginRoute = () => {
+const PublicOnlyRoute = ({ children }: { children: React.ReactElement }) => {
     const { currentUser, loading } = useAuth();
     const { isVietnamese } = useLocale();
 
@@ -85,7 +85,7 @@ const LoginRoute = () => {
         return <Navigate replace to={currentUser.newUser ? "/wallets" : "/dashboard"} />;
     }
 
-    return <Login />;
+    return children;
 };
 
 function App() {
@@ -96,7 +96,22 @@ function App() {
                     <ToastProvider>
                         <AuthProvider>
                             <Routes>
-                                <Route element={<LoginRoute />} path="/login" />
+                                <Route
+                                    element={
+                                        <PublicOnlyRoute>
+                                            <Login />
+                                        </PublicOnlyRoute>
+                                    }
+                                    path="/login"
+                                />
+                                <Route
+                                    element={
+                                        <PublicOnlyRoute>
+                                            <Register />
+                                        </PublicOnlyRoute>
+                                    }
+                                    path="/register"
+                                />
                                 <Route
                                     element={<Navigate replace to="/dashboard" />}
                                     path="/"

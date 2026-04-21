@@ -5,6 +5,7 @@ import Wallet from "../models/Wallet";
 import Transaction from "../models/Transaction";
 import Budget from "../models/Budget";
 import { v2 as cloudinary } from "cloudinary";
+import { syncUserIdentity } from "../utils/user-identity";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -16,16 +17,16 @@ export const getProfile = async (req: any, res: Response) => {
     try {
         const userId = req.user.uid;
 
-        let user = await User.findOne({ uid: userId });
-        if (!user) {
-            // Create user if not exists
-            user = new User({
+        const existingUser = await User.findOne({ uid: userId });
+        const user =
+            existingUser ||
+            (await syncUserIdentity({
                 uid: userId,
                 email: req.user.email,
-                displayName: req.user.name || req.user.email?.split("@")[0],
-            });
-            await user.save();
-        }
+                displayName: req.user.name,
+                picture: req.user.picture,
+                signInProvider: req.user.signInProvider,
+            }));
 
         // Get real statistics
         const goalsStats = await Goal.aggregate([

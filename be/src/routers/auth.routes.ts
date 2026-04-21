@@ -1,12 +1,16 @@
 import { Router } from "express";
 import { verifyFirebaseToken } from "../middleware/auth";
-import { verifyToken } from "../controllers/auth.controller";
+import {
+    completeRegistration,
+    resolveLoginIdentifier,
+    verifyToken,
+} from "../controllers/auth.controller";
 
 const router = Router();
 
-// @route   GET /api/auth/verify
-// @desc    Xác thực token Firebase và lấy thông tin user
-// @access  Private
+router.post("/resolve-login", resolveLoginIdentifier);
+
 router.get("/verify", verifyFirebaseToken, verifyToken);
+router.post("/complete-registration", verifyFirebaseToken, completeRegistration);
 
 export default router;

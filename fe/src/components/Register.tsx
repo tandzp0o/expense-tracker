@@ -8,15 +8,19 @@ import { hexToRgba } from "../lib/utils";
 import { Spinner } from "./ui/spinner";
 import AuthShell from "./auth/AuthShell";
 
-const Login: React.FC = () => {
+const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{1,28}[a-z0-9]$/;
+
+const Register: React.FC = () => {
     const navigate = useNavigate();
-    const { signInWithCredentials, signInWithGoogle, loading } = useAuth();
+    const { loading, registerWithEmail, signInWithGoogle } = useAuth();
     const { isVietnamese } = useLocale();
     const { appearance } = useTheme();
     const { toast } = useToast();
     const [formValues, setFormValues] = useState({
-        identifier: "",
+        username: "",
+        email: "",
         password: "",
+        confirmPassword: "",
     });
     const [submitting, setSubmitting] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
@@ -26,22 +30,27 @@ const Login: React.FC = () => {
             isVietnamese
                 ? {
                       tagline: "Digital Atelier of Wealth",
-                      title: "Đăng nhập vào FinTrack",
+                      title: "Tạo tài khoản mới",
                       description:
-                          "Sử dụng email hoặc username để đăng nhập, hoặc tiếp tục với Google nếu bạn đã quen thuộc.",
-                      identifier: "Email hoặc username",
-                      identifierPlaceholder: "ví dụ: abc123 hoặc you@example.com",
+                          "Chọn username để đăng nhập như tandzp0o, sau đó bạn có thể bổ sung tên hiển thị và thông tin cá nhân trong hồ sơ.",
+                      username: "Username",
+                      usernamePlaceholder: "ví dụ: tandzp0o",
+                      usernameHint:
+                          "Dùng 3-30 ký tự gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang.",
+                      email: "Email",
+                      emailPlaceholder: "you@example.com",
                       password: "Mật khẩu",
-                      passwordPlaceholder: "Nhập mật khẩu của bạn",
-                      forgotPassword: "Quên mật khẩu?",
-                      login: "Đăng nhập",
+                      passwordPlaceholder: "Tối thiểu 6 ký tự",
+                      confirmPassword: "Nhập lại mật khẩu",
+                      confirmPasswordPlaceholder: "Nhập lại mật khẩu",
+                      register: "Đăng ký",
+                      registering: "Đang tạo tài khoản...",
                       divider: "Hoặc",
-                      continueWithGoogle: "Tiếp tục với Google",
-                      signingIn: "Đang đăng nhập...",
+                      continueWithGoogle: "Đăng ký với Google",
                       googleHelper:
-                          "Tài khoản Google vẫn được hỗ trợ song song trong phiên bản này.",
-                      bottomNote: "Chưa có tài khoản?",
-                      bottomAction: "Đăng ký",
+                          "Nếu bạn muốn, bạn vẫn có thể bắt đầu nhanh bằng Google.",
+                      bottomNote: "Đã có tài khoản?",
+                      bottomAction: "Đăng nhập",
                       footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
                       footerLinks: [
                           "Chính sách",
@@ -49,10 +58,10 @@ const Login: React.FC = () => {
                           "Bảo mật",
                           "Liên hệ",
                       ],
-                      forgotTitle: "Đặt lại mật khẩu",
-                      forgotDescription:
-                          "Nếu đây là tài khoản Google, hãy dùng nút Google. Nếu là tài khoản mật khẩu, hiện tại bạn cần đặt lại mật khẩu trong Firebase Console hoặc luồng quản trị.",
-                      loginErrorTitle: "Đăng nhập thất bại",
+                      registerErrorTitle: "Đăng ký thất bại",
+                      registerSuccessTitle: "Tạo tài khoản thành công",
+                      registerSuccessDescription:
+                          "Tài khoản đã sẵn sàng. Bạn sẽ được chuyển vào ứng dụng.",
                       googleError: "Không thể xác thực với Google. Vui lòng thử lại.",
                       infoTitle: "Thông tin đang cập nhật",
                       infoDescription:
@@ -60,22 +69,27 @@ const Login: React.FC = () => {
                   }
                 : {
                       tagline: "Digital Atelier of Wealth",
-                      title: "Sign in to FinTrack",
+                      title: "Create a new account",
                       description:
-                          "Use your email or username and password, or continue with Google if you already use it.",
-                      identifier: "Email or username",
-                      identifierPlaceholder: "for example: tandzp0o or you@example.com",
+                          "Choose a username such as tandzp0o for sign-in, then complete your display name and profile details later.",
+                      username: "Username",
+                      usernamePlaceholder: "for example: tandzp0o",
+                      usernameHint:
+                          "Use 3-30 characters with letters, numbers, dot, underscore, or hyphen.",
+                      email: "Email",
+                      emailPlaceholder: "you@example.com",
                       password: "Password",
-                      passwordPlaceholder: "Enter your password",
-                      forgotPassword: "Forgot password?",
-                      login: "Login",
+                      passwordPlaceholder: "At least 6 characters",
+                      confirmPassword: "Confirm password",
+                      confirmPasswordPlaceholder: "Enter password again",
+                      register: "Register",
+                      registering: "Creating account...",
                       divider: "Or",
-                      continueWithGoogle: "Continue with Google",
-                      signingIn: "Signing in...",
+                      continueWithGoogle: "Register with Google",
                       googleHelper:
-                          "Google accounts still work alongside password-based accounts.",
-                      bottomNote: "Need an account?",
-                      bottomAction: "Register",
+                          "You can still start with Google if that is easier for you.",
+                      bottomNote: "Already have an account?",
+                      bottomAction: "Login",
                       footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
                       footerLinks: [
                           "Privacy",
@@ -83,10 +97,10 @@ const Login: React.FC = () => {
                           "Security",
                           "Contact",
                       ],
-                      forgotTitle: "Reset password",
-                      forgotDescription:
-                          "If this is a Google account, use Google sign-in. For password accounts, reset currently needs to be handled in Firebase Console or your admin flow.",
-                      loginErrorTitle: "Sign in failed",
+                      registerErrorTitle: "Registration failed",
+                      registerSuccessTitle: "Account created",
+                      registerSuccessDescription:
+                          "Your account is ready. We will take you into the app.",
                       googleError:
                           "Could not authenticate with Google. Please try again.",
                       infoTitle: "Information pending",
@@ -100,15 +114,43 @@ const Login: React.FC = () => {
     const buttonGradient = `linear-gradient(135deg, ${appearance.primaryColor} 0%, rgba(5, 12, 28, 0.96) 100%)`;
     const isBusy = submitting || googleLoading || loading;
 
+    const validateForm = () => {
+        const username = formValues.username.trim().toLowerCase();
+        const email = formValues.email.trim();
+
+        if (!username || !email || !formValues.password || !formValues.confirmPassword) {
+            return isVietnamese
+                ? "Vui lòng nhập đầy đủ username, email và mật khẩu."
+                : "Please fill in your username, email, and password.";
+        }
+
+        if (!USERNAME_PATTERN.test(username)) {
+            return copy.usernameHint;
+        }
+
+        if (formValues.password.length < 6) {
+            return isVietnamese
+                ? "Mật khẩu phải có ít nhất 6 ký tự."
+                : "Password must contain at least 6 characters.";
+        }
+
+        if (formValues.password !== formValues.confirmPassword) {
+            return isVietnamese
+                ? "Mật khẩu nhập lại không khớp."
+                : "Password confirmation does not match.";
+        }
+
+        return null;
+    };
+
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (!formValues.identifier.trim() || !formValues.password) {
+        const validationError = validateForm();
+        if (validationError) {
             toast({
-                title: copy.loginErrorTitle,
-                description: isVietnamese
-                    ? "Vui lòng nhập đầy đủ email/username và mật khẩu."
-                    : "Please enter both your email or username and your password.",
+                title: copy.registerErrorTitle,
+                description: validationError,
                 variant: "destructive",
             });
             return;
@@ -116,18 +158,26 @@ const Login: React.FC = () => {
 
         setSubmitting(true);
         try {
-            await signInWithCredentials(
-                formValues.identifier.trim(),
-                formValues.password,
-            );
+            await registerWithEmail({
+                email: formValues.email.trim(),
+                password: formValues.password,
+                username: formValues.username.trim().toLowerCase(),
+            });
+
+            toast({
+                title: copy.registerSuccessTitle,
+                description: copy.registerSuccessDescription,
+                variant: "success",
+            });
+            navigate("/wallets", { replace: true });
         } catch (error: any) {
             toast({
-                title: copy.loginErrorTitle,
+                title: copy.registerErrorTitle,
                 description:
                     error.message ||
                     (isVietnamese
-                        ? "Không thể đăng nhập. Vui lòng kiểm tra thông tin và thử lại."
-                        : "Could not sign in. Please check your credentials and try again."),
+                        ? "Không thể tạo tài khoản. Vui lòng thử lại."
+                        : "Could not create your account. Please try again."),
                 variant: "destructive",
             });
         } finally {
@@ -140,22 +190,15 @@ const Login: React.FC = () => {
         try {
             await signInWithGoogle();
         } catch (error) {
-            console.error("Google sign-in failed:", error);
+            console.error("Google sign-up failed:", error);
             toast({
-                title: copy.loginErrorTitle,
+                title: copy.registerErrorTitle,
                 description: copy.googleError,
                 variant: "destructive",
             });
         } finally {
             setGoogleLoading(false);
         }
-    };
-
-    const handleForgotPassword = () => {
-        toast({
-            title: copy.forgotTitle,
-            description: copy.forgotDescription,
-        });
     };
 
     const handleFooterAction = () => {
@@ -172,7 +215,7 @@ const Login: React.FC = () => {
             description={copy.description}
             footerLinks={copy.footerLinks}
             footerRights={copy.footerRights}
-            onBottomAction={() => navigate("/register")}
+            onBottomAction={() => navigate("/login")}
             onFooterAction={handleFooterAction}
             tagline={copy.tagline}
             title={copy.title}
@@ -180,21 +223,48 @@ const Login: React.FC = () => {
             <form className="space-y-6" onSubmit={handleSubmit}>
                 <div className="space-y-2">
                     <label className="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300/85">
-                        {copy.identifier}
+                        {copy.username}
                     </label>
                     <div className="group relative">
                         <input
+                            autoCapitalize="none"
                             autoComplete="username"
                             className="w-full rounded-t-xl border-b border-white/10 bg-white/[0.045] px-4 py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                             onChange={(event) =>
                                 setFormValues((current) => ({
                                     ...current,
-                                    identifier: event.target.value,
+                                    username: event.target.value.toLowerCase(),
                                 }))
                             }
-                            placeholder={copy.identifierPlaceholder}
+                            placeholder={copy.usernamePlaceholder}
                             type="text"
-                            value={formValues.identifier}
+                            value={formValues.username}
+                        />
+                        <div
+                            className="absolute bottom-0 left-0 h-[2px] w-0 transition-all duration-700 ease-in-out group-focus-within:w-full"
+                            style={{ backgroundColor: appearance.primaryColor }}
+                        />
+                    </div>
+                    <p className="px-1 text-xs text-slate-400">{copy.usernameHint}</p>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300/85">
+                        {copy.email}
+                    </label>
+                    <div className="group relative">
+                        <input
+                            autoComplete="email"
+                            className="w-full rounded-t-xl border-b border-white/10 bg-white/[0.045] px-4 py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                            onChange={(event) =>
+                                setFormValues((current) => ({
+                                    ...current,
+                                    email: event.target.value,
+                                }))
+                            }
+                            placeholder={copy.emailPlaceholder}
+                            type="email"
+                            value={formValues.email}
                         />
                         <div
                             className="absolute bottom-0 left-0 h-[2px] w-0 transition-all duration-700 ease-in-out group-focus-within:w-full"
@@ -203,38 +273,55 @@ const Login: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-3 px-1">
-                        <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-300/85">
+                <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-2">
+                        <label className="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300/85">
                             {copy.password}
                         </label>
-                        <button
-                            className="text-[11px] uppercase tracking-wider transition-colors"
-                            onClick={handleForgotPassword}
-                            style={{ color: appearance.primaryColor }}
-                            type="button"
-                        >
-                            {copy.forgotPassword}
-                        </button>
+                        <div className="group relative">
+                            <input
+                                autoComplete="new-password"
+                                className="w-full rounded-t-xl border-b border-white/10 bg-white/[0.045] px-4 py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        password: event.target.value,
+                                    }))
+                                }
+                                placeholder={copy.passwordPlaceholder}
+                                type="password"
+                                value={formValues.password}
+                            />
+                            <div
+                                className="absolute bottom-0 left-0 h-[2px] w-0 transition-all duration-700 ease-in-out group-focus-within:w-full"
+                                style={{ backgroundColor: appearance.primaryColor }}
+                            />
+                        </div>
                     </div>
-                    <div className="group relative">
-                        <input
-                            autoComplete="current-password"
-                            className="w-full rounded-t-xl border-b border-white/10 bg-white/[0.045] px-4 py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
-                            onChange={(event) =>
-                                setFormValues((current) => ({
-                                    ...current,
-                                    password: event.target.value,
-                                }))
-                            }
-                            placeholder={copy.passwordPlaceholder}
-                            type="password"
-                            value={formValues.password}
-                        />
-                        <div
-                            className="absolute bottom-0 left-0 h-[2px] w-0 transition-all duration-700 ease-in-out group-focus-within:w-full"
-                            style={{ backgroundColor: appearance.primaryColor }}
-                        />
+
+                    <div className="space-y-2">
+                        <label className="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300/85">
+                            {copy.confirmPassword}
+                        </label>
+                        <div className="group relative">
+                            <input
+                                autoComplete="new-password"
+                                className="w-full rounded-t-xl border-b border-white/10 bg-white/[0.045] px-4 py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        confirmPassword: event.target.value,
+                                    }))
+                                }
+                                placeholder={copy.confirmPasswordPlaceholder}
+                                type="password"
+                                value={formValues.confirmPassword}
+                            />
+                            <div
+                                className="absolute bottom-0 left-0 h-[2px] w-0 transition-all duration-700 ease-in-out group-focus-within:w-full"
+                                style={{ backgroundColor: appearance.primaryColor }}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -250,7 +337,7 @@ const Login: React.FC = () => {
                     }}
                     type="submit"
                 >
-                    {submitting ? copy.signingIn : copy.login}
+                    {submitting ? copy.registering : copy.register}
                 </button>
             </form>
 
@@ -294,7 +381,11 @@ const Login: React.FC = () => {
                         />
                     </svg>
                 )}
-                <span>{googleLoading || loading ? copy.signingIn : copy.continueWithGoogle}</span>
+                <span>
+                    {googleLoading || loading
+                        ? copy.registering
+                        : copy.continueWithGoogle}
+                </span>
             </button>
 
             <p className="mt-3 text-center text-xs text-slate-400">
@@ -304,4 +395,4 @@ const Login: React.FC = () => {
     );
 };
 
-export default Login;
+export default Register;

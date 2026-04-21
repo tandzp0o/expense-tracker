@@ -1,25 +1,34 @@
 import React, {
+    ReactNode,
     createContext,
     useContext,
-    useState,
     useEffect,
     useRef,
-    ReactNode,
+    useState,
 } from "react";
-import { auth, signInWithGoogle } from "../firebase/config";
-import { API_URL } from "../config/api";
-import { clearApiCaches } from "../services/api";
 import {
     User as FirebaseUser,
+    deleteUser,
     onAuthStateChanged,
     signOut as firebaseSignOut,
 } from "firebase/auth";
+import {
+    auth,
+    registerWithEmailPassword,
+    signInWithEmailPassword,
+    signInWithGoogle,
+} from "../firebase/config";
+import { API_URL } from "../config/api";
+import { authApi, clearApiCaches } from "../services/api";
 
 interface AppUser {
     uid: string;
     email: string | null;
+    username: string;
     displayName: string;
     newUser: boolean;
+    hasPassword: boolean;
+    authProviders: string[];
     avatar?: string | null;
     photoURL?: string | null;
 }
@@ -27,16 +36,31 @@ interface AppUser {
 type BackendAppUser = Partial<AppUser> & {
     uid?: string;
     email?: string | null;
+    username?: string | null;
     displayName?: string | null;
     newUser?: boolean;
+    hasPassword?: boolean;
+    authProviders?: string[];
     avatar?: string | null;
     photoURL?: string | null;
+};
+
+type RegisterPayload = {
+    email: string;
+    password: string;
+    username: string;
+    displayName?: string;
 };
 
 type AuthContextType = {
     currentUser: AppUser | null;
     loading: boolean;
     signInWithGoogle: () => Promise<void>;
+    signInWithCredentials: (
+        identifier: string,
+        password: string,
+    ) => Promise<void>;
+    registerWithEmail: (payload: RegisterPayload) => Promise<void>;
     logout: () => Promise<void>;
     isAuthenticated: boolean;
     updateUserStatus: (isNew: boolean) => void;
@@ -57,7 +81,6 @@ type AuthProviderProps = {
 };
 
 const verifyTokenWithBackend = async (token: string): Promise<BackendAppUser> => {
-    console.log("Verifying token with backend at:", `${API_URL}/api/auth/verify`);
     const response = await fetch(`${API_URL}/api/auth/verify`, {
         cache: "no-store",
         method: "GET",
@@ -85,6 +108,10 @@ const verifyTokenWithBackend = async (token: string): Promise<BackendAppUser> =>
 const getPreferredValue = (...values: Array<string | null | undefined>) =>
     values.find((value) => typeof value === "string" && value.trim().length > 0) || null;
 
+const getDefaultUsername = (...values: Array<string | null | undefined>) =>
+    getPreferredValue(...values)?.toLowerCase().replace(/[^a-z0-9._-]+/g, "") ||
+    "user";
+
 const clearWalletGuideSessionFlags = () => {
     if (typeof window === "undefined") {
         return;
@@ -103,9 +130,15 @@ const buildAppUser = (
     firebaseUser: FirebaseUser,
 ): AppUser => {
     const email = backendUser.email ?? firebaseUser.email;
+    const username = getDefaultUsername(
+        backendUser.username,
+        email?.split("@")[0],
+        firebaseUser.email?.split("@")[0],
+    );
     const displayName =
         getPreferredValue(backendUser.displayName, firebaseUser.displayName) ||
-        (email ? email.split("@")[0] : "User");
+        username ||
+        "User";
     const photoURL = getPreferredValue(
         backendUser.photoURL,
         firebaseUser.photoURL,
@@ -115,8 +148,11 @@ const buildAppUser = (
     return {
         uid: backendUser.uid || firebaseUser.uid,
         email,
+        username,
         displayName,
         newUser: backendUser.newUser ?? false,
+        hasPassword: backendUser.hasPassword ?? false,
+        authProviders: backendUser.authProviders || [],
         avatar,
         photoURL,
     };
@@ -129,16 +165,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const previousUserIdRef = useRef<string | null>(null);
 
     useEffect(() => {
-        console.log("AuthContext - Setting up auth state listener...");
-
         const unsubscribe = onAuthStateChanged(
             auth,
             async (firebaseUser: FirebaseUser | null) => {
                 setLoading(true);
-                console.log(
-                    "AuthContext - Auth state changed:",
-                    firebaseUser?.email || "null",
-                );
 
                 if (firebaseUser) {
                     const previousUserId = previousUserIdRef.current;
@@ -147,34 +177,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
 
                     try {
-                        console.log("AuthContext - Getting ID token...");
                         const token = await firebaseUser.getIdToken(true);
-                        console.log(
-                            "AuthContext - Token received, verifying with backend...",
-                        );
-
                         const appUserData = await verifyTokenWithBackend(token);
-                        console.log(
-                            "AuthContext - Backend verification successful:",
-                            appUserData,
-                        );
 
                         previousUserIdRef.current = firebaseUser.uid;
                         setCurrentUser(buildAppUser(appUserData, firebaseUser));
                     } catch (error) {
-                        console.error(
-                            "AuthContext - User sync failed, signing out:",
-                            error,
-                        );
+                        console.error("User sync failed, signing out:", error);
                         previousUserIdRef.current = null;
                         clearApiCaches();
                         await firebaseSignOut(auth);
                         setCurrentUser(null);
                     }
                 } else {
-                    console.log(
-                        "AuthContext - No firebase user, setting currentUser to null",
-                    );
                     clearWalletGuideSessionFlags();
                     previousUserIdRef.current = null;
                     clearApiCaches();
@@ -185,7 +200,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         );
 
         return () => {
-            console.log("AuthContext - Cleaning up auth state listener...");
             unsubscribe();
         };
     }, []);
@@ -195,7 +209,72 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setLoading(true);
             await signInWithGoogle();
         } catch (error) {
-            console.error("Google popup sign-in failed:", error);
+            setLoading(false);
+            throw error;
+        }
+    };
+
+    const handleCredentialSignIn = async (
+        identifier: string,
+        password: string,
+    ): Promise<void> => {
+        try {
+            setLoading(true);
+            const resolvedAccount = await authApi.resolveLogin(identifier);
+
+            if (resolvedAccount.hasPassword === false) {
+                throw new Error(
+                    "This account uses Google sign-in. Please continue with Google.",
+                );
+            }
+
+            await signInWithEmailPassword(resolvedAccount.email, password);
+        } catch (error) {
+            setLoading(false);
+            throw error;
+        }
+    };
+
+    const handleRegisterWithEmail = async (
+        payload: RegisterPayload,
+    ): Promise<void> => {
+        let createdUser: FirebaseUser | null = null;
+
+        try {
+            setLoading(true);
+
+            const credential = await registerWithEmailPassword(
+                payload.email,
+                payload.password,
+            );
+
+            createdUser = credential.user;
+            const token = await credential.user.getIdToken(true);
+            const backendUser = await authApi.completeRegistration(
+                {
+                    username: payload.username,
+                    displayName: payload.displayName,
+                },
+                token,
+            );
+
+            previousUserIdRef.current = credential.user.uid;
+            setCurrentUser(buildAppUser(backendUser, credential.user));
+            setLoading(false);
+        } catch (error) {
+            if (createdUser) {
+                try {
+                    await deleteUser(createdUser);
+                } catch (deleteError) {
+                    console.error("Failed to rollback Firebase user:", deleteError);
+                }
+            }
+
+            clearWalletGuideSessionFlags();
+            clearApiCaches();
+            previousUserIdRef.current = null;
+            await firebaseSignOut(auth).catch(() => undefined);
+            setCurrentUser(null);
             setLoading(false);
             throw error;
         }
@@ -224,6 +303,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         currentUser,
         loading,
         signInWithGoogle: handleGoogleSignIn,
+        signInWithCredentials: handleCredentialSignIn,
+        registerWithEmail: handleRegisterWithEmail,
         logout,
         isAuthenticated,
         updateUserStatus,

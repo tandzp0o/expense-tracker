@@ -31,6 +31,7 @@ export const verifyFirebaseToken = async (
             email: decodedToken.email || "",
             name: decodedToken.name || "",
             picture: decodedToken.picture || "",
+            signInProvider: decodedToken.firebase?.sign_in_provider || "",
         };
         next();
     } catch (error: any) {

@@ -589,6 +589,36 @@ export const goalApi = {
     },
 };
 
+export const authApi = {
+    resolveLogin: async (identifier: string) => {
+        try {
+            const apiClient = createApiClient();
+            const response = await apiClient.post("/auth/resolve-login", {
+                identifier,
+            });
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    completeRegistration: async (
+        profileData: { username: string; displayName?: string },
+        token?: string,
+    ) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.post(
+                "/auth/complete-registration",
+                profileData,
+            );
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+};
+
 // --- User API ---
 export const userApi = {
     // Get user profile
@@ -640,6 +670,7 @@ export const userApi = {
 };
 
 const api = {
+    auth: authApi,
     wallet: walletApi,
     transaction: transactionApi,
     dish: dishApi,
