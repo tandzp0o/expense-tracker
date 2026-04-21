@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
+import Budget from "../models/Budget";
+import Goal from "../models/Goal";
+import Transaction from "../models/Transaction";
 import User from "../models/User";
+import Wallet from "../models/Wallet";
 import {
     USERNAME_RULE_TEXT,
     deriveDisplayName,
@@ -19,10 +23,21 @@ interface AuthenticatedRequest extends Request {
     };
 }
 
+const hasLinkedData = async (uid: string) => {
+    const [walletCount, transactionCount, goalCount, budgetCount] =
+        await Promise.all([
+            Wallet.countDocuments({ userId: uid }),
+            Transaction.countDocuments({ userId: uid }),
+            Goal.countDocuments({ userId: uid }),
+            Budget.countDocuments({ userId: uid }),
+        ]);
+
+    return walletCount + transactionCount + goalCount + budgetCount > 0;
+};
+
 export const verifyToken = async (req: AuthenticatedRequest, res: Response) => {
     try {
         if (!req.user) {
-            console.log("Không tìm thấy user trong request");
             return res.status(401).json({
                 success: false,
                 message: "User not authenticated",
@@ -30,7 +45,14 @@ export const verifyToken = async (req: AuthenticatedRequest, res: Response) => {
         }
 
         const { uid, email, picture, name, signInProvider } = req.user;
-        console.log("Xác thực user:", { uid, email });
+        const existingUser = await User.findOne({ uid });
+
+        if (!existingUser && signInProvider === "password") {
+            return res.status(409).json({
+                success: false,
+                message: "Password account registration is incomplete",
+            });
+        }
 
         const user = await syncUserIdentity({
             uid,
@@ -41,7 +63,7 @@ export const verifyToken = async (req: AuthenticatedRequest, res: Response) => {
         });
 
         res.set("Cache-Control", "private, no-store, max-age=0");
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             uid: user.uid,
             email: user.email,
@@ -55,8 +77,8 @@ export const verifyToken = async (req: AuthenticatedRequest, res: Response) => {
             authProviders: user.authProviders,
         });
     } catch (error) {
-        console.error("Lỗi khi xác thực token:", error);
-        res.status(500).json({
+        console.error("Token verification failed:", error);
+        return res.status(500).json({
             success: false,
             message: "Server error",
             error: error instanceof Error ? error.message : "Unknown error",
@@ -134,6 +156,7 @@ export const completeRegistration = async (
             });
         }
 
+        const normalizedEmail = req.user.email.toLowerCase();
         const requestedUsername = normalizeUsername(String(req.body?.username || ""));
         if (!isUsernameValid(requestedUsername)) {
             return res.status(400).json({
@@ -142,21 +165,38 @@ export const completeRegistration = async (
             });
         }
 
-        const duplicate = await User.findOne({
+        const duplicateUsername = await User.findOne({
             username: requestedUsername,
             uid: { $ne: req.user.uid },
         }).select("uid");
 
-        if (duplicate) {
+        if (duplicateUsername) {
             return res.status(409).json({
                 success: false,
                 message: "Username is already in use",
             });
         }
 
+        const duplicateEmailOwner = await User.findOne({
+            email: normalizedEmail,
+            uid: { $ne: req.user.uid },
+        }).select("uid email newUser");
+
+        if (duplicateEmailOwner) {
+            const duplicateHasLinkedData = await hasLinkedData(duplicateEmailOwner.uid);
+            if (duplicateHasLinkedData) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Email is already linked to another account",
+                });
+            }
+
+            await User.deleteOne({ _id: duplicateEmailOwner._id });
+        }
+
         const user = await syncUserIdentity({
             uid: req.user.uid,
-            email: req.user.email,
+            email: normalizedEmail,
             displayName: req.body?.displayName,
             picture: req.user.picture,
             signInProvider: req.user.signInProvider,
@@ -189,6 +229,46 @@ export const completeRegistration = async (
         });
     } catch (error) {
         console.error("Complete registration failed:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+        });
+    }
+};
+
+export const rollbackRegistration = async (
+    req: AuthenticatedRequest,
+    res: Response,
+) => {
+    try {
+        if (!req.user?.uid) {
+            return res.status(401).json({
+                success: false,
+                message: "User not authenticated",
+            });
+        }
+
+        const user = await User.findOne({ uid: req.user.uid });
+        if (!user) {
+            return res.status(200).json({
+                success: true,
+            });
+        }
+
+        if (await hasLinkedData(req.user.uid)) {
+            return res.status(409).json({
+                success: false,
+                message: "Cannot rollback a user that already has linked data",
+            });
+        }
+
+        await User.deleteOne({ uid: req.user.uid });
+
+        return res.status(200).json({
+            success: true,
+        });
+    } catch (error) {
+        console.error("Rollback registration failed:", error);
         return res.status(500).json({
             success: false,
             message: "Server error",

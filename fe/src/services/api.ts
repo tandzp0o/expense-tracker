@@ -617,6 +617,16 @@ export const authApi = {
             return handleApiError(error);
         }
     },
+
+    rollbackRegistration: async (token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.delete("/auth/registration-draft");
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
 };
 
 // --- User API ---

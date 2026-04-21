@@ -163,11 +163,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const isAuthenticated = !!currentUser;
     const previousUserIdRef = useRef<string | null>(null);
+    const registrationInProgressRef = useRef(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(
             auth,
             async (firebaseUser: FirebaseUser | null) => {
+                if (firebaseUser && registrationInProgressRef.current) {
+                    return;
+                }
+
                 setLoading(true);
 
                 if (firebaseUser) {
@@ -241,6 +246,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         let createdUser: FirebaseUser | null = null;
 
         try {
+            registrationInProgressRef.current = true;
             setLoading(true);
 
             const credential = await registerWithEmailPassword(
@@ -260,9 +266,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             previousUserIdRef.current = credential.user.uid;
             setCurrentUser(buildAppUser(backendUser, credential.user));
+            registrationInProgressRef.current = false;
             setLoading(false);
         } catch (error) {
             if (createdUser) {
+                try {
+                    const token = await createdUser.getIdToken(true);
+                    await authApi.rollbackRegistration(token).catch(() => undefined);
+                } catch (rollbackError) {
+                    console.error(
+                        "Failed to rollback Mongo registration draft:",
+                        rollbackError,
+                    );
+                }
+
                 try {
                     await deleteUser(createdUser);
                 } catch (deleteError) {
@@ -270,6 +287,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
             }
 
+            registrationInProgressRef.current = false;
             clearWalletGuideSessionFlags();
             clearApiCaches();
             previousUserIdRef.current = null;

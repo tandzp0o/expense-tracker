@@ -3,6 +3,7 @@ import { verifyFirebaseToken } from "../middleware/auth";
 import {
     completeRegistration,
     resolveLoginIdentifier,
+    rollbackRegistration,
     verifyToken,
 } from "../controllers/auth.controller";
 
@@ -12,5 +13,6 @@ router.post("/resolve-login", resolveLoginIdentifier);
 
 router.get("/verify", verifyFirebaseToken, verifyToken);
 router.post("/complete-registration", verifyFirebaseToken, completeRegistration);
+router.delete("/registration-draft", verifyFirebaseToken, rollbackRegistration);
 
 export default router;
