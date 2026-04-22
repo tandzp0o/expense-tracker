@@ -95,6 +95,12 @@
         @apply min-h-screen bg-background text-foreground;
     }
 
+    .metric-card-grid {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    }
+
     .glass-panel {
         background: color-mix(in srgb, var(--app-card) 88%, transparent);
         backdrop-filter: blur(18px);
@@ -172,6 +178,12 @@
 
     .app-header-user-trigger.is-scrolled:hover {
         background: color-mix(in srgb, var(--app-card) 84%, transparent);
+    }
+}
+
+@media (min-width: 640px) {
+    .metric-card-grid {
+        gap: 1rem;
     }
 }
 

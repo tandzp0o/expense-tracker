@@ -90,12 +90,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                                     <button
                                         key={item.to}
                                         aria-disabled="true"
-                                        className="flex cursor-not-allowed flex-col items-center justify-center gap-1 rounded-[var(--app-radius-md)] px-2 py-2 text-[11px] font-medium text-muted-foreground/45"
+                                        className="flex min-w-0 cursor-not-allowed flex-col items-center justify-center gap-0.5 rounded-[var(--app-radius-md)] px-1 py-1.5 text-[9px] font-medium text-muted-foreground/45 sm:text-[10px]"
                                         disabled
                                         type="button"
                                     >
-                                        <Icon className="h-4 w-4" />
-                                        <span>{item.label}</span>
+                                        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                        <span className="block w-full overflow-hidden text-ellipsis whitespace-nowrap leading-none">
+                                            {item.label}
+                                        </span>
                                     </button>
                                 );
                             }
@@ -106,7 +108,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                                     to={item.to}
                                     className={({ isActive }) =>
                                         cn(
-                                            "flex flex-col items-center justify-center gap-1 rounded-[var(--app-radius-md)] px-2 py-2 text-[11px] font-medium transition-all",
+                                            "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--app-radius-md)] px-1 py-1.5 text-[9px] font-medium transition-all sm:text-[10px]",
                                             "isPrimary" in item && item.isPrimary
                                                 ? "bg-primary text-primary-foreground shadow-sm"
                                             : isActive
@@ -115,8 +117,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                                         )
                                     }
                                 >
-                                    <Icon className="h-4 w-4" />
-                                    <span>{item.label}</span>
+                                    <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                    <span className="block w-full overflow-hidden text-ellipsis whitespace-nowrap leading-none">
+                                        {item.label}
+                                    </span>
                                 </NavLink>
                             );
                         })}

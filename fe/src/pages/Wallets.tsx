@@ -8,6 +8,7 @@ import {
     Car,
     CreditCard,
     Home,
+    PencilLine,
     Plane,
     Plus,
     ShoppingCart,
@@ -131,7 +132,7 @@ const Wallets: React.FC = () => {
     const { language, isVietnamese } = useLocale();
     const { toast } = useToast();
     const { appearance } = useTheme();
-    const copy = isVietnamese
+    const baseCopy = isVietnamese
         ? {
               loadFailed: "Không thể tải ví",
               retry: "Vui lòng thử lại.",
@@ -384,6 +385,28 @@ const Wallets: React.FC = () => {
               transferTo: (name?: string) => `Transfer to ${name || "destination wallet"}`,
               transferFrom: (name?: string) => `Received from ${name || "source wallet"}`,
           };
+    const copy = {
+        ...baseCopy,
+        pageTitle: isVietnamese ? "Ví tiền" : "Wallets",
+        pageDescription: isVietnamese
+            ? "Quản lý ví, số dư và chuyển tiền nội bộ thật gọn trong một nơi."
+            : "Manage wallets, balances, and internal transfers in one place.",
+        transferReadyDesc: isVietnamese
+            ? "Có thể chuyển tiền khi bạn đã có ít nhất hai ví."
+            : "Transfers are available once you have at least two wallets.",
+        balanceTrendDesc: isVietnamese
+            ? "Theo dõi biến động số dư trong 6 tháng gần đây."
+            : "Follow your balance movement over the last six months.",
+        internalTransferDesc: isVietnamese
+            ? "Chuyển nhanh tiền giữa các ví đang có."
+            : "Move money quickly between your wallets.",
+        noWalletsDesc: isVietnamese
+            ? "Tạo ví đầu tiên để bắt đầu ghi nhận và theo dõi số dư."
+            : "Create your first wallet to start tracking balances.",
+        formDescription: isVietnamese
+            ? "Điền các thông tin cơ bản để tạo hoặc cập nhật ví."
+            : "Fill in the key details to create or update a wallet.",
+    };
     const guideOpenFormLabel = isVietnamese
         ? "M\u1edf form \u2192"
         : "Open form ->";
@@ -1268,7 +1291,7 @@ const Wallets: React.FC = () => {
                 title={copy.pageTitle}
             />
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="metric-card-grid">
                 <MetricCard
                     icon={WalletCards}
                     subtitle={copy.activeWallets(wallets.length)}
@@ -1306,31 +1329,37 @@ const Wallets: React.FC = () => {
                                 return (
                                     <Card
                                         key={wallet._id}
-                                        className="overflow-hidden border-border/80"
+                                        className="overflow-hidden border-border/80 bg-card/95"
                                     >
                                         <div
-                                            className="p-5 text-white"
+                                            className={`relative overflow-hidden p-4 text-white sm:p-5 ${
+                                                wallet.imageUrl ? "pb-16 sm:pb-20" : ""
+                                            }`}
                                             style={{
                                                 background: `linear-gradient(135deg, ${wallet.color || appearance.primaryColor}, rgba(15, 23, 42, 0.95))`,
                                             }}
                                         >
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div>
-                                                    <p className="text-xs uppercase tracking-[0.16em] text-white/70">
+                                            <div className="pointer-events-none absolute inset-0">
+                                                <div className="absolute right-0 top-0 h-28 w-28 translate-x-8 -translate-y-8 rounded-full bg-white/10" />
+                                                <div className="absolute bottom-0 left-0 h-24 w-24 -translate-x-8 translate-y-8 rounded-full bg-white/10" />
+                                            </div>
+                                            <div className="relative z-10 flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="text-[11px] uppercase tracking-[0.14em] text-white/70">
                                                         {getWalletTypeLabel(wallet.type)}
                                                     </p>
-                                                    <p className="mt-3 text-2xl font-semibold">
+                                                    <p className="mt-2 text-[1.45rem] font-semibold sm:text-[1.65rem]">
                                                         {formatCurrency(wallet.balance)}
                                                     </p>
                                                 </div>
-                                                <div className="rounded-[var(--app-radius-md)] bg-white/12 p-3">
-                                                    <Icon className="h-5 w-5" />
+                                                <div className="rounded-[calc(var(--app-radius-md)-2px)] bg-white/12 p-2.5">
+                                                    <Icon className="h-[18px] w-[18px]" />
                                                 </div>
                                             </div>
-                                            <div className="mt-8 flex items-end justify-between gap-4">
-                                                <div>
-                                                    <p className="text-sm font-medium">{wallet.name}</p>
-                                                    <p className="text-xs text-white/70">
+                                            <div className="mt-6 flex items-end justify-between gap-3">
+                                                <div className={`min-w-0 ${wallet.imageUrl ? "pr-20 sm:pr-24" : ""}`}>
+                                                    <p className="text-sm font-medium sm:text-[15px]">{wallet.name}</p>
+                                                    <p className="truncate text-[11px] text-white/70">
                                                         {wallet.currency}
                                                         {wallet.accountNumber
                                                             ? ` • ${wallet.accountNumber}`
@@ -1338,30 +1367,40 @@ const Wallets: React.FC = () => {
                                                     </p>
                                                 </div>
                                                 {wallet.hasTransactions ? (
-                                                    <Badge className="border-white/20 bg-white/10 text-white" variant="outline">
+                                                    <Badge className="border-white/20 bg-white/10 px-2 py-0.5 text-[10px] text-white" variant="outline">
                                                         {copy.hasHistory}
                                                     </Badge>
                                                 ) : null}
                                             </div>
+
+                                            {wallet.imageUrl ? (
+                                                <div className="absolute bottom-4 right-4 z-10 rounded-[var(--app-radius-md)] border border-white/20 bg-white/10 p-1 shadow-sm sm:bottom-5 sm:right-5">
+                                                    <img
+                                                        alt={wallet.name}
+                                                        className="h-14 w-14 rounded-[calc(var(--app-radius-md)-6px)] object-cover sm:h-16 sm:w-16"
+                                                        src={wallet.imageUrl}
+                                                    />
+                                                </div>
+                                            ) : null}
                                         </div>
 
-                                        {wallet.imageUrl ? (
-                                            <img
-                                                alt={wallet.name}
-                                                className="h-32 w-full object-cover"
-                                                src={wallet.imageUrl}
-                                            />
-                                        ) : null}
-
-                                        <CardContent className="flex items-center justify-between gap-3 p-5">
-                                            <Button onClick={() => openEdit(wallet)} variant="outline">
+                                        <CardContent className="flex items-center justify-end gap-2 px-4 pb-4 pt-2.5 sm:px-5 sm:pb-5">
+                                            <Button
+                                                className="h-7 px-2.5 text-[11px]"
+                                                onClick={() => openEdit(wallet)}
+                                                size="sm"
+                                                variant="outline"
+                                            >
+                                                <PencilLine className="h-3 w-3" />
                                                 {copy.edit}
                                             </Button>
                                             <Button
+                                                className="h-7 w-7"
                                                 onClick={() => setPendingDelete(wallet)}
+                                                size="icon"
                                                 variant="ghost"
                                             >
-                                                <Trash2 className="h-4 w-4" />
+                                                <Trash2 className="h-3 w-3" />
                                             </Button>
                                         </CardContent>
                                     </Card>

@@ -98,12 +98,12 @@ const WALLET_GRADIENTS = [
 ];
 
 const PIE_FALLBACK_COLORS = [
-  "#2563eb",
-  "#0f172a",
-  "#f97316",
-  "#0f766e",
-  "#7c3aed",
-  "#16a34a",
+  "#f59e0b",
+  "#06b6d4",
+  "#8b5cf6",
+  "#ef4444",
+  "#14b8a6",
+  "#3b82f6",
 ];
 
 const parseAmount = (raw: unknown) => {
@@ -191,7 +191,7 @@ const getCategoryMeta = (category: string) => {
   ) {
     return {
       icon: ShoppingBag,
-      tone: "bg-amber-500/10 text-amber-600",
+      tone: "bg-emerald-500/10 text-emerald-600",
     };
   }
 
@@ -234,6 +234,44 @@ const getCategoryMeta = (category: string) => {
   };
 };
 
+const getCategoryChartColor = (category: string, index: number) => {
+  const label = normalizeText(category || "");
+
+  if (label.includes("an") || label.includes("uong") || label.includes("food")) {
+    return "#10b981";
+  }
+
+  if (
+    label.includes("xe") ||
+    label.includes("transport") ||
+    label.includes("di lai")
+  ) {
+    return "#0ea5e9";
+  }
+
+  if (
+    label.includes("nha") ||
+    label.includes("thue") ||
+    label.includes("dien")
+  ) {
+    return "#8b5cf6";
+  }
+
+  if (
+    label.includes("y te") ||
+    label.includes("suc khoe") ||
+    label.includes("health")
+  ) {
+    return "#f43f5e";
+  }
+
+  if (label.includes("mua") || label.includes("shopping")) {
+    return "#ec4899";
+  }
+
+  return PIE_FALLBACK_COLORS[index % PIE_FALLBACK_COLORS.length];
+};
+
 const DashboardStatCard: React.FC<{
   title: string;
   value: string;
@@ -242,29 +280,27 @@ const DashboardStatCard: React.FC<{
   iconClassName?: string;
 }> = ({ title, value, description, icon: Icon, iconClassName }) => (
   <Card className="overflow-hidden border-border/70 bg-card/95">
-    <CardContent className="p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            {title}
-          </p>
-          <div className="space-y-2">
-            <p className="text-3xl font-semibold tracking-tight text-foreground">
-              {value}
-            </p>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {description}
-            </p>
-          </div>
-        </div>
-
+    <CardContent className="p-4 sm:p-5">
+      <div className="flex items-start gap-3">
         <div
           className={cn(
-            "flex h-11 w-11 items-center justify-center rounded-[var(--app-radius-md)] bg-muted text-foreground",
+            "flex h-10 w-10 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-3px)] bg-muted text-foreground",
             iconClassName,
           )}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {title}
+          </p>
+          <p className="mt-2 text-[1.5rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[1.7rem]">
+            {value}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {description}
+          </p>
         </div>
       </div>
     </CardContent>
@@ -295,11 +331,11 @@ const Dashboard: React.FC = () => {
     number | null
   >(null);
 
-  const copy = isVietnamese
+  const baseCopy = isVietnamese
       ? {
           headerTitle: "Bảng điều khiển tài chính",
           headerDescription:
-            "Header gom tieu de, mo ta, cac nut thao tac va bo loc. Tat ca cards, charts va cac section ben duoi deu di theo ky xem va vi dang chon.",
+            "Theo dõi dòng tiền, giao dịch gần đây, mục tiêu và số dư ví trong một nơi.",
           reportButton: "Báo cáo",
           addTransaction: "Thêm giao dịch",
           allWallets: "Tất cả ví",
@@ -480,6 +516,32 @@ const Dashboard: React.FC = () => {
           OTHER: "Saving",
         },
       };
+
+  const copy = {
+    ...baseCopy,
+    headerTitle: isVietnamese ? "Bảng điều khiển tài chính" : "Finance Dashboard",
+    headerDescription: isVietnamese
+      ? "Theo dõi dòng tiền, giao dịch gần đây, mục tiêu và số dư ví trong một nơi."
+      : "Track cash flow, recent activity, goals, and wallet balances in one place.",
+    summaryChartDesc: isVietnamese
+      ? "Tỷ trọng chi tiêu theo từng danh mục chính."
+      : "Spending share across your main categories.",
+    transactionsDesc: isVietnamese
+      ? "Giao dịch gần đây theo bộ lọc hiện tại."
+      : "Recent transactions based on the current filters.",
+    openTransactions: isVietnamese ? "Xem tất cả" : "View all",
+    savingGoalDesc: isVietnamese
+      ? "Theo dõi mục tiêu đang ưu tiên và tiến độ hiện tại."
+      : "Keep an eye on your current priority goal.",
+    noGoalsDesc: isVietnamese
+      ? "Tạo mục tiêu để bắt đầu theo dõi tiến độ tiết kiệm."
+      : "Create a goal to start tracking savings progress.",
+    myWalletTitle: isVietnamese ? "Ví tiền" : "Wallets",
+    myWalletDesc: isVietnamese
+      ? "Xem nhanh số dư và tỷ trọng của từng ví."
+      : "Quickly scan balances and wallet share.",
+    manageWallets: isVietnamese ? "Quản lý ví" : "Manage wallets",
+  };
 
   const formatDeltaText = useCallback(
     (current: number, previous: number) => {
@@ -878,13 +940,9 @@ const Dashboard: React.FC = () => {
         name,
         value,
         percent: totalExpense > 0 ? (value / totalExpense) * 100 : 0,
-        color:
-          index === 0
-            ? appearance.primaryColor
-            : PIE_FALLBACK_COLORS[index % PIE_FALLBACK_COLORS.length],
+        color: getCategoryChartColor(name, index),
       }));
   }, [
-    appearance.primaryColor,
     copy.genericCategory,
     currentCashflowTransactions,
     totalExpense,
@@ -1019,12 +1077,19 @@ const Dashboard: React.FC = () => {
       <PageHeader
         actions={
           <div className="flex w-full flex-col gap-3 lg:items-end">
-            <div className="grid gap-3 sm:flex sm:flex-wrap sm:justify-end">
-              <Button onClick={() => navigate("/analytics")} variant="outline">
+            <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+              <Button
+                className="h-9 whitespace-nowrap px-3 text-xs sm:text-sm"
+                onClick={() => navigate("/analytics")}
+                variant="outline"
+              >
                 <Download className="h-4 w-4" />
                 {copy.reportButton}
               </Button>
-              <Button onClick={() => navigate("/transactions")}>
+              <Button
+                className="h-9 whitespace-nowrap px-3 text-xs sm:text-sm"
+                onClick={() => navigate("/transactions")}
+              >
                 <Plus className="h-4 w-4" />
                 {copy.addTransaction}
               </Button>
@@ -1062,7 +1127,7 @@ const Dashboard: React.FC = () => {
         title={copy.headerTitle}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <DashboardStatCard
           description={
             selectedWallet === "all"
@@ -1284,15 +1349,16 @@ const Dashboard: React.FC = () => {
         >
           {/* section transaction */}
           <Card className="overflow-hidden xl:flex xl:h-full xl:flex-col">
-            <CardHeader className="flex flex-col gap-4 border-b border-border/70 md:flex-row md:items-start md:justify-between">
+            <CardHeader className="flex flex-col gap-3 border-b border-border/70 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
                 <CardTitle>{copy.transactionsTitle}</CardTitle>
                 <CardDescription>{copy.transactionsDesc}</CardDescription>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {(["ALL", "INCOME", "EXPENSE"] as const).map((type) => (
                   <Button
+                    className="h-8 whitespace-nowrap rounded-full px-2.5 text-xs"
                     key={type}
                     onClick={() => setTransactionFilter(type)}
                     size="sm"
@@ -1306,6 +1372,7 @@ const Dashboard: React.FC = () => {
                   </Button>
                 ))}
                 <Button
+                  className="h-8 whitespace-nowrap rounded-full px-2.5 text-xs"
                   onClick={() => navigate("/transactions")}
                   size="sm"
                   variant="outline"
@@ -1315,9 +1382,9 @@ const Dashboard: React.FC = () => {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-3 pt-6 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+            <CardContent className="space-y-2.5 pt-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
               {recentTransactions.length > 0 ? (
-                recentTransactions.slice(0, 8).map((transaction) => {
+                recentTransactions.slice(0, 10).map((transaction) => {
                   const isIncome = transaction.type === "INCOME";
                   const isExpense = transaction.type === "EXPENSE";
                   const transactionLabel =
@@ -1334,56 +1401,54 @@ const Dashboard: React.FC = () => {
                   return (
                     <div
                       key={transaction._id}
-                      className="grid gap-4 rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4 lg:grid-cols-[minmax(0,1.8fr)_auto_auto_auto] lg:items-center"
+                      className="flex items-start justify-between gap-2.5 rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 px-3 py-2.5"
                     >
-                      <div className="min-w-0">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={cn(
-                              "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--app-radius-md)]",
-                              categoryMeta.tone,
-                            )}
-                          >
-                            <Icon className="h-4 w-4" />
-                          </div>
+                      <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                        <div
+                          className={cn(
+                            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-5px)]",
+                            categoryMeta.tone,
+                          )}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
 
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-foreground">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-[13px] font-semibold text-foreground sm:text-sm">
                               {transactionLabel}
                             </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {walletName} -{" "}
-                              {transaction.category || copy.genericCategory}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {formatDate(transaction.date)}
-                            </p>
+                            <Badge
+                              className="h-5 rounded-full px-1.5 text-[10px]"
+                              variant={
+                                isIncome
+                                  ? "success"
+                                  : isExpense
+                                    ? "danger"
+                                    : "outline"
+                              }
+                            >
+                              {isIncome
+                                ? copy.transactionLabels.INCOME
+                                : isExpense
+                                  ? copy.transactionLabels.EXPENSE
+                                  : copy.transactionLabels.OTHER}
+                            </Badge>
                           </div>
+                          <p className="hidden">
+                            {walletName} • {transaction.category || copy.genericCategory}
+                          </p>
+                          <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                            {walletName} • {transaction.category || copy.genericCategory} •{" "}
+                            {formatDate(transaction.date)}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center lg:justify-center">
-                        <Badge
-                          variant={
-                            isIncome
-                              ? "success"
-                              : isExpense
-                                ? "danger"
-                                : "outline"
-                          }
-                        >
-                          {isIncome
-                            ? copy.transactionLabels.INCOME
-                            : isExpense
-                              ? copy.transactionLabels.EXPENSE
-                              : copy.transactionLabels.OTHER}
-                        </Badge>
-                      </div>
-
-                      <div className="text-left lg:text-right">
+                      <div className="ml-1.5 flex shrink-0 flex-col items-end gap-1">
                         <p
                           className={cn(
-                            "font-semibold",
+                            "text-[13px] font-semibold sm:text-sm",
                             isIncome
                               ? "text-emerald-600"
                               : isExpense
@@ -1394,15 +1459,13 @@ const Dashboard: React.FC = () => {
                           {isIncome ? "+" : isExpense ? "-" : ""}
                           {formatCurrency(parseAmount(transaction.amount))}
                         </p>
-                      </div>
-
-                      <div className="flex items-center justify-end">
                         <Button
+                          className="h-7 w-7 rounded-full"
                           onClick={() => setPendingDelete(transaction)}
                           size="icon"
                           variant="ghost"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
@@ -1527,7 +1590,7 @@ const Dashboard: React.FC = () => {
 
             <CardContent className="pt-6">
               {walletCards.length > 0 ? (
-                <div className="flex flex-nowrap gap-4 overflow-x-auto overflow-y-hidden py-2">
+                <div className="flex flex-nowrap gap-3 overflow-x-auto overflow-y-hidden py-1">
                   {walletCards.map((wallet) => {
                     const normalizedType = normalizeText(wallet.type || "");
                     const walletTypeLabel = normalizedType.includes("bank")
@@ -1541,7 +1604,7 @@ const Dashboard: React.FC = () => {
                     return (
                       <div
                         key={wallet._id}
-                        className="relative min-w-[280px] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] p-6 text-white shadow-sm sm:min-w-[320px]"
+                        className="relative min-w-[236px] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] p-4 text-white shadow-sm sm:min-w-[260px] sm:p-5"
                         style={{
                           backgroundImage: wallet.background,
                         }}
@@ -1551,39 +1614,39 @@ const Dashboard: React.FC = () => {
                           <div className="absolute bottom-0 left-0 h-28 w-28 -translate-x-8 translate-y-8 rounded-full bg-white/10" />
                         </div>
 
-                        <div className="relative z-10 flex h-full flex-col justify-between gap-8">
+                        <div className="relative z-10 flex h-full flex-col gap-5">
                           <div className="flex items-start justify-between gap-4">
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium text-white/75">
+                            <div className="space-y-1.5">
+                              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/72">
                                 {walletTypeLabel}
                               </p>
-                              <h3 className="text-2xl font-semibold tracking-tight">
+                              <h3 className="text-lg font-semibold tracking-tight sm:text-xl">
                                 {wallet.name}
                               </h3>
                             </div>
 
-                            <div className="flex h-11 w-11 items-center justify-center rounded-[var(--app-radius-md)] bg-white/12">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-[calc(var(--app-radius-md)-2px)] bg-white/12 sm:h-10 sm:w-10">
                               {normalizedType.includes("bank") ? (
-                                <Landmark className="h-5 w-5" />
+                                <Landmark className="h-4 w-4 sm:h-5 sm:w-5" />
                               ) : normalizedType.includes("ewallet") ? (
-                                <CreditCard className="h-5 w-5" />
+                                <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
                               ) : (
-                                <Wallet className="h-5 w-5" />
+                                <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
                               )}
                             </div>
                           </div>
 
-                          <div className="space-y-4">
+                          <div className="space-y-2.5">
                             <div>
-                              <p className="text-xs uppercase tracking-[0.22em] text-white/70">
+                              <p className="text-[10px] uppercase tracking-[0.18em] text-white/68">
                                 {copy.availableBalance}
                               </p>
-                              <p className="mt-2 text-3xl font-semibold tracking-tight">
+                              <p className="mt-1.5 text-[1.45rem] font-semibold tracking-tight sm:text-[1.7rem]">
                                 {formatCurrency(parseAmount(wallet.balance))}
                               </p>
                             </div>
 
-                            <div className="flex items-center justify-between text-sm text-white/80">
+                            <div className="flex items-center justify-between text-xs text-white/80">
                               <span>{copy.share}</span>
                               <span>{wallet.share.toFixed(0)}%</span>
                             </div>
@@ -1591,7 +1654,7 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {selectedWallet === wallet._id ? (
-                          <span className="absolute right-4 top-4 rounded-full bg-white/14 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-white">
+                          <span className="absolute right-3 top-3 rounded-full bg-white/14 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
                             {copy.active}
                           </span>
                         ) : null}

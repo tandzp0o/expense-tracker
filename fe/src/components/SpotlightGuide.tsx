@@ -11,6 +11,7 @@ import React, {
 import { createPortal } from "react-dom";
 import { useLocale } from "../contexts/LocaleContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { useLockBodyScroll } from "../hooks/useLockBodyScroll";
 import { hexToRgba } from "../lib/utils";
 
 type Placement = "top" | "bottom" | "left" | "right";
@@ -123,6 +124,8 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
     const [bubbleSize, setBubbleSize] = useState<Size | null>(null);
     const [viewportSize, setViewportSize] = useState<Size | null>(null);
     const [boundaryRect, setBoundaryRect] = useState<Boundary | null>(null);
+
+    useLockBodyScroll(open);
 
     const titleId = `${baseId}-title`;
     const descriptionId = `${baseId}-description`;
@@ -370,6 +373,50 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
             }
         };
     }, [open, rect]);
+
+    useEffect(() => {
+        if (!open || typeof document === "undefined") {
+            return;
+        }
+
+        const shouldAllowScroll = (eventTarget: EventTarget | null) => {
+            if (!(eventTarget instanceof Node)) {
+                return false;
+            }
+
+            return !!bubbleRef.current?.contains(eventTarget);
+        };
+
+        const handleTouchMove = (event: TouchEvent) => {
+            if (shouldAllowScroll(event.target)) {
+                return;
+            }
+
+            event.preventDefault();
+        };
+
+        const handleWheel = (event: WheelEvent) => {
+            if (shouldAllowScroll(event.target)) {
+                return;
+            }
+
+            event.preventDefault();
+        };
+
+        document.addEventListener("touchmove", handleTouchMove, {
+            capture: true,
+            passive: false,
+        });
+        document.addEventListener("wheel", handleWheel, {
+            capture: true,
+            passive: false,
+        });
+
+        return () => {
+            document.removeEventListener("touchmove", handleTouchMove, true);
+            document.removeEventListener("wheel", handleWheel, true);
+        };
+    }, [open]);
 
     const highlightRect = useMemo(() => {
         if (!rect || !viewportSize) {
@@ -638,7 +685,7 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
     }
 
     return createPortal(
-        <div className="pointer-events-none fixed inset-0 z-[2000]">
+        <div className="pointer-events-none fixed inset-0 z-[2000] overscroll-none">
             <button
                 aria-label={skipAriaLabel}
                 className="pointer-events-auto fixed right-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-[5] inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/35 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300/90 backdrop-blur-md transition-colors duration-150 hover:border-white/20 hover:bg-slate-950/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 sm:right-6 sm:top-6"
@@ -738,7 +785,7 @@ const SpotlightGuide: React.FC<SpotlightGuideProps> = ({
                 ref={bubbleRef}
                 aria-describedby={descriptionId}
                 aria-labelledby={titleId}
-                className="pointer-events-auto fixed max-w-[calc(100vw-48px)] overflow-y-auto rounded-[calc(var(--app-radius-xl)+10px)] border border-white/15 bg-slate-950/95 p-4 text-white shadow-[0_26px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out sm:p-6"
+                className="pointer-events-auto fixed max-w-[calc(100vw-48px)] overflow-y-auto overscroll-contain rounded-[calc(var(--app-radius-xl)+10px)] border border-white/15 bg-slate-950/95 p-4 text-white shadow-[0_26px_70px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out sm:p-6"
                 role="dialog"
                 style={{
                     ...bubbleStyle,

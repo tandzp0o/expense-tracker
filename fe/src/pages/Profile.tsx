@@ -223,7 +223,7 @@ const Profile: React.FC = () => {
         );
     }
 
-    const copy = isVietnamese
+    const baseCopy = isVietnamese
         ? {
               title: "Hồ sơ cá nhân",
               description:
@@ -296,6 +296,21 @@ const Profile: React.FC = () => {
                   "Latest five transactions loaded specifically for the profile screen.",
               noRecentTransactions: "No recent transactions.",
           };
+    const copy = {
+        ...baseCopy,
+        description: isVietnamese
+            ? "Quản lý thông tin cá nhân và theo dõi vài chỉ số tài chính nổi bật."
+            : "Manage your personal details and review key finance highlights.",
+        editSectionDesc: isVietnamese
+            ? "Cập nhật những thông tin cơ bản của hồ sơ cá nhân."
+            : "Update the essential details of your profile.",
+        balanceHistoryDesc: isVietnamese
+            ? "Diễn biến số dư trong 6 tháng gần đây."
+            : "Balance movement over the last six months.",
+        recentTransactionsDesc: isVietnamese
+            ? "Một vài giao dịch mới nhất để bạn theo dõi nhanh."
+            : "A few of your latest transactions for quick review.",
+    };
 
     return (
         <div className="space-y-6">
@@ -391,7 +406,7 @@ const Profile: React.FC = () => {
                 </Card>
 
                 <div className="space-y-6">
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="metric-card-grid">
                         <MetricCard
                             icon={CalendarDays}
                             subtitle={`${stats?.growth || 0}% ${copy.vsPreviousMonth}`}

@@ -47,7 +47,7 @@ const Budgets: React.FC = () => {
         amount: 0,
     });
 
-    const copy = isVietnamese
+    const baseCopy = isVietnamese
         ? {
               title: "Ngân sách",
               description:
@@ -142,6 +142,18 @@ const Budgets: React.FC = () => {
               loadFailed: "Could not load budgets",
               retry: "Please retry.",
           };
+    const copy = {
+        ...baseCopy,
+        description: isVietnamese
+            ? "Thiết lập ngân sách tháng và theo dõi mức chi đã dùng."
+            : "Set monthly budgets and track how much has been used.",
+        monthlyCategoriesDesc: isVietnamese
+            ? "Mỗi mục cho biết ngân sách, số đã chi và phần còn lại."
+            : "Each category shows budget, spent amount, and remaining balance.",
+        formDescription: isVietnamese
+            ? "Điền danh mục và số tiền để tạo hoặc cập nhật ngân sách."
+            : "Enter a category and amount to create or update a budget.",
+    };
     const loadFailedTitle = isVietnamese
         ? "Không thể tải ngân sách"
         : "Could not load budgets";
@@ -312,7 +324,7 @@ const Budgets: React.FC = () => {
                 title={copy.title}
             />
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="metric-card-grid">
                 <MetricCard
                     icon={CreditCard}
                     subtitle={`${growth}% ${copy.vsPreviousMonth}`}

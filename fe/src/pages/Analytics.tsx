@@ -56,7 +56,7 @@ const Analytics: React.FC = () => {
     const [customStart, setCustomStart] = useState("");
     const [customEnd, setCustomEnd] = useState("");
 
-    const copy = isVietnamese
+    const baseCopy = isVietnamese
         ? {
               loadFailed: "Không thể tải phân tích",
               retry: "Vui lòng thử lại.",
@@ -127,6 +127,24 @@ const Analytics: React.FC = () => {
               incomeSeriesLabel: "Income",
               expenseSeriesLabel: "Expense",
           };
+    const copy = {
+        ...baseCopy,
+        pageDescription: isVietnamese
+            ? "Xem nhanh thu, chi và chênh lệch theo khoảng thời gian bạn chọn."
+            : "Review income, expense, and net results for your selected time range.",
+        sixMonthTrendDesc: isVietnamese
+            ? "Biến động thu và chi trong 6 tháng gần đây."
+            : "Income and expense movement across the last six months.",
+        expenseMixDesc: isVietnamese
+            ? "Những nhóm chi tiêu nổi bật trong khoảng đang xem."
+            : "Top spending groups in the current range.",
+        noExpenseDataDesc: isVietnamese
+            ? "Chưa có khoản chi nào trong khoảng thời gian này."
+            : "There are no expense entries in this time range.",
+        efficiencyTitle: isVietnamese
+            ? "Hiệu quả tài chính"
+            : "Financial snapshot",
+    };
     const loadFailedTitle = isVietnamese
         ? "Không thể tải phân tích"
         : "Could not load analytics";
@@ -360,7 +378,7 @@ const Analytics: React.FC = () => {
                 title={copy.pageTitle}
             />
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="metric-card-grid">
                 <MetricCard
                     icon={CircleDollarSign}
                     subtitle={copy.filteredIncome}

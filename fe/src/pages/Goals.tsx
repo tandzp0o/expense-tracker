@@ -55,7 +55,7 @@ const Goals: React.FC = () => {
         category: "general",
     });
 
-    const copy = isVietnamese
+    const baseCopy = isVietnamese
         ? {
               pageTitle: "Mục tiêu tiết kiệm",
               pageDescription:
@@ -176,6 +176,18 @@ const Goals: React.FC = () => {
                   expired: "Expired",
               },
           };
+    const copy = {
+        ...baseCopy,
+        pageDescription: isVietnamese
+            ? "Theo dõi các mục tiêu tiết kiệm và tiến độ hoàn thành của bạn."
+            : "Track your savings goals and overall progress.",
+        noGoalsDesc: isVietnamese
+            ? "Tạo mục tiêu đầu tiên để bắt đầu theo dõi kế hoạch tiết kiệm."
+            : "Create your first goal to start tracking savings progress.",
+        formDescription: isVietnamese
+            ? "Điền các thông tin chính để tạo hoặc cập nhật mục tiêu."
+            : "Fill in the main details to create or update a goal.",
+    };
 
     const getStatusLabel = (status: GoalItem["status"]) => copy.statuses[status];
     const getCategoryLabel = (category: string) =>
@@ -417,7 +429,7 @@ const Goals: React.FC = () => {
                 title={copy.pageTitle}
             />
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="metric-card-grid">
                 <MetricCard
                     icon={Target}
                     subtitle={copy.totalSavedDesc}

@@ -1,33 +1,33 @@
 import React from "react";
 import { Globe2, Languages, SlidersHorizontal } from "lucide-react";
-import { useLocale } from "../contexts/LocaleContext";
 import { PageHeader } from "../components/app/page-header";
 import { MetricCard } from "../components/app/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Select } from "../components/ui/select";
 import ThemeSwitcher from "../components/ThemeSwitcher";
+import { useLocale } from "../contexts/LocaleContext";
 
 const Settings: React.FC = () => {
     const { language, setLanguage, isVietnamese } = useLocale();
+    const pageTitle = isVietnamese ? "Cài đặt" : "Settings";
+    const pageDescription = isVietnamese
+        ? "Tùy chỉnh ngôn ngữ hiển thị và giao diện theo cách bạn muốn."
+        : "Adjust language and appearance settings the way you prefer.";
 
     return (
         <div className="space-y-6">
             <PageHeader
-                description={
-                    isVietnamese
-                        ? "Quản lý ngôn ngữ hiển thị và các tùy chỉnh giao diện của toàn bộ frontend."
-                        : "Manage interface language and appearance settings for the whole frontend."
-                }
-                title={isVietnamese ? "Cài đặt" : "Settings"}
+                description={pageDescription}
+                title={pageTitle}
             />
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="metric-card-grid">
                 <MetricCard
                     icon={Languages}
                     subtitle={
                         isVietnamese
-                            ? "Đổi ngôn ngữ cho các nhãn chính trong ứng dụng"
-                            : "Switch the main interface language"
+                            ? "Đổi ngôn ngữ cho các nhãn chính trong ứng dụng."
+                            : "Switch the main interface language."
                     }
                     title={isVietnamese ? "Ngôn ngữ" : "Language"}
                     value={language === "vi" ? "Tiếng Việt" : "English"}
@@ -36,8 +36,8 @@ const Settings: React.FC = () => {
                     icon={SlidersHorizontal}
                     subtitle={
                         isVietnamese
-                            ? "Tùy chỉnh màu chủ đạo, font, cỡ chữ và bo góc"
-                            : "Customize primary color, font, base size and radius"
+                            ? "Tùy chỉnh màu chủ đạo, phông chữ, cỡ chữ và bo góc."
+                            : "Customize primary color, font, base size, and radius."
                     }
                     title={isVietnamese ? "Giao diện" : "Appearance"}
                     value={isVietnamese ? "Cá nhân hóa" : "Personalized"}
@@ -46,8 +46,8 @@ const Settings: React.FC = () => {
                     icon={Globe2}
                     subtitle={
                         isVietnamese
-                            ? "Thiết lập được lưu tại local storage trên trình duyệt hiện tại"
-                            : "Settings are persisted in local storage for this browser"
+                            ? "Thiết lập được lưu trên trình duyệt hiện tại để dùng lại nhanh hơn."
+                            : "Settings are stored in this browser for quicker reuse."
                     }
                     title={isVietnamese ? "Lưu trữ" : "Persistence"}
                     value={isVietnamese ? "Tự động" : "Automatic"}
@@ -61,8 +61,8 @@ const Settings: React.FC = () => {
                     </CardTitle>
                     <CardDescription>
                         {isVietnamese
-                            ? "Chọn ngôn ngữ để đổi các nhãn giao diện chính giữa tiếng Việt và tiếng Anh."
-                            : "Choose the language for the main interface labels."}
+                            ? "Chọn ngôn ngữ cho các nhãn và nội dung chính giữa tiếng Việt và tiếng Anh."
+                            : "Choose the language for the main labels and content."}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="max-w-md">

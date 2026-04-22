@@ -100,7 +100,7 @@ const Transactions: React.FC = () => {
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
     const hasLoadedWalletsRef = useRef(false);
 
-    const copy = isVietnamese
+    const baseCopy = isVietnamese
         ? {
               pageTitle: "Giao dịch",
               pageDescription:
@@ -221,6 +221,19 @@ const Transactions: React.FC = () => {
               updateTransaction: "Update transaction",
               noWalletFallback: "Unknown",
           };
+    const copy = {
+        ...baseCopy,
+        pageDescription: isVietnamese
+            ? "Tìm, lọc và quản lý giao dịch theo ghi chú, danh mục và ví."
+            : "Search, filter, and manage transactions by note, category, and wallet.",
+        transactionListDesc: (currentPage: number, totalPages: number, totalRows: number) =>
+            isVietnamese
+                ? `Trang ${currentPage}/${totalPages} • Tổng ${totalRows} giao dịch`
+                : `Page ${currentPage}/${totalPages} • ${totalRows} transactions total`,
+        formDescription: isVietnamese
+            ? "Nhập các thông tin chính để tạo hoặc cập nhật giao dịch."
+            : "Enter the key details to create or update a transaction.",
+    };
     const getCategoryLabel = (category: string) => {
         if (category === "Transfer") {
             return isVietnamese ? "Chuyển khoản" : "Transfer";
