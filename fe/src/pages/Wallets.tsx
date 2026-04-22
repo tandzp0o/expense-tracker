@@ -1329,35 +1329,41 @@ const Wallets: React.FC = () => {
                                 return (
                                     <Card
                                         key={wallet._id}
-                                        className="overflow-hidden border-border/80 bg-card/95"
+                                        className="group overflow-hidden border-border/80 bg-card/95"
                                     >
                                         <div
-                                            className={`relative overflow-hidden p-4 text-white sm:p-5 ${
-                                                wallet.imageUrl ? "pb-16 sm:pb-20" : ""
-                                            }`}
+                                            className="relative min-h-[220px] overflow-hidden text-white sm:min-h-[236px]"
                                             style={{
-                                                background: `linear-gradient(135deg, ${wallet.color || appearance.primaryColor}, rgba(15, 23, 42, 0.95))`,
+                                                backgroundColor: wallet.color || appearance.primaryColor,
+                                                backgroundImage: wallet.imageUrl
+                                                    ? `linear-gradient(180deg, rgba(10, 16, 30, 0.12) 0%, rgba(10, 16, 30, 0.32) 38%, rgba(2, 6, 23, 0.82) 72%, rgba(2, 6, 23, 0.96) 100%), url(${wallet.imageUrl})`
+                                                    : `linear-gradient(135deg, ${wallet.color || appearance.primaryColor} 0%, rgba(37, 99, 235, 0.78) 34%, rgba(15, 23, 42, 0.96) 100%)`,
+                                                backgroundPosition: "center",
+                                                backgroundSize: "cover",
                                             }}
                                         >
                                             <div className="pointer-events-none absolute inset-0">
                                                 <div className="absolute right-0 top-0 h-28 w-28 translate-x-8 -translate-y-8 rounded-full bg-white/10" />
                                                 <div className="absolute bottom-0 left-0 h-24 w-24 -translate-x-8 translate-y-8 rounded-full bg-white/10" />
+                                                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0)_34%,rgba(2,6,23,0.2)_100%)]" />
                                             </div>
-                                            <div className="relative z-10 flex items-start justify-between gap-3">
+                                            <div className="relative z-10 flex min-h-[220px] flex-col justify-between p-4 sm:min-h-[236px] sm:p-5">
+                                                <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                     <p className="text-[11px] uppercase tracking-[0.14em] text-white/70">
                                                         {getWalletTypeLabel(wallet.type)}
-                                                    </p>
-                                                    <p className="mt-2 text-[1.45rem] font-semibold sm:text-[1.65rem]">
-                                                        {formatCurrency(wallet.balance)}
                                                     </p>
                                                 </div>
                                                 <div className="rounded-[calc(var(--app-radius-md)-2px)] bg-white/12 p-2.5">
                                                     <Icon className="h-[18px] w-[18px]" />
                                                 </div>
-                                            </div>
-                                            <div className="mt-6 flex items-end justify-between gap-3">
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <div className="flex items-end justify-between gap-3">
                                                 <div className={`min-w-0 ${wallet.imageUrl ? "pr-20 sm:pr-24" : ""}`}>
+                                                    <p className="mb-2 text-[1.55rem] font-semibold tracking-tight text-white sm:text-[1.75rem]">
+                                                        {formatCurrency(wallet.balance)}
+                                                    </p>
                                                     <p className="text-sm font-medium sm:text-[15px]">{wallet.name}</p>
                                                     <p className="truncate text-[11px] text-white/70">
                                                         {wallet.currency}
@@ -1373,36 +1379,28 @@ const Wallets: React.FC = () => {
                                                 ) : null}
                                             </div>
 
-                                            {wallet.imageUrl ? (
-                                                <div className="absolute bottom-4 right-4 z-10 rounded-[var(--app-radius-md)] border border-white/20 bg-white/10 p-1 shadow-sm sm:bottom-5 sm:right-5">
-                                                    <img
-                                                        alt={wallet.name}
-                                                        className="h-14 w-14 rounded-[calc(var(--app-radius-md)-6px)] object-cover sm:h-16 sm:w-16"
-                                                        src={wallet.imageUrl}
-                                                    />
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button
+                                                    className="h-8 rounded-full border-white/15 bg-white/12 px-3 text-[11px] text-white backdrop-blur-sm hover:bg-white/18 hover:text-white"
+                                                    onClick={() => openEdit(wallet)}
+                                                    size="sm"
+                                                    variant="outline"
+                                                >
+                                                    <PencilLine className="h-3 w-3" />
+                                                    {copy.edit}
+                                                </Button>
+                                                <Button
+                                                    className="h-8 w-8 rounded-full bg-white/12 text-white backdrop-blur-sm hover:bg-white/18 hover:text-white"
+                                                    onClick={() => setPendingDelete(wallet)}
+                                                    size="icon"
+                                                    variant="ghost"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
                                                 </div>
-                                            ) : null}
+                                            </div>
                                         </div>
-
-                                        <CardContent className="flex items-center justify-end gap-2 px-4 pb-4 pt-2.5 sm:px-5 sm:pb-5">
-                                            <Button
-                                                className="h-7 px-2.5 text-[11px]"
-                                                onClick={() => openEdit(wallet)}
-                                                size="sm"
-                                                variant="outline"
-                                            >
-                                                <PencilLine className="h-3 w-3" />
-                                                {copy.edit}
-                                            </Button>
-                                            <Button
-                                                className="h-7 w-7"
-                                                onClick={() => setPendingDelete(wallet)}
-                                                size="icon"
-                                                variant="ghost"
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                        </CardContent>
                                     </Card>
                                 );
                             })}

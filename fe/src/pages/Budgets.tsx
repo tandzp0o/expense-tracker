@@ -324,7 +324,7 @@ const Budgets: React.FC = () => {
                 title={copy.title}
             />
 
-            <div className="metric-card-grid">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <MetricCard
                     icon={CreditCard}
                     subtitle={`${growth}% ${copy.vsPreviousMonth}`}

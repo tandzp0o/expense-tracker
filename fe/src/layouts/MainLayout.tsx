@@ -84,20 +84,39 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                         {mobileNavigationItems.map((item) => {
                             const Icon = item.icon;
                             const locked = isItemLocked(item.to);
+                            const isPrimary = "isPrimary" in item && item.isPrimary;
 
                             if (locked) {
                                 return (
                                     <button
                                         key={item.to}
                                         aria-disabled="true"
-                                        className="flex min-w-0 cursor-not-allowed flex-col items-center justify-center gap-0.5 rounded-[var(--app-radius-md)] px-1 py-1.5 text-[9px] font-medium text-muted-foreground/45 sm:text-[10px]"
+                                        className={cn(
+                                            "flex min-w-0 cursor-not-allowed flex-col items-center justify-center text-center",
+                                            isPrimary
+                                                ? "-mt-6 gap-1 px-0 pb-0 pt-0"
+                                                : "gap-0.5 rounded-[var(--app-radius-md)] px-1 py-1.5 text-[9px] font-medium text-muted-foreground/45 sm:text-[10px]",
+                                        )}
                                         disabled
                                         type="button"
                                     >
-                                        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                        <span className="block w-full overflow-hidden text-ellipsis whitespace-nowrap leading-none">
-                                            {item.label}
-                                        </span>
+                                        {isPrimary ? (
+                                            <>
+                                                <span className="flex h-14 w-14 items-center justify-center rounded-full border-[5px] border-card bg-muted text-muted-foreground/45 shadow-[0_10px_28px_-18px_rgba(15,23,42,0.55)]">
+                                                    <Icon className="h-5 w-5" />
+                                                </span>
+                                                <span className="block w-full overflow-hidden text-ellipsis whitespace-nowrap text-[9px] font-semibold leading-none text-muted-foreground/45 sm:text-[10px]">
+                                                    {item.label}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                                <span className="block w-full overflow-hidden text-ellipsis whitespace-nowrap leading-none">
+                                                    {item.label}
+                                                </span>
+                                            </>
+                                        )}
                                     </button>
                                 );
                             }
@@ -107,20 +126,36 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                                     key={item.to}
                                     to={item.to}
                                     className={({ isActive }) =>
-                                        cn(
-                                            "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--app-radius-md)] px-1 py-1.5 text-[9px] font-medium transition-all sm:text-[10px]",
-                                            "isPrimary" in item && item.isPrimary
-                                                ? "bg-primary text-primary-foreground shadow-sm"
-                                            : isActive
-                                                  ? "bg-primary-soft text-primary"
-                                                  : "text-muted-foreground",
-                                        )
+                                        isPrimary
+                                            ? cn(
+                                                  "flex min-w-0 -mt-6 flex-col items-center justify-center gap-1 px-0 pb-0 pt-0 text-center transition-all",
+                                                  isActive ? "text-primary" : "text-muted-foreground",
+                                              )
+                                            : cn(
+                                                  "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--app-radius-md)] px-1 py-1.5 text-[9px] font-medium text-center transition-all sm:text-[10px]",
+                                                  isActive
+                                                      ? "bg-primary-soft text-primary"
+                                                      : "text-muted-foreground",
+                                              )
                                     }
                                 >
-                                    <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                    <span className="block w-full overflow-hidden text-ellipsis whitespace-nowrap leading-none">
-                                        {item.label}
-                                    </span>
+                                    {isPrimary ? (
+                                        <>
+                                            <span className="flex h-14 w-14 items-center justify-center rounded-full border-[5px] border-card bg-primary text-primary-foreground shadow-[0_16px_34px_-18px_rgba(37,99,235,0.9)] transition-transform duration-200 hover:-translate-y-0.5">
+                                                <Icon className="h-5 w-5" />
+                                            </span>
+                                            <span className="block w-full overflow-hidden text-ellipsis whitespace-nowrap text-[9px] font-semibold leading-none sm:text-[10px]">
+                                                {item.label}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                            <span className="block w-full overflow-hidden text-ellipsis whitespace-nowrap leading-none">
+                                                {item.label}
+                                            </span>
+                                        </>
+                                    )}
                                 </NavLink>
                             );
                         })}

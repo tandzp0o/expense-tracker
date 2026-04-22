@@ -334,6 +334,63 @@ const Analytics: React.FC = () => {
     ]);
 
     const savingRate = stats.income > 0 ? (stats.net / stats.income) * 100 : 0;
+    const insightParagraphs = useMemo(() => {
+        const expenseTransactions = filteredTransactions.filter(
+            (transaction) => transaction.type === "EXPENSE",
+        );
+        const averageExpense =
+            expenseTransactions.length > 0
+                ? stats.expense / expenseTransactions.length
+                : 0;
+        const topExpense = breakdown[0];
+        const targetSavingAmount = stats.income > 0 ? stats.income * 0.2 : 0;
+
+        if (isVietnamese) {
+            const health =
+                stats.net > 0
+                    ? savingRate >= 20
+                        ? `Bạn đang giữ được trạng thái tài chính khá tốt: thu nhập vẫn cao hơn chi tiêu và tỷ lệ tiết kiệm đạt khoảng ${Math.round(savingRate)}%. Nếu duy trì nhịp này, bạn đang có nền tảng tốt để tích lũy dài hạn.`
+                        : `Bạn vẫn đang dương về dòng tiền nhưng phần giữ lại sau chi tiêu mới khoảng ${Math.round(savingRate)}%. Tình hình ổn nhưng biên an toàn chưa dày, nên vẫn cần kiểm soát các khoản phát sinh.`
+                    : stats.net === 0
+                      ? "Dòng tiền đang ở mức cân bằng, nghĩa là số tiền đi ra gần như bằng số tiền đi vào. Đây là giai đoạn nên siết lại các khoản chưa thật sự cần thiết để tạo vùng đệm an toàn hơn."
+                      : `Chi tiêu hiện đang vượt thu nhập khoảng ${formatCurrency(Math.abs(stats.net))} trong giai đoạn này. Nếu kéo dài, nhịp dùng tiền hiện tại sẽ làm giảm khả năng tiết kiệm và gây áp lực lên các mục tiêu tài chính sau đó.`;
+
+            const spending = topExpense
+                ? `Khoản chi tập trung nhiều nhất đang là ${topExpense.name}, chiếm khoảng ${Math.round(topExpense.percent)}% tổng chi. Mỗi giao dịch chi tiêu hiện trung bình khoảng ${formatCurrency(averageExpense)}, cho thấy bạn nên theo dõi sát nhóm này nếu muốn tối ưu ngân sách.`
+                : "Hiện chưa có khoản chi nào trong giai đoạn này, nên đây là thời điểm thuận lợi để đặt ra khung chi tiêu rõ ràng trước khi phát sinh thêm giao dịch.";
+
+            const direction =
+                stats.income > 0
+                    ? savingRate >= 20
+                        ? `Mục tiêu tiếp theo phù hợp là duy trì đều mức tiết kiệm tối thiểu ${formatCurrency(targetSavingAmount)} cho mỗi chu kỳ tương tự và chuyển phần dư vào quỹ dự phòng hoặc mục tiêu dài hạn.`
+                        : `Mục tiêu nên hướng tới là nâng phần tiền giữ lại lên ít nhất ${formatCurrency(targetSavingAmount)} cho mỗi chu kỳ tương tự. Bạn có thể bắt đầu bằng việc giới hạn nhóm chi lớn nhất trước, rồi mới mở rộng sang các khoản nhỏ hơn.`
+                    : "Ưu tiên trước mắt nên là ổn định nguồn thu và giữ mức chi thật gọn. Khi đã có dòng tiền đều hơn, bạn sẽ dễ đặt mục tiêu tiết kiệm rõ ràng và thực tế hơn.";
+
+            return [health, spending, direction];
+        }
+
+        const health =
+            stats.net > 0
+                ? savingRate >= 20
+                    ? `Your finances are in a healthy state right now: income is still above spending and your saving rate is around ${Math.round(savingRate)}%. Keeping this pace would support stronger long-term progress.`
+                    : `You are still cash-flow positive, but only about ${Math.round(savingRate)}% is being retained. The situation is stable, though the safety margin is still fairly thin.`
+                : stats.net === 0
+                  ? "Your cash flow is currently balanced, which means money in is roughly matching money out. This is a good moment to trim optional spending and create a stronger buffer."
+                  : `Spending is currently above income by about ${formatCurrency(Math.abs(stats.net))} in this period. If that pattern continues, it will reduce your room to save and slow future goals.`;
+
+        const spending = topExpense
+            ? `${topExpense.name} is your biggest spending group, representing about ${Math.round(topExpense.percent)}% of total expense. Your average expense transaction is roughly ${formatCurrency(averageExpense)}, so this category is the best place to optimize first.`
+            : "There are no expense entries in this period yet, which makes this a good time to define a clearer spending plan before new transactions build up.";
+
+        const direction =
+            stats.income > 0
+                ? savingRate >= 20
+                    ? `A sensible next target is to keep saving at least ${formatCurrency(targetSavingAmount)} for each similar period and redirect the surplus into emergency reserves or long-term goals.`
+                    : `A practical next target would be to retain at least ${formatCurrency(targetSavingAmount)} in each similar period. Start by tightening the largest expense group before worrying about smaller categories.`
+                : "The immediate focus should be stabilizing income and keeping spending lean. Once cash flow is more predictable, savings targets become much easier to maintain.";
+
+        return [health, spending, direction];
+    }, [breakdown, filteredTransactions, isVietnamese, savingRate, stats.expense, stats.income, stats.net]);
 
     if (loading) {
         return (
@@ -378,7 +435,7 @@ const Analytics: React.FC = () => {
                 title={copy.pageTitle}
             />
 
-            <div className="metric-card-grid">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                     icon={CircleDollarSign}
                     subtitle={copy.filteredIncome}
@@ -493,6 +550,11 @@ const Analytics: React.FC = () => {
                                 currentRange.end.format("DD/MM/YYYY"),
                             )}
                         </p>
+                        <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
+                            {insightParagraphs.map((paragraph) => (
+                                <p key={paragraph}>{paragraph}</p>
+                            ))}
+                        </div>
                     </div>
                     <div className="rounded-[var(--app-radius-lg)] bg-primary-soft p-5">
                         <p className="text-sm text-muted-foreground">{copy.savingRate}</p>

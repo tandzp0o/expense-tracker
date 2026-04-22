@@ -45,13 +45,6 @@ const preferenceOptions = [
     { value: "chay", vi: "Chay", en: "Vegetarian" },
 ] as const;
 
-const twoLineClampStyle: React.CSSProperties = {
-    display: "-webkit-box",
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: "vertical",
-    overflow: "hidden",
-};
-
 const oneLineClampStyle: React.CSSProperties = {
     display: "-webkit-box",
     WebkitLineClamp: 1,
@@ -64,19 +57,38 @@ const DishImageCarousel: React.FC<{
     name: string;
 }> = ({ images, name }) => {
     const [activeIndex, setActiveIndex] = useState(0);
+    const [transitionEnabled, setTransitionEnabled] = useState(true);
+    const extendedImages =
+        images.length > 1 ? [...images, images[0]] : images;
 
     useEffect(() => {
         if (images.length < 2) {
             setActiveIndex(0);
+            setTransitionEnabled(true);
             return;
         }
 
         const intervalId = window.setInterval(() => {
-            setActiveIndex((current) => (current + 1) % images.length);
+            setTransitionEnabled(true);
+            setActiveIndex((current) => current + 1);
         }, 3200);
 
         return () => window.clearInterval(intervalId);
     }, [images]);
+
+    useEffect(() => {
+        if (transitionEnabled || activeIndex !== 0) {
+            return;
+        }
+
+        const frameId = window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                setTransitionEnabled(true);
+            });
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
+    }, [activeIndex, transitionEnabled]);
 
     if (images.length === 0) {
         return (
@@ -89,17 +101,24 @@ const DishImageCarousel: React.FC<{
     return (
         <div className="absolute inset-0 overflow-hidden">
             <div
-                className="flex h-full transition-transform duration-700 ease-out"
+                className="flex h-full ease-out"
+                onTransitionEnd={() => {
+                    if (images.length > 1 && activeIndex === images.length) {
+                        setTransitionEnabled(false);
+                        setActiveIndex(0);
+                    }
+                }}
                 style={{
-                    width: `${images.length * 100}%`,
-                    transform: `translateX(-${activeIndex * (100 / images.length)}%)`,
+                    width: `${extendedImages.length * 100}%`,
+                    transform: `translateX(-${activeIndex * (100 / extendedImages.length)}%)`,
+                    transition: transitionEnabled ? "transform 700ms ease-out" : "none",
                 }}
             >
-                {images.map((image, index) => (
+                {extendedImages.map((image, index) => (
                     <div
                         key={`${image}-${index}`}
                         className="h-full shrink-0"
-                        style={{ width: `${100 / images.length}%` }}
+                        style={{ width: `${100 / extendedImages.length}%` }}
                     >
                         <img
                             alt={`${name}-${index + 1}`}
@@ -528,10 +547,10 @@ const DishSuggestions: React.FC = () => {
             </Card>
 
             {filteredDishes.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {filteredDishes.map((dish) => (
                         <Card key={dish._id} className="overflow-hidden border-border/80 bg-card/95">
-                            <div className="relative aspect-[4/5] overflow-hidden">
+                            <div className="relative aspect-[4/4.35] overflow-hidden">
                                 <DishImageCarousel images={dish.imageUrls} name={dish.name} />
                                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.08)_0%,rgba(2,6,23,0.24)_38%,rgba(2,6,23,0.72)_72%,rgba(2,6,23,0.92)_100%)]" />
 
@@ -552,22 +571,22 @@ const DishSuggestions: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="absolute inset-x-0 bottom-0 z-10 p-4">
-                                    <div className="space-y-3">
-                                        <div className="space-y-1.5">
-                                            <h3 className="text-lg font-semibold text-white sm:text-xl">
+                                <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+                                    <div className="space-y-2.5">
+                                        <div className="space-y-1">
+                                            <h3 className="text-[15px] font-semibold text-white sm:text-base">
                                                 {dish.name}
                                             </h3>
                                             <p
-                                                className="text-sm leading-5 text-white/78"
-                                                style={twoLineClampStyle}
+                                                className="text-[12px] leading-4 text-white/78"
+                                                style={oneLineClampStyle}
                                             >
                                                 {dish.description || copy.noDescription}
                                             </p>
                                         </div>
 
                                         <div className="flex flex-wrap gap-2">
-                                            {dish.preferences.slice(0, 3).map((preference) => (
+                                            {dish.preferences.slice(0, 2).map((preference) => (
                                                 <Badge
                                                     key={preference}
                                                     className="border-white/10 bg-white/10 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
@@ -576,12 +595,12 @@ const DishSuggestions: React.FC = () => {
                                                     {getPreferenceLabel(preference)}
                                                 </Badge>
                                             ))}
-                                            {dish.preferences.length > 3 ? (
+                                            {dish.preferences.length > 2 ? (
                                                 <Badge
                                                     className="border-white/10 bg-white/10 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
                                                     variant="outline"
                                                 >
-                                                    +{dish.preferences.length - 3}
+                                                    +{dish.preferences.length - 2}
                                                 </Badge>
                                             ) : null}
                                         </div>
@@ -595,7 +614,7 @@ const DishSuggestions: React.FC = () => {
                                             </div>
                                             <div className="flex shrink-0 items-center gap-2">
                                                 <Button
-                                                    className="h-8 rounded-full bg-slate-950/45 px-2.5 text-[11px] text-white backdrop-blur-sm hover:bg-slate-950/65 hover:text-white"
+                                                    className="h-7 rounded-full bg-slate-950/45 px-2.5 text-[10px] text-white backdrop-blur-sm hover:bg-slate-950/65 hover:text-white"
                                                     onClick={() => handleOpenModal(dish)}
                                                     size="sm"
                                                     variant="ghost"
@@ -604,7 +623,7 @@ const DishSuggestions: React.FC = () => {
                                                     {copy.edit}
                                                 </Button>
                                                 <Button
-                                                    className="h-8 w-8 rounded-full bg-slate-950/45 text-white backdrop-blur-sm hover:bg-slate-950/65 hover:text-white"
+                                                    className="h-7 w-7 rounded-full bg-slate-950/45 text-white backdrop-blur-sm hover:bg-slate-950/65 hover:text-white"
                                                     onClick={() => setPendingDelete(dish)}
                                                     size="icon"
                                                     variant="ghost"

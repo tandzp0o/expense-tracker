@@ -429,7 +429,7 @@ const Goals: React.FC = () => {
                 title={copy.pageTitle}
             />
 
-            <div className="metric-card-grid">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <MetricCard
                     icon={Target}
                     subtitle={copy.totalSavedDesc}

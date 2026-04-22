@@ -96,9 +96,9 @@
     }
 
     .metric-card-grid {
-        display: grid;
-        gap: 0.75rem;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+        display: flex;
+        flex-direction: column;
+        gap: 0.625rem;
     }
 
     .glass-panel {
@@ -183,7 +183,7 @@
 
 @media (min-width: 640px) {
     .metric-card-grid {
-        gap: 1rem;
+        gap: 0.75rem;
     }
 }
 

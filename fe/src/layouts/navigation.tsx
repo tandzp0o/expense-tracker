@@ -3,7 +3,7 @@ import {
     CreditCard,
     Goal,
     LayoutDashboard,
-    PiggyBank,
+    Plus,
     ReceiptText,
     Settings,
     UserRound,
@@ -98,7 +98,7 @@ export const buildMobileNavigationItems = (language: Language) => {
         {
             to: "/transactions",
             label: text[language].add,
-            icon: PiggyBank,
+            icon: Plus,
             isPrimary: true,
         },
         items[5],

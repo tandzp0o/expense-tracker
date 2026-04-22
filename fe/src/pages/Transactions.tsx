@@ -563,7 +563,7 @@ const Transactions: React.FC = () => {
                 <CardContent>
                     {transactions.length > 0 ? (
                         <>
-                            <div className="space-y-3 md:hidden">
+                            <div className="space-y-2.5 md:hidden">
                                 {transactions.map((transaction) => {
                                     const amount = parseAmount(transaction.amount);
                                     const isIncome = transaction.type === "INCOME";
@@ -572,73 +572,58 @@ const Transactions: React.FC = () => {
                                     return (
                                         <div
                                             key={transaction._id}
-                                            className="rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4"
+                                            className="rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 px-3 py-2.5"
                                         >
                                             <div className="flex items-start justify-between gap-3">
-                                                <div className="flex min-w-0 items-start gap-3">
-                                                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] bg-primary-soft text-primary">
-                                                        <ReceiptText className="h-4 w-4" />
+                                                <div className="flex min-w-0 items-start gap-2.5">
+                                                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-5px)] bg-primary-soft text-primary">
+                                                        <ReceiptText className="h-3.5 w-3.5" />
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="truncate font-medium text-foreground">
+                                                        <p className="truncate text-[13px] font-semibold text-foreground">
                                                             {transaction.note || copy.untitledTransaction}
                                                         </p>
-                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                            ID {transaction._id.slice(-6).toUpperCase()}
+                                                        <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                                                            {getCategoryLabel(transaction.category)} • {walletName} •{" "}
+                                                            {formatDate(transaction.date)}
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <Badge variant={isIncome ? "success" : "danger"}>
+                                                <Badge
+                                                    className="h-5 shrink-0 whitespace-nowrap rounded-full px-2 text-[10px] leading-none"
+                                                    variant={isIncome ? "success" : "danger"}
+                                                >
                                                     {getTransactionTypeLabel(transaction.type)}
                                                 </Badge>
                                             </div>
 
-                                            <div className="mt-4 grid gap-2 text-sm">
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <span className="text-muted-foreground">{copy.category}</span>
-                                                    <span className="text-right text-foreground">
-                                                        {getCategoryLabel(transaction.category)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <span className="text-muted-foreground">{copy.wallet}</span>
-                                                    <span className="text-right text-foreground">
-                                                        {walletName}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <span className="text-muted-foreground">{copy.date}</span>
-                                                    <span className="text-right text-foreground">
-                                                        {formatDate(transaction.date)}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-4 flex items-center justify-between gap-3">
+                                            <div className="mt-3 flex items-center justify-between gap-3">
                                                 <span
                                                     className={
                                                         isIncome
-                                                            ? "text-base font-semibold text-emerald-600"
-                                                            : "text-base font-semibold text-rose-600"
+                                                            ? "text-sm font-semibold text-emerald-600"
+                                                            : "text-sm font-semibold text-rose-600"
                                                     }
                                                 >
                                                     {isIncome ? "+" : "-"}
                                                     {formatCurrency(amount)}
                                                 </span>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1">
                                                     <Button
+                                                        className="h-7 w-7"
                                                         onClick={() => handleOpenModal(transaction)}
                                                         size="icon"
                                                         variant="ghost"
                                                     >
-                                                        <PencilLine className="h-4 w-4" />
+                                                        <PencilLine className="h-3.5 w-3.5" />
                                                     </Button>
                                                     <Button
+                                                        className="h-7 w-7"
                                                         onClick={() => setPendingDelete(transaction)}
                                                         size="icon"
                                                         variant="ghost"
                                                     >
-                                                        <Trash2 className="h-4 w-4" />
+                                                        <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </div>
                                             </div>
@@ -666,31 +651,28 @@ const Transactions: React.FC = () => {
                                                 key={transaction._id}
                                                 className="border-b border-border/70 text-sm last:border-b-0"
                                             >
-                                                <td className="py-4">
+                                                <td className="py-3.5">
                                                     <div className="flex items-start gap-3">
-                                                        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-[var(--app-radius-md)] bg-primary-soft text-primary">
-                                                            <ReceiptText className="h-4 w-4" />
+                                                        <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-[calc(var(--app-radius-md)-4px)] bg-primary-soft text-primary">
+                                                            <ReceiptText className="h-3.5 w-3.5" />
                                                         </div>
                                                         <div>
                                                             <p className="font-medium text-foreground">
                                                                 {transaction.note || copy.untitledTransaction}
                                                             </p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                ID {transaction._id.slice(-6).toUpperCase()}
-                                                            </p>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="py-4 text-muted-foreground">
+                                                <td className="py-3.5 text-muted-foreground">
                                                     {getCategoryLabel(transaction.category)}
                                                 </td>
-                                                <td className="py-4 text-muted-foreground">
+                                                <td className="py-3.5 text-muted-foreground">
                                                     {getWalletName(transaction.walletId)}
                                                 </td>
-                                                <td className="py-4 text-muted-foreground">
+                                                <td className="py-3.5 text-muted-foreground">
                                                     {formatDate(transaction.date)}
                                                 </td>
-                                                <td className="py-4">
+                                                <td className="py-3.5">
                                                     <Badge
                                                         variant={
                                                             transaction.type === "INCOME"
@@ -701,7 +683,7 @@ const Transactions: React.FC = () => {
                                                         {getTransactionTypeLabel(transaction.type)}
                                                     </Badge>
                                                 </td>
-                                                <td className="py-4 text-right font-semibold">
+                                                <td className="py-3.5 text-right font-semibold">
                                                     <span
                                                         className={
                                                             transaction.type === "INCOME"
@@ -713,7 +695,7 @@ const Transactions: React.FC = () => {
                                                         {formatCurrency(parseAmount(transaction.amount))}
                                                     </span>
                                                 </td>
-                                                <td className="py-4">
+                                                <td className="py-3.5">
                                                     <div className="flex justify-end gap-2">
                                                         <Button
                                                             onClick={() => handleOpenModal(transaction)}
