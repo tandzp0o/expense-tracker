@@ -35,9 +35,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-        return (
+    return (
         <div className="app-shell">
-            <div className="mx-auto flex min-h-screen w-full max-w-[1940px] gap-3 px-2.5 py-2.5 sm:gap-4 sm:px-3 sm:py-3 md:px-4">
+            <div className="mx-auto flex min-h-screen w-full max-w-[1940px] gap-2 px-2 py-2 sm:gap-3 sm:px-3 sm:py-3 md:gap-4 md:px-4">
                 <aside className="hidden w-[280px] shrink-0 lg:block">
                     <div className="glass-panel sticky top-3 h-[calc(100vh-1.5rem)] overflow-hidden rounded-[var(--app-radius-xl)] border border-border shadow-soft">
                         <Sidenav />
@@ -49,9 +49,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                         <Header onMenuClick={() => setMenuOpen(true)} />
                         <main
                             className={cn(
-                                "min-h-[calc(100vh-120px)] px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6",
+                                "min-h-[calc(100vh-120px)] px-3 py-3.5 sm:px-4 sm:py-5 md:px-5 md:py-6",
                                 isMobile
-                                    ? "pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)]"
+                                    ? "pb-[calc(env(safe-area-inset-bottom,0px)+6rem)]"
                                     : "pb-6",
                             )}
                         >

@@ -1217,7 +1217,7 @@ const Wallets: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
             {currentGuide ? (
                 <SpotlightGuide
                     actionDisabled={currentGuide.actionDisabled}
@@ -1313,9 +1313,9 @@ const Wallets: React.FC = () => {
             </div>
 
             {wallets.length > 0 ? (
-                <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
-                    <div className="space-y-6">
-                        <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 sm:gap-6 xl:grid-cols-[1.5fr,1fr]">
+                    <div className="space-y-4 sm:space-y-6">
+                        <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
                             {wallets.map((wallet) => {
                                 const Icon =
                                     wallet.icon && wallet.icon in walletIconMap
@@ -1332,7 +1332,7 @@ const Wallets: React.FC = () => {
                                         className="group overflow-hidden border-border/80 bg-card/95"
                                     >
                                         <div
-                                            className="relative min-h-[220px] overflow-hidden text-white sm:min-h-[236px]"
+                                            className="relative min-h-[188px] overflow-hidden text-white sm:min-h-[212px]"
                                             style={{
                                                 backgroundColor: wallet.color || appearance.primaryColor,
                                                 backgroundImage: wallet.imageUrl
@@ -1347,7 +1347,7 @@ const Wallets: React.FC = () => {
                                                 <div className="absolute bottom-0 left-0 h-24 w-24 -translate-x-8 translate-y-8 rounded-full bg-white/10" />
                                                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0)_34%,rgba(2,6,23,0.2)_100%)]" />
                                             </div>
-                                            <div className="relative z-10 flex min-h-[220px] flex-col justify-between p-4 sm:min-h-[236px] sm:p-5">
+                                            <div className="relative z-10 flex min-h-[188px] flex-col justify-between p-3.5 sm:min-h-[212px] sm:p-4 lg:p-5">
                                                 <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                     <p className="text-[11px] uppercase tracking-[0.14em] text-white/70">
