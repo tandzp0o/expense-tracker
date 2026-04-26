@@ -103,11 +103,18 @@ export const resolveLoginIdentifier = async (req: Request, res: Response) => {
                 "email hasPassword authProviders",
             );
 
+            if (!user?.email) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Account not found",
+                });
+            }
+
             return res.status(200).json({
                 success: true,
-                email: normalizedEmail,
-                hasPassword: user?.hasPassword ?? true,
-                authProviders: user?.authProviders || [],
+                email: user.email,
+                hasPassword: user.hasPassword,
+                authProviders: user.authProviders || [],
             });
         }
 
@@ -157,18 +164,23 @@ export const completeRegistration = async (
         }
 
         const normalizedEmail = req.user.email.toLowerCase();
-        const requestedUsername = normalizeUsername(String(req.body?.username || ""));
-        if (!isUsernameValid(requestedUsername)) {
+        const requestedUsername = normalizeUsername(
+            String(req.body?.username || ""),
+        );
+
+        if (requestedUsername && !isUsernameValid(requestedUsername)) {
             return res.status(400).json({
                 success: false,
                 message: USERNAME_RULE_TEXT,
             });
         }
 
-        const duplicateUsername = await User.findOne({
-            username: requestedUsername,
-            uid: { $ne: req.user.uid },
-        }).select("uid");
+        const duplicateUsername = requestedUsername
+            ? await User.findOne({
+                  username: requestedUsername,
+                  uid: { $ne: req.user.uid },
+              }).select("uid")
+            : null;
 
         if (duplicateUsername) {
             return res.status(409).json({
@@ -200,10 +212,12 @@ export const completeRegistration = async (
             displayName: req.body?.displayName,
             picture: req.user.picture,
             signInProvider: req.user.signInProvider,
-            username: requestedUsername,
+            username: requestedUsername || undefined,
         });
 
-        user.username = requestedUsername;
+        if (requestedUsername) {
+            user.username = requestedUsername;
+        }
         user.displayName =
             String(req.body?.displayName || "").trim() ||
             user.displayName ||

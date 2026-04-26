@@ -1,5 +1,5 @@
 import React, { ReactNode, useId } from "react";
-import { useTheme } from "../../contexts/ThemeContext";
+import { getAppearanceGradientColors, useTheme } from "../../contexts/ThemeContext";
 import { hexToRgba } from "../../lib/utils";
 
 type AuthShellProps = {
@@ -29,8 +29,10 @@ const AuthShell: React.FC<AuthShellProps> = ({
 }) => {
     const gradientId = useId().replace(/:/g, "-");
     const { appearance } = useTheme();
-    const primaryGlow = hexToRgba(appearance.primaryColor, 0.18);
-    const primaryGlowStrong = hexToRgba(appearance.primaryColor, 0.34);
+    const themeColors = getAppearanceGradientColors(appearance);
+    const primaryGlow = hexToRgba(themeColors.primary, 0.18);
+    const primaryGlowStrong = hexToRgba(themeColors.primary, 0.34);
+    const secondaryGlow = hexToRgba(themeColors.secondary, 0.18);
 
     return (
         <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#08101f] text-slate-100">
@@ -52,7 +54,7 @@ const AuthShell: React.FC<AuthShellProps> = ({
                     style={{
                         background: `
                             radial-gradient(circle at top left, ${primaryGlowStrong}, transparent 24%),
-                            radial-gradient(circle at 82% 16%, rgba(192,193,255,0.08), transparent 20%),
+                            radial-gradient(circle at 82% 16%, ${secondaryGlow}, transparent 20%),
                             linear-gradient(225deg, transparent 0%, ${primaryGlow} 48%, transparent 100%)
                         `,
                     }}
@@ -73,15 +75,15 @@ const AuthShell: React.FC<AuthShellProps> = ({
                             <stop
                                 offset="0%"
                                 style={{
-                                    stopColor: appearance.primaryColor,
+                                    stopColor: themeColors.primary,
                                     stopOpacity: 0.22,
                                 }}
                             />
                             <stop
                                 offset="100%"
                                 style={{
-                                    stopColor: "#c0c1ff",
-                                    stopOpacity: 0,
+                                    stopColor: themeColors.secondary,
+                                    stopOpacity: 0.06,
                                 }}
                             />
                         </linearGradient>
@@ -107,7 +109,7 @@ const AuthShell: React.FC<AuthShellProps> = ({
                             className="pointer-events-none absolute inset-x-0 top-0 h-28"
                             style={{
                                 background: `linear-gradient(180deg, ${hexToRgba(
-                                    appearance.primaryColor,
+                                    themeColors.secondary,
                                     0.12,
                                 )} 0%, transparent 100%)`,
                             }}

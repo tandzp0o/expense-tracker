@@ -48,7 +48,7 @@ type BackendAppUser = Partial<AppUser> & {
 type RegisterPayload = {
     email: string;
     password: string;
-    username: string;
+    username?: string;
     displayName?: string;
 };
 

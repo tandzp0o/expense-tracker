@@ -7,15 +7,19 @@ import { auth } from "../firebase/config";
 import { goalApi } from "../services/api";
 import { useToast } from "../contexts/ToastContext";
 import { useLocale } from "../contexts/LocaleContext";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import {
+    formatCurrency,
+    formatDate,
+    formatWholeNumberInput,
+    parseWholeNumberInput,
+} from "../utils/formatters";
 import { PageHeader } from "../components/app/page-header";
 import { MetricCard } from "../components/app/metric-card";
 import { EmptyState } from "../components/app/empty-state";
-import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent } from "../components/ui/card";
-import { Dialog } from "../components/ui/dialog";
+import { ConfirmDialog, Dialog, DialogFooter, DialogSection } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Progress } from "../components/ui/progress";
 import { Spinner } from "../components/ui/spinner";
@@ -46,6 +50,8 @@ const Goals: React.FC = () => {
     const [pendingDelete, setPendingDelete] = useState<GoalItem | null>(null);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState("");
+    const [targetAmountInput, setTargetAmountInput] = useState("");
+    const [currentAmountInput, setCurrentAmountInput] = useState("");
     const [form, setForm] = useState({
         title: "",
         targetAmount: 0,
@@ -274,6 +280,8 @@ const Goals: React.FC = () => {
         });
         setImageFile(null);
         setImagePreview("");
+        setTargetAmountInput("");
+        setCurrentAmountInput("");
     };
 
     const openCreate = () => {
@@ -293,7 +301,37 @@ const Goals: React.FC = () => {
         });
         setImageFile(null);
         setImagePreview(goal.imageUrl || "");
+        setTargetAmountInput(formatWholeNumberInput(goal.targetAmount));
+        setCurrentAmountInput(formatWholeNumberInput(goal.currentAmount));
         setModalOpen(true);
+    };
+
+    const handleTargetAmountChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const numericValue = parseWholeNumberInput(event.target.value);
+
+        setTargetAmountInput(
+            numericValue > 0 ? formatWholeNumberInput(numericValue) : "",
+        );
+        setForm((current) => ({
+            ...current,
+            targetAmount: numericValue,
+        }));
+    };
+
+    const handleCurrentAmountChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const numericValue = parseWholeNumberInput(event.target.value);
+
+        setCurrentAmountInput(
+            numericValue > 0 ? formatWholeNumberInput(numericValue) : "",
+        );
+        setForm((current) => ({
+            ...current,
+            currentAmount: numericValue,
+        }));
     };
 
     const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -417,7 +455,7 @@ const Goals: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
             <PageHeader
                 actions={
                     <Button onClick={openCreate}>
@@ -451,7 +489,7 @@ const Goals: React.FC = () => {
             </div>
 
             {goals.length > 0 ? (
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {goals.map((goal) => {
                         const progress =
                             goal.targetAmount > 0
@@ -478,7 +516,7 @@ const Goals: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
-                                <CardContent className="space-y-4 p-5">
+                                <CardContent className="space-y-3.5 p-4 sm:space-y-4 sm:p-5">
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <h3 className="text-lg font-semibold">{goal.title}</h3>
@@ -521,7 +559,7 @@ const Goals: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between border-t border-border pt-4 text-sm">
+                                    <div className="flex flex-col gap-3 border-t border-border pt-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:pt-4">
                                         <span className="text-muted-foreground">
                                             {goal.deadline
                                                 ? `${copy.deadline} ${formatDate(goal.deadline)}`
@@ -561,67 +599,86 @@ const Goals: React.FC = () => {
 
             <Dialog
                 description={copy.formDescription}
+                className="max-w-3xl"
+                eyebrow={
+                    editing
+                        ? isVietnamese
+                            ? "Ch\u1ec9nh m\u1ee5c ti\u00eau"
+                            : "Edit goal"
+                        : isVietnamese
+                          ? "K\u1ebf ho\u1ea1ch m\u1edbi"
+                          : "New plan"
+                }
+                icon={GoalIcon}
                 onClose={() => setModalOpen(false)}
                 open={modalOpen}
                 title={editing ? copy.editGoal : copy.createGoalTitle}
+                tone="goal"
             >
-                <div className="space-y-4">
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.title}</label>
-                        <Input
-                            onChange={(event) =>
-                                setForm((current) => ({
-                                    ...current,
-                                    title: event.target.value,
-                                }))
-                            }
-                            value={form.title}
-                        />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.targetAmount}</label>
-                            <Input
-                                min={0}
-                                onChange={(event) =>
-                                    setForm((current) => ({
-                                        ...current,
-                                        targetAmount: Number(event.target.value) || 0,
-                                    }))
-                                }
-                                type="number"
-                                value={form.targetAmount}
-                            />
+                <div className="space-y-3">
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "M\u1eb7t \u0111\u1ecbnh \u0111\u1eb7t m\u1ee5c ti\u00eau theo t\u00ean v\u00e0 nh\u00f3m \u0111\u1ec3 d\u1ec5 ph\u00e2n bi\u1ec7t."
+                                : "Start with the goal name and grouping so it stays easy to spot later."
+                        }
+                        title={isVietnamese ? "Nh\u1eadn di\u1ec7n m\u1ee5c ti\u00eau" : "Goal identity"}
+                    >
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.title}</label>
+                                <Input
+                                    onChange={(event) =>
+                                        setForm((current) => ({
+                                            ...current,
+                                            title: event.target.value,
+                                        }))
+                                    }
+                                    value={form.title}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.category}</label>
+                                <Input
+                                    onChange={(event) =>
+                                        setForm((current) => ({
+                                            ...current,
+                                            category: event.target.value,
+                                        }))
+                                    }
+                                    value={form.category}
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.currentAmount}</label>
-                            <Input
-                                min={0}
-                                onChange={(event) =>
-                                    setForm((current) => ({
-                                        ...current,
-                                        currentAmount: Number(event.target.value) || 0,
-                                    }))
-                                }
-                                type="number"
-                                value={form.currentAmount}
-                            />
-                        </div>
-                    </div>
+                    </DialogSection>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.category}</label>
-                            <Input
-                                onChange={(event) =>
-                                    setForm((current) => ({
-                                        ...current,
-                                        category: event.target.value,
-                                    }))
-                                }
-                                value={form.category}
-                            />
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "Theo d\u00f5i c\u1ea3 s\u1ed1 ti\u1ec1n c\u1ea7n \u0111\u1ea1t, s\u1ed1 \u0111\u00e3 c\u00f3 v\u00e0 m\u1ed1c th\u1eddi gian."
+                                : "Track the target, current progress, and deadline in one place."
+                        }
+                        title={isVietnamese ? "Ti\u1ebfn \u0111\u1ed9" : "Progress setup"}
+                    >
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.targetAmount}</label>
+                                <Input
+                                    inputMode="numeric"
+                                    onChange={handleTargetAmountChange}
+                                    type="text"
+                                    value={targetAmountInput}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.currentAmount}</label>
+                                <Input
+                                    inputMode="numeric"
+                                    onChange={handleCurrentAmountChange}
+                                    type="text"
+                                    value={currentAmountInput}
+                                />
+                            </div>
                         </div>
                         <div>
                             <label className="mb-2 block text-sm font-medium">{copy.deadlineLabel}</label>
@@ -636,45 +693,54 @@ const Goals: React.FC = () => {
                                 value={form.deadline}
                             />
                         </div>
-                    </div>
+                    </DialogSection>
 
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.coverImage}</label>
-                        <Input accept="image/*" onChange={handleImageChange} type="file" />
-                        {imagePreview ? (
-                            <img
-                                alt={copy.goalPreview}
-                                className="mt-3 h-36 w-full rounded-[var(--app-radius-lg)] object-cover"
-                                src={imagePreview}
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "Th\u00eam \u1ea3nh b\u00eca v\u00e0 m\u00f4 t\u1ea3 \u0111\u1ec3 m\u1ee5c ti\u00eau d\u1ec5 g\u1ee3i nh\u1edb h\u01a1n."
+                                : "Add a cover image and note for better context."
+                        }
+                        title={isVietnamese ? "Ng\u1eef c\u1ea3nh" : "Context"}
+                    >
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.coverImage}</label>
+                            <Input accept="image/*" onChange={handleImageChange} type="file" />
+                            {imagePreview ? (
+                                <img
+                                    alt={copy.goalPreview}
+                                    className="mt-3 h-28 w-full rounded-[var(--app-radius-lg)] object-cover sm:h-36"
+                                    src={imagePreview}
+                                />
+                            ) : null}
+                        </div>
+
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.description}</label>
+                            <Textarea
+                                onChange={(event) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        description: event.target.value,
+                                    }))
+                                }
+                                value={form.description}
                             />
-                        ) : null}
-                    </div>
+                        </div>
+                    </DialogSection>
 
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.description}</label>
-                        <Textarea
-                            onChange={(event) =>
-                                setForm((current) => ({
-                                    ...current,
-                                    description: event.target.value,
-                                }))
-                            }
-                            value={form.description}
-                        />
-                    </div>
-
-                    <div className="flex justify-end gap-3">
-                        <Button onClick={() => setModalOpen(false)} variant="outline">
+                    <DialogFooter>
+                        <Button className="w-full sm:w-auto" onClick={() => setModalOpen(false)} variant="outline">
                             {copy.cancel}
                         </Button>
-                        <Button disabled={saving} onClick={handleSubmit}>
+                        <Button className="w-full sm:w-auto" disabled={saving} onClick={handleSubmit}>
                             {saving
                                 ? copy.saving
                                 : editing
                                   ? copy.updateGoal
                                   : copy.createGoal}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </div>
             </Dialog>
 

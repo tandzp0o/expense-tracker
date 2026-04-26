@@ -6,6 +6,7 @@ import {
     FontScale,
     RadiusPreset,
     ThemeMode,
+    getAppearanceGradientColors,
     useTheme,
 } from "../contexts/ThemeContext";
 import { useLocale } from "../contexts/LocaleContext";
@@ -22,6 +23,13 @@ const colorPresets = [
     "#dc2626",
     "#ea580c",
     "#0891b2",
+];
+
+const gradientPresets = [
+    { label: "Money flow", primary: "#047857", secondary: "#84cc16" },
+    { label: "Cash gold", primary: "#0f766e", secondary: "#f59e0b" },
+    { label: "Trust blue", primary: "#0369a1", secondary: "#22c55e" },
+    { label: "Premium dark", primary: "#10b981", secondary: "#111827" },
 ];
 
 const fontPresets: Array<{ label: string; value: FontPreset; preview: string }> =
@@ -53,12 +61,21 @@ const ThemePanel: React.FC<{
     onReset: () => void;
 }> = ({ appearance, onApply, onReset }) => {
     const { isVietnamese } = useLocale();
+    const gradientColors = useMemo(
+        () =>
+            getAppearanceGradientColors({
+                primaryColor: appearance.primaryColor,
+                secondaryColor: appearance.secondaryColor,
+            }),
+        [appearance.primaryColor, appearance.secondaryColor],
+    );
+    const hasSecondaryColor = Boolean(appearance.secondaryColor);
     const previewStyle = useMemo(
         () => ({
-            background: `linear-gradient(135deg, ${appearance.primaryColor}, rgba(15, 23, 42, 0.86))`,
+            background: `linear-gradient(135deg, ${gradientColors.primary} 0%, ${gradientColors.secondary} 58%, rgba(15, 23, 42, 0.86) 100%)`,
             borderRadius: "var(--app-radius-lg)",
         }),
-        [appearance.primaryColor],
+        [gradientColors.primary, gradientColors.secondary],
     );
 
     return (
@@ -70,8 +87,8 @@ const ThemePanel: React.FC<{
                     </CardTitle>
                     <CardDescription>
                         {isVietnamese
-                            ? "Người dùng có thể chỉnh chế độ sáng tối, màu chủ đạo, font chữ, cỡ chữ và độ bo góc."
-                            : "User can tune mode, primary color, font family, base font size and corner radius."}
+                            ? "Người dùng có thể chỉnh chế độ sáng tối, màu chủ đạo, màu phụ cho linear, font chữ, cỡ chữ và độ bo góc."
+                            : "User can tune mode, primary and gradient colors, font family, base font size and corner radius."}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
@@ -135,6 +152,103 @@ const ThemePanel: React.FC<{
                                     <span className="sr-only">{color}</span>
                                 </button>
                             ))}
+                        </div>
+                    </div>
+
+                    <div className="rounded-[var(--app-radius-lg)] border border-border/80 bg-muted/30 p-3">
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-medium">
+                                    {isVietnamese
+                                        ? "Màu phụ cho linear"
+                                        : "Secondary gradient color"}
+                                </p>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                    {isVietnamese
+                                        ? "Nếu tắt màu phụ, giao diện sẽ dùng lại màu chủ đạo như hiện tại."
+                                        : "When disabled, gradients fall back to the primary color."}
+                                </p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <Input
+                                    className="h-9 w-20"
+                                    onChange={(event) =>
+                                        onApply({ secondaryColor: event.target.value })
+                                    }
+                                    type="color"
+                                    value={appearance.secondaryColor || appearance.primaryColor}
+                                />
+                                <Button
+                                    disabled={!hasSecondaryColor}
+                                    onClick={() => onApply({ secondaryColor: "" })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    {isVietnamese ? "Tắt" : "Off"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-6 gap-2">
+                            {colorPresets.map((color) => (
+                                <button
+                                    key={`secondary-${color}`}
+                                    className={cn(
+                                        "h-9 rounded-[var(--app-radius-md)] border transition-transform hover:scale-[1.03]",
+                                        appearance.secondaryColor === color
+                                            ? "border-foreground"
+                                            : "border-border",
+                                    )}
+                                    onClick={() => onApply({ secondaryColor: color })}
+                                    style={{ backgroundColor: color }}
+                                    type="button"
+                                >
+                                    <span className="sr-only">{color}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <p className="mb-2 text-sm font-medium">
+                            {isVietnamese ? "Bộ màu nhanh" : "Quick palettes"}
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            {gradientPresets.map((preset) => {
+                                const selected =
+                                    appearance.primaryColor === preset.primary &&
+                                    appearance.secondaryColor === preset.secondary;
+
+                                return (
+                                    <button
+                                        key={preset.label}
+                                        className={cn(
+                                            "overflow-hidden rounded-[var(--app-radius-lg)] border p-3 text-left transition-transform hover:-translate-y-0.5",
+                                            selected ? "border-foreground" : "border-border",
+                                        )}
+                                        onClick={() =>
+                                            onApply({
+                                                primaryColor: preset.primary,
+                                                secondaryColor: preset.secondary,
+                                            })
+                                        }
+                                        type="button"
+                                    >
+                                        <span
+                                            className="mb-3 block h-12 rounded-[var(--app-radius-md)]"
+                                            style={{
+                                                background: `linear-gradient(135deg, ${preset.primary}, ${preset.secondary})`,
+                                            }}
+                                        />
+                                        <span className="flex items-center justify-between gap-2 text-sm font-medium">
+                                            {preset.label}
+                                            {selected ? (
+                                                <Check className="h-4 w-4 text-primary" />
+                                            ) : null}
+                                        </span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -343,8 +457,8 @@ const ThemeSwitcher: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =
             <Sheet
                 description={
                     isVietnamese
-                        ? "Tùy chỉnh màu chủ đạo, chế độ sáng tối, font, cỡ chữ và bo góc."
-                        : "Customize primary color, mode, font, size and corner radius."
+                        ? "Tùy chỉnh màu chủ đạo, màu phụ cho linear, chế độ sáng tối, font, cỡ chữ và bo góc."
+                        : "Customize primary color, secondary gradient color, mode, font, size and corner radius."
                 }
                 onClose={() => setOpen(false)}
                 open={open}

@@ -1,8 +1,12 @@
 # expense-tracker
 
-fe react + be express, firebase auth
+Frontend dùng React, backend dùng Express và xác thực bằng Firebase.
 
-cd to this folder and run docker compose up -d
+Để khởi chạy môi trường bằng Docker:
 
-note: in the container start mongo-setup-1
+1. Di chuyển tới thư mục dự án này.
+2. Chạy `docker compose up -d`.
 
+Lưu ý:
+
+- Trong container cần khởi động `mongo-setup-1`.

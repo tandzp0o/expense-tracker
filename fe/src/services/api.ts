@@ -170,7 +170,12 @@ const handleApiError = (error: any): never => {
 // --- Budget API ---
 export const budgetApi = {
     getBudgets: async (
-        params?: { month?: number; year?: number; category?: string },
+        params?: {
+            month?: number;
+            year?: number;
+            category?: string;
+            walletId?: string;
+        },
         token?: string,
     ) => {
         try {
@@ -183,7 +188,7 @@ export const budgetApi = {
     },
 
     getBudgetSummary: async (
-        params?: { month?: number; year?: number },
+        params?: { month?: number; year?: number; walletId?: string },
         token?: string,
     ) => {
         try {
@@ -289,6 +294,7 @@ export const transactionApi = {
             startDate?: string;
             endDate?: string;
             type?: "INCOME" | "EXPENSE";
+            status?: "SCHEDULED" | "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
             category?: string;
             walletId?: string;
             page?: number;
@@ -321,6 +327,20 @@ export const transactionApi = {
             const response = await apiClient.post(
                 "/transactions",
                 transactionData,
+            );
+            invalidateTransactionCache();
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    createTransfer: async (transferData: any, token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.post(
+                "/transactions/transfer",
+                transferData,
             );
             invalidateTransactionCache();
             return response.data;
@@ -380,7 +400,9 @@ export const transactionApi = {
             // Định nghĩa interface cho giao dịch
             interface Transaction {
                 type: string;
+                status?: string;
                 amount: number | string;
+                category?: string;
             }
 
             // Định nghĩa interface cho kết quả thống kê
@@ -392,6 +414,14 @@ export const transactionApi = {
             // Tính tổng thu nhập và chi tiêu
             const { totalIncome, totalExpense } = transactions.reduce(
                 (acc: TransactionStats, transaction: Transaction) => {
+                    if (
+                        transaction.category === "Transfer" ||
+                        (transaction.status &&
+                            transaction.status !== "COMPLETED")
+                    ) {
+                        return acc;
+                    }
+
                     if (transaction.type === "INCOME") {
                         acc.totalIncome += Number(transaction.amount) || 0;
                     } else if (transaction.type === "EXPENSE") {
@@ -603,7 +633,7 @@ export const authApi = {
     },
 
     completeRegistration: async (
-        profileData: { username: string; displayName?: string },
+        profileData: { username?: string; displayName?: string },
         token?: string,
     ) => {
         try {

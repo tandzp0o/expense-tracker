@@ -3,29 +3,43 @@ import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import { CreditCard, Plus, Trash2 } from "lucide-react";
 import { auth } from "../firebase/config";
-import { budgetApi } from "../services/api";
-import { formatCurrency } from "../utils/formatters";
+import { budgetApi, walletApi } from "../services/api";
+import {
+    formatCurrency,
+    formatWholeNumberInput,
+    parseWholeNumberInput,
+} from "../utils/formatters";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
 import { PageHeader } from "../components/app/page-header";
 import { MetricCard } from "../components/app/metric-card";
 import { EmptyState } from "../components/app/empty-state";
-import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Dialog } from "../components/ui/dialog";
+import { ConfirmDialog, Dialog, DialogFooter, DialogSection } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Progress } from "../components/ui/progress";
+import { Select } from "../components/ui/select";
 import { Spinner } from "../components/ui/spinner";
 
 dayjs.locale("vi");
 
 interface BudgetSummaryItem {
     _id: string;
+    walletId: string;
+    walletName: string;
     category: string;
     amount: number;
     spent: number;
+    remaining: number;
+    overspent?: number;
     percent: number;
+    color?: string;
+}
+
+interface WalletItem {
+    _id: string;
+    name: string;
 }
 
 const Budgets: React.FC = () => {
@@ -34,6 +48,7 @@ const Budgets: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [budgets, setBudgets] = useState<BudgetSummaryItem[]>([]);
+    const [wallets, setWallets] = useState<WalletItem[]>([]);
     const [growth, setGrowth] = useState(0);
     const [totalBudget, setTotalBudget] = useState(0);
     const [totalSpent, setTotalSpent] = useState(0);
@@ -43,9 +58,11 @@ const Budgets: React.FC = () => {
         null,
     );
     const [formData, setFormData] = useState({
+        walletId: "",
         category: "",
         amount: 0,
     });
+    const [amountInput, setAmountInput] = useState("");
 
     const baseCopy = isVietnamese
         ? {
@@ -71,8 +88,11 @@ const Budgets: React.FC = () => {
                   "Biểu mẫu gửi category, amount, month và year đúng như budget API yêu cầu.",
               editBudget: "Chỉnh sửa ngân sách",
               createBudgetTitle: "Tạo ngân sách",
+              wallet: "Ví",
               category: "Danh mục",
               amount: "Số tiền",
+              walletRequired: "Cần chọn ví",
+              walletRequiredDesc: "Hãy chọn ví áp dụng cho ngân sách này.",
               categoryPlaceholder: "Ví dụ: Ăn uống, Tiền nhà, Du lịch",
               cancel: "Hủy",
               saving: "Đang lưu...",
@@ -118,8 +138,11 @@ const Budgets: React.FC = () => {
                   "The form posts category, amount, month and year exactly as expected by the budget API.",
               editBudget: "Edit budget",
               createBudgetTitle: "Create budget",
+              wallet: "Wallet",
               category: "Category",
               amount: "Amount",
+              walletRequired: "Wallet required",
+              walletRequiredDesc: "Select the wallet for this budget.",
               categoryPlaceholder: "Example: Food, Rent, Travel",
               cancel: "Cancel",
               saving: "Saving...",
@@ -148,11 +171,11 @@ const Budgets: React.FC = () => {
             ? "Thiết lập ngân sách tháng và theo dõi mức chi đã dùng."
             : "Set monthly budgets and track how much has been used.",
         monthlyCategoriesDesc: isVietnamese
-            ? "Mỗi mục cho biết ngân sách, số đã chi và phần còn lại."
-            : "Each category shows budget, spent amount, and remaining balance.",
+            ? "Mỗi mục cho biết ví áp dụng, ngân sách, số đã chi và phần còn lại."
+            : "Each item shows the linked wallet, budget, spent amount, and remaining balance.",
         formDescription: isVietnamese
-            ? "Điền danh mục và số tiền để tạo hoặc cập nhật ngân sách."
-            : "Enter a category and amount to create or update a budget.",
+            ? "Điền ví, danh mục và số tiền để tạo hoặc cập nhật ngân sách."
+            : "Choose a wallet, category, and amount to create or update a budget.",
     };
     const loadFailedTitle = isVietnamese
         ? "Không thể tải ngân sách"
@@ -168,14 +191,27 @@ const Budgets: React.FC = () => {
             if (!token) {
                 return;
             }
-            const response: any = await budgetApi.getBudgetSummary(
-                { month: dayjs().month() + 1, year: dayjs().year() },
-                token,
-            );
+            const [walletResponse, response]: any = await Promise.all([
+                walletApi.getWallets(token),
+                budgetApi.getBudgetSummary(
+                    { month: dayjs().month() + 1, year: dayjs().year() },
+                    token,
+                ),
+            ]);
+            const walletList = walletResponse?.wallets || [];
+            setWallets(walletList);
             setBudgets(response?.items || []);
             setTotalBudget(response?.totalBudget || 0);
             setTotalSpent(response?.totalSpent || 0);
             setGrowth(response?.growth || 0);
+            setFormData((current) => ({
+                ...current,
+                walletId:
+                    current.walletId &&
+                    walletList.some((wallet: WalletItem) => wallet._id === current.walletId)
+                        ? current.walletId
+                        : walletList[0]?._id || "",
+            }));
         } catch (error: any) {
             toast({
                 title: loadFailedTitle,
@@ -201,20 +237,44 @@ const Budgets: React.FC = () => {
 
     const openCreate = () => {
         setEditing(null);
-        setFormData({ category: "", amount: 0 });
+        setFormData({ walletId: wallets[0]?._id || "", category: "", amount: 0 });
+        setAmountInput("");
         setModalOpen(true);
     };
 
     const openEdit = (budget: BudgetSummaryItem) => {
         setEditing(budget);
         setFormData({
+            walletId: budget.walletId,
             category: budget.category,
             amount: budget.amount,
         });
+        setAmountInput(formatWholeNumberInput(budget.amount));
         setModalOpen(true);
     };
 
+    const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const numericValue = parseWholeNumberInput(event.target.value);
+
+        setAmountInput(
+            numericValue > 0 ? formatWholeNumberInput(numericValue) : "",
+        );
+        setFormData((current) => ({
+            ...current,
+            amount: numericValue,
+        }));
+    };
+
     const handleSubmit = async () => {
+        if (!formData.walletId) {
+            toast({
+                title: copy.walletRequired,
+                description: copy.walletRequiredDesc,
+                variant: "destructive",
+            });
+            return;
+        }
+
         if (!formData.category.trim()) {
             toast({
                 title: copy.categoryRequired,
@@ -241,6 +301,7 @@ const Budgets: React.FC = () => {
             }
 
             const payload = {
+                walletId: formData.walletId,
                 category: formData.category.trim(),
                 amount: formData.amount,
                 month: dayjs().month() + 1,
@@ -262,6 +323,7 @@ const Budgets: React.FC = () => {
             }
 
             setModalOpen(false);
+            setAmountInput("");
             await fetchData();
         } catch (error: any) {
             toast({
@@ -312,7 +374,7 @@ const Budgets: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
             <PageHeader
                 actions={
                     <Button onClick={openCreate}>
@@ -367,15 +429,14 @@ const Budgets: React.FC = () => {
 
                                 return (
                                     <Card key={budget._id} className="border-border/80">
-                                        <CardContent className="p-5">
-                                            <div className="mb-4 flex items-start justify-between gap-3">
-                                                <div>
-                                                    <p className="text-base font-semibold text-foreground">
+                                        <CardContent className="p-3.5 sm:p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-base font-semibold text-foreground">
                                                         {budget.category}
                                                     </p>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {formatCurrency(budget.spent)} {copy.of}{" "}
-                                                        {formatCurrency(budget.amount)}
+                                                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                                                        {budget.walletName}
                                                     </p>
                                                 </div>
                                                 <Button
@@ -387,11 +448,43 @@ const Budgets: React.FC = () => {
                                                 </Button>
                                             </div>
 
+                                            <div className="mt-3 grid gap-2 rounded-[var(--app-radius-md)] bg-muted/35 p-3">
+                                                <div className="flex items-center justify-between gap-3 text-sm">
+                                                    <span className="text-muted-foreground">
+                                                        {copy.spent}
+                                                    </span>
+                                                    <span className="font-medium text-foreground">
+                                                        {formatCurrency(budget.spent)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-3 text-sm">
+                                                    <span className="text-muted-foreground">
+                                                        {copy.remaining}
+                                                    </span>
+                                                    <span className="font-medium text-foreground">
+                                                        {formatCurrency(budget.remaining)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                                                    <span>
+                                                        {formatCurrency(budget.spent)} {copy.of}{" "}
+                                                        {formatCurrency(budget.amount)}
+                                                    </span>
+                                                    {budget.overspent ? (
+                                                        <span className="font-medium text-rose-600">
+                                                            +{formatCurrency(budget.overspent)}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-3">
                                             <Progress
                                                 indicatorClassName={statusColor}
                                                 value={Math.min(budget.percent, 100)}
                                             />
-                                            <div className="mt-3 flex items-center justify-between text-sm">
+                                            </div>
+                                            <div className="mt-2.5 flex items-center justify-between text-sm">
                                                 <span className="text-muted-foreground">
                                                     {Math.round(budget.percent)}%
                                                 </span>
@@ -422,50 +515,97 @@ const Budgets: React.FC = () => {
 
             <Dialog
                 description={copy.formDescription}
+                eyebrow={
+                    editing
+                        ? isVietnamese
+                            ? "Ch\u1ec9nh ng\u00e2n s\u00e1ch"
+                            : "Edit budget"
+                        : isVietnamese
+                          ? "K\u1ebf ho\u1ea1ch m\u1edbi"
+                          : "New plan"
+                }
+                icon={CreditCard}
                 onClose={() => setModalOpen(false)}
                 open={modalOpen}
                 title={editing ? copy.editBudget : copy.createBudgetTitle}
+                tone="budget"
             >
-                <div className="space-y-4">
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.category}</label>
-                        <Input
-                            onChange={(event) =>
-                                setFormData((current) => ({
-                                    ...current,
-                                    category: event.target.value,
-                                }))
-                            }
-                            placeholder={copy.categoryPlaceholder}
-                            value={formData.category}
-                        />
-                    </div>
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.amount}</label>
-                        <Input
-                            min={0}
-                            onChange={(event) =>
-                                setFormData((current) => ({
-                                    ...current,
-                                    amount: Number(event.target.value) || 0,
-                                }))
-                            }
-                            type="number"
-                            value={formData.amount}
-                        />
-                    </div>
-                    <div className="flex justify-end gap-3">
-                        <Button onClick={() => setModalOpen(false)} variant="outline">
+                <div className="space-y-3">
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "G\u1eafn ng\u00e2n s\u00e1ch v\u00e0o \u0111\u00fang v\u00ed \u0111\u1ec3 theo d\u00f5i reserve v\u00e0 chi ti\u00eau ch\u00ednh x\u00e1c."
+                                : "Attach this budget to the right wallet so reserve tracking stays accurate."
+                        }
+                        title={isVietnamese ? "Ph\u1ea1m vi \u00e1p d\u1ee5ng" : "Scope"}
+                    >
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.wallet}</label>
+                                <Select
+                                    onChange={(event) =>
+                                        setFormData((current) => ({
+                                            ...current,
+                                            walletId: event.target.value,
+                                        }))
+                                    }
+                                    value={formData.walletId}
+                                >
+                                    <option value="">{copy.wallet}</option>
+                                    {wallets.map((wallet) => (
+                                        <option key={wallet._id} value={wallet._id}>
+                                            {wallet.name}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.category}</label>
+                                <Input
+                                    onChange={(event) =>
+                                        setFormData((current) => ({
+                                            ...current,
+                                            category: event.target.value,
+                                        }))
+                                    }
+                                    placeholder={copy.categoryPlaceholder}
+                                    value={formData.category}
+                                />
+                            </div>
+                        </div>
+                    </DialogSection>
+
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "Nh\u1eadp m\u1ed9c chi t\u1ed1i \u0111a cho th\u00e1ng n\u00e0y."
+                                : "Set the spending limit for this month."
+                        }
+                        title={isVietnamese ? "H\u1ea1n m\u1ee9c" : "Budget amount"}
+                    >
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.amount}</label>
+                            <Input
+                                inputMode="numeric"
+                                onChange={handleAmountChange}
+                                type="text"
+                                value={amountInput}
+                            />
+                        </div>
+                    </DialogSection>
+
+                    <DialogFooter>
+                        <Button className="w-full sm:w-auto" onClick={() => setModalOpen(false)} variant="outline">
                             {copy.cancel}
                         </Button>
-                        <Button disabled={submitting} onClick={handleSubmit}>
+                        <Button className="w-full sm:w-auto" disabled={submitting} onClick={handleSubmit}>
                             {submitting
                                 ? copy.saving
                                 : editing
                                   ? copy.updateBudget
                                   : copy.createBudget}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </div>
             </Dialog>
 

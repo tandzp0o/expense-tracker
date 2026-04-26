@@ -6,6 +6,8 @@ import {
     ArrowLeftRight,
     Building2,
     Car,
+    ChartPie,
+    ChevronRight,
     CreditCard,
     Home,
     PencilLine,
@@ -19,21 +21,24 @@ import {
     WalletCards,
 } from "lucide-react";
 import { auth } from "../firebase/config";
-import { transactionApi, userApi, walletApi } from "../services/api";
-import { formatCurrency } from "../utils/formatters";
+import { budgetApi, transactionApi, userApi, walletApi } from "../services/api";
+import {
+    formatCurrency,
+    formatWholeNumberInput,
+    parseWholeNumberInput,
+} from "../utils/formatters";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
-import { useTheme } from "../contexts/ThemeContext";
+import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
 import { hexToRgba } from "../lib/utils";
 import { PageHeader } from "../components/app/page-header";
 import { MetricCard } from "../components/app/metric-card";
 import { EmptyState } from "../components/app/empty-state";
-import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Dialog } from "../components/ui/dialog";
+import { ConfirmDialog, Dialog, DialogFooter, DialogSection } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Select } from "../components/ui/select";
 import { Spinner } from "../components/ui/spinner";
@@ -56,6 +61,39 @@ interface WalletItem {
     isArchived?: boolean;
     hasTransactions?: boolean;
     updatedAt: string;
+}
+
+interface WalletBudgetItem {
+    _id: string;
+    walletId: string;
+    walletName: string;
+    category: string;
+    amount: number;
+    spent: number;
+    remaining: number;
+    overspent?: number;
+    color?: string;
+}
+
+interface WalletBudgetSummaryItem {
+    walletId: string;
+    walletName: string;
+    walletCurrency: string;
+    totalBudget: number;
+    totalSpent: number;
+    totalRemaining: number;
+    overspent: number;
+    items: WalletBudgetItem[];
+}
+
+interface WalletBudgetSummaryResponse {
+    month: number;
+    year: number;
+    totalBudget: number;
+    totalSpent: number;
+    totalRemaining: number;
+    walletSummaries: WalletBudgetSummaryItem[];
+    items: WalletBudgetItem[];
 }
 
 type WalletGuideStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -119,12 +157,30 @@ const colorOptions = [
 
 const WALLET_GUIDE_STEP_COUNT = 9;
 
-const formatWholeNumberInput = (value: number) =>
-    value > 0 ? new Intl.NumberFormat("vi-VN").format(value) : "";
+const getTransferDestinationWalletId = (
+    walletList: WalletItem[],
+    fromWalletId: string,
+    preferredToWalletId: string = "",
+) => {
+    if (!fromWalletId) {
+        return preferredToWalletId &&
+            walletList.some((wallet) => wallet._id === preferredToWalletId)
+            ? preferredToWalletId
+            : "";
+    }
 
-const parseWholeNumberInput = (value: string) => {
-    const digits = value.replace(/[^\d]/g, "");
-    return digits ? Number(digits) : 0;
+    const destinationWallets = walletList.filter(
+        (wallet) => wallet._id !== fromWalletId,
+    );
+
+    if (
+        preferredToWalletId &&
+        destinationWallets.some((wallet) => wallet._id === preferredToWalletId)
+    ) {
+        return preferredToWalletId;
+    }
+
+    return destinationWallets[0]?._id || "";
 };
 
 const Wallets: React.FC = () => {
@@ -132,6 +188,7 @@ const Wallets: React.FC = () => {
     const { language, isVietnamese } = useLocale();
     const { toast } = useToast();
     const { appearance } = useTheme();
+    const themeColors = getAppearanceGradientColors(appearance);
     const baseCopy = isVietnamese
         ? {
               loadFailed: "Không thể tải ví",
@@ -406,6 +463,28 @@ const Wallets: React.FC = () => {
         formDescription: isVietnamese
             ? "Điền các thông tin cơ bản để tạo hoặc cập nhật ví."
             : "Fill in the key details to create or update a wallet.",
+        freeToSpend: isVietnamese
+            ? "Ti\u1ec1n t\u1ef1 do"
+            : "Free to spend",
+        budgetReserved: isVietnamese
+            ? "Gi\u1eef cho ng\u00e2n s\u00e1ch"
+            : "Reserved for budgets",
+        walletAllocation: isVietnamese
+            ? "Ph\u00e2n b\u1ed5 trong v\u00ed"
+            : "Wallet allocation",
+        walletAllocationDetails: isVietnamese
+            ? "Chi ti\u1ebft ph\u00e2n b\u1ed5"
+            : "Allocation details",
+        backToCard: isVietnamese ? "Quay l\u1ea1i" : "Back",
+        walletAllocationDesc: isVietnamese
+            ? "Thanh d\u01b0\u1edbi \u0111\u00e2y cho bi\u1ebft s\u1ed1 d\u01b0 t\u1ef1 do v\u00e0 ph\u1ea7n c\u00f2n l\u1ea1i c\u1ee7a t\u1eebng ng\u00e2n s\u00e1ch trong v\u00ed."
+            : "The bar below splits free balance and remaining budget allocations inside this wallet.",
+        noBudgetReserve: isVietnamese
+            ? "Ch\u01b0a c\u00f3 ng\u00e2n s\u00e1ch n\u00e0o g\u1eafn v\u1edbi v\u00ed n\u00e0y trong th\u00e1ng hi\u1ec7n t\u1ea1i."
+            : "No budgets are linked to this wallet in the current month.",
+        oversubscribedWallet: isVietnamese
+            ? "Ng\u00e2n s\u00e1ch c\u00f2n l\u1ea1i \u0111ang l\u1edbn h\u01a1n s\u1ed1 d\u01b0 v\u00ed, c\u1ea7n gi\u1ea3m reserve ho\u1eb7c n\u1ea1p th\u00eam ti\u1ec1n."
+            : "Remaining budget reserves are larger than the wallet balance. Reduce allocations or top up the wallet.",
     };
     const guideOpenFormLabel = isVietnamese
         ? "M\u1edf form \u2192"
@@ -431,6 +510,8 @@ const Wallets: React.FC = () => {
     const [submitting, setSubmitting] = useState(false);
     const [wallets, setWallets] = useState<WalletItem[]>([]);
     const [stats, setStats] = useState<any>(null);
+    const [budgetSummary, setBudgetSummary] =
+        useState<WalletBudgetSummaryResponse | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<WalletItem | null>(null);
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -453,6 +534,8 @@ const Wallets: React.FC = () => {
         toWalletId: "",
         amount: 0,
     });
+    const [transferAmountInput, setTransferAmountInput] = useState("");
+    const [expandedWalletId, setExpandedWalletId] = useState<string | null>(null);
 
     const addWalletButtonRef = useRef<HTMLButtonElement | null>(null);
     const imageFieldRef = useRef<HTMLElement | null>(null);
@@ -537,25 +620,53 @@ const Wallets: React.FC = () => {
             if (!token) {
                 return;
             }
-            const [walletResponse, statsResponse] = await Promise.all([
+            const [walletResponse, statsResponse, budgetSummaryResponse] = await Promise.all([
                 walletApi.getWallets(token),
                 userApi.getProfileStats(token),
+                budgetApi.getBudgetSummary(
+                    {
+                        month: dayjs().month() + 1,
+                        year: dayjs().year(),
+                    },
+                    token,
+                ),
             ]);
 
             const walletList = walletResponse?.wallets || [];
             setWallets(walletList);
             setStats(statsResponse?.data || statsResponse);
+            setBudgetSummary(budgetSummaryResponse || null);
 
             if (walletList.length >= 2) {
-                setTransferValues((current) =>
-                    current.fromWalletId
-                        ? current
-                        : {
-                              fromWalletId: walletList[0]._id,
-                              toWalletId: walletList[1]._id,
-                              amount: 0,
-                          },
-                );
+                setTransferValues((current) => {
+                    const availableWalletIds = new Set(
+                        walletList.map((wallet: WalletItem) => wallet._id),
+                    );
+                    const nextFromWalletId = availableWalletIds.has(
+                        current.fromWalletId,
+                    )
+                        ? current.fromWalletId
+                        : walletList[0]._id;
+                    const nextToWalletId = getTransferDestinationWalletId(
+                        walletList,
+                        nextFromWalletId,
+                        availableWalletIds.has(current.toWalletId)
+                            ? current.toWalletId
+                            : "",
+                    );
+
+                    return {
+                        ...current,
+                        fromWalletId: nextFromWalletId,
+                        toWalletId: nextToWalletId,
+                    };
+                });
+            } else {
+                setTransferValues((current) => ({
+                    ...current,
+                    fromWalletId: walletList[0]?._id || "",
+                    toWalletId: "",
+                }));
             }
         } catch (error: any) {
             toast({
@@ -914,6 +1025,71 @@ const Wallets: React.FC = () => {
         }));
     };
 
+    const handleTransferAmountChange = (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const numericValue = parseWholeNumberInput(event.target.value);
+
+        setTransferAmountInput(
+            numericValue > 0 ? formatWholeNumberInput(numericValue) : "",
+        );
+        setTransferValues((current) => ({
+            ...current,
+            amount: numericValue,
+        }));
+    };
+    const handleFromWalletChange = (
+        event: React.ChangeEvent<HTMLSelectElement>,
+    ) => {
+        const nextFromWalletId = event.target.value;
+
+        setTransferValues((current) => ({
+            ...current,
+            fromWalletId: nextFromWalletId,
+            toWalletId: getTransferDestinationWalletId(
+                wallets,
+                nextFromWalletId,
+                current.toWalletId,
+            ),
+        }));
+    };
+    const handleToWalletChange = (
+        event: React.ChangeEvent<HTMLSelectElement>,
+    ) => {
+        const nextToWalletId = event.target.value;
+
+        setTransferValues((current) => ({
+            ...current,
+            toWalletId:
+                nextToWalletId && nextToWalletId === current.fromWalletId
+                    ? ""
+                    : nextToWalletId,
+        }));
+    };
+    const transferDestinationWallets = useMemo(
+        () =>
+            wallets.filter(
+                (wallet) => wallet._id !== transferValues.fromWalletId,
+            ),
+        [wallets, transferValues.fromWalletId],
+    );
+    const walletBudgetSummaryMap = useMemo(
+        () =>
+            new Map(
+                (budgetSummary?.walletSummaries || []).map((summary) => [
+                    summary.walletId,
+                    summary,
+                ]),
+            ),
+        [budgetSummary],
+    );
+
+    const getBudgetColor = useCallback(
+        (budget: WalletBudgetItem, index: number) =>
+            budget.color || colorOptions[index % colorOptions.length],
+        [],
+    );
+
     const submitWallet = async (confirmTypeChange = false) => {
         if (!formValues.name.trim()) {
             toast({
@@ -1064,36 +1240,24 @@ const Wallets: React.FC = () => {
                 return;
             }
 
-            await Promise.all([
-                transactionApi.createTransaction(
-                    {
-                        type: "EXPENSE",
-                        amount: transferValues.amount,
-                        walletId: transferValues.fromWalletId,
-                        category: copy.transferCategory,
-                        note: copy.transferTo(
-                            wallets.find((wallet) => wallet._id === transferValues.toWalletId)
-                                ?.name,
-                        ),
-                        date: new Date().toISOString(),
-                    },
-                    token,
-                ),
-                transactionApi.createTransaction(
-                    {
-                        type: "INCOME",
-                        amount: transferValues.amount,
-                        walletId: transferValues.toWalletId,
-                        category: copy.transferCategory,
-                        note: copy.transferFrom(
-                            wallets.find((wallet) => wallet._id === transferValues.fromWalletId)
-                                ?.name,
-                        ),
-                        date: new Date().toISOString(),
-                    },
-                    token,
-                ),
-            ]);
+            const sourceWallet = wallets.find(
+                (wallet) => wallet._id === transferValues.fromWalletId,
+            );
+            const destinationWallet = wallets.find(
+                (wallet) => wallet._id === transferValues.toWalletId,
+            );
+
+            await transactionApi.createTransfer(
+                {
+                    fromWalletId: transferValues.fromWalletId,
+                    toWalletId: transferValues.toWalletId,
+                    amount: transferValues.amount,
+                    date: new Date().toISOString(),
+                    sourceNote: copy.transferTo(destinationWallet?.name),
+                    destinationNote: copy.transferFrom(sourceWallet?.name),
+                },
+                token,
+            );
 
             toast({
                 title: copy.transferCompleted,
@@ -1103,6 +1267,7 @@ const Wallets: React.FC = () => {
                 ...current,
                 amount: 0,
             }));
+            setTransferAmountInput("");
             await fetchData();
         } catch (error: any) {
             toast({
@@ -1296,7 +1461,9 @@ const Wallets: React.FC = () => {
                     icon={WalletCards}
                     subtitle={copy.activeWallets(wallets.length)}
                     title={copy.totalBalance}
-                    value={formatCurrency(stats?.totalBalance || totalBalance)}
+                    value={formatCurrency(stats?.totalBalance || totalBalance, "VND", {
+                        displayMode: "full",
+                    })}
                 />
                 <MetricCard
                     icon={Building2}
@@ -1325,83 +1492,268 @@ const Wallets: React.FC = () => {
                                           : wallet.type === "ewallet"
                                             ? Smartphone
                                             : Wallet;
+                                const walletBudgetSummary =
+                                    walletBudgetSummaryMap.get(wallet._id);
+                                const reserveItems = (
+                                    walletBudgetSummary?.items || []
+                                ).filter(
+                                    (item) =>
+                                        Number(item.remaining || 0) > 0 ||
+                                        Number(item.spent || 0) > 0,
+                                );
+                                const reservedAmount = reserveItems.reduce(
+                                    (sum, item) =>
+                                        sum + Number(item.remaining || 0),
+                                    0,
+                                );
+                                const freeAmount = Math.max(
+                                    Number(wallet.balance || 0) - reservedAmount,
+                                    0,
+                                );
+                                const oversubscribedAmount = Math.max(
+                                    reservedAmount - Number(wallet.balance || 0),
+                                    0,
+                                );
+                                const allocationTotal = Math.max(
+                                    Number(wallet.balance || 0),
+                                    reservedAmount,
+                                    1,
+                                );
+                                const allocationSegments = [
+                                    ...(freeAmount > 0
+                                        ? [
+                                              {
+                                                  key: `${wallet._id}-free`,
+                                                  label: copy.freeToSpend,
+                                                  amount: freeAmount,
+                                                  color: hexToRgba(
+                                                      appearance.primaryColor,
+                                                      0.82,
+                                                  ),
+                                              },
+                                          ]
+                                        : []),
+                                    ...reserveItems
+                                        .filter(
+                                            (item) =>
+                                                Number(item.remaining || 0) > 0,
+                                        )
+                                        .map((item, index) => ({
+                                            key: item._id,
+                                            label: item.category,
+                                            amount: Number(item.remaining || 0),
+                                            color: getBudgetColor(item, index),
+                                        })),
+                                ];
+
+                                const isExpanded = expandedWalletId === wallet._id;
+                                const walletBackground = wallet.imageUrl
+                                    ? `linear-gradient(180deg, rgba(2, 6, 23, 0.16) 0%, rgba(2, 6, 23, 0.48) 55%, rgba(2, 6, 23, 0.9) 100%), url(${wallet.imageUrl})`
+                                    : wallet.color
+                                      ? `linear-gradient(180deg, ${hexToRgba(wallet.color, 0.64)} 0%, ${hexToRgba(wallet.color, 0.88)} 52%, rgba(2, 6, 23, 0.94) 100%)`
+                                      : `linear-gradient(180deg, ${hexToRgba(themeColors.primary, 0.64)} 0%, ${hexToRgba(themeColors.secondary, 0.88)} 52%, rgba(2, 6, 23, 0.94) 100%)`;
 
                                 return (
-                                    <Card
+                                    <div
                                         key={wallet._id}
-                                        className="group overflow-hidden border-border/80 bg-card/95"
+                                        className="overflow-hidden rounded-[var(--app-radius-xl)] border border-border/80 bg-card shadow-sm"
                                     >
                                         <div
-                                            className="relative min-h-[188px] overflow-hidden text-white sm:min-h-[212px]"
+                                            className="flex w-[200%] transition-transform duration-300 ease-out"
                                             style={{
-                                                backgroundColor: wallet.color || appearance.primaryColor,
-                                                backgroundImage: wallet.imageUrl
-                                                    ? `linear-gradient(180deg, rgba(10, 16, 30, 0.12) 0%, rgba(10, 16, 30, 0.32) 38%, rgba(2, 6, 23, 0.82) 72%, rgba(2, 6, 23, 0.96) 100%), url(${wallet.imageUrl})`
-                                                    : `linear-gradient(135deg, ${wallet.color || appearance.primaryColor} 0%, rgba(37, 99, 235, 0.78) 34%, rgba(15, 23, 42, 0.96) 100%)`,
-                                                backgroundPosition: "center",
-                                                backgroundSize: "cover",
+                                                transform: isExpanded
+                                                    ? "translateX(-50%)"
+                                                    : "translateX(0)",
                                             }}
                                         >
-                                            <div className="pointer-events-none absolute inset-0">
-                                                <div className="absolute right-0 top-0 h-28 w-28 translate-x-8 -translate-y-8 rounded-full bg-white/10" />
-                                                <div className="absolute bottom-0 left-0 h-24 w-24 -translate-x-8 translate-y-8 rounded-full bg-white/10" />
-                                                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0)_34%,rgba(2,6,23,0.2)_100%)]" />
-                                            </div>
-                                            <div className="relative z-10 flex min-h-[188px] flex-col justify-between p-3.5 sm:min-h-[212px] sm:p-4 lg:p-5">
-                                                <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <p className="text-[11px] uppercase tracking-[0.14em] text-white/70">
-                                                        {getWalletTypeLabel(wallet.type)}
-                                                    </p>
+                                            <div
+                                                className="relative min-h-[262px] w-1/2 shrink-0 p-4 text-white sm:min-h-[286px] sm:p-5"
+                                                style={{
+                                                    backgroundImage: walletBackground,
+                                                    backgroundPosition: "center",
+                                                    backgroundSize: "cover",
+                                                }}
+                                            >
+                                                <div className="relative z-[1] flex h-full flex-col justify-between gap-5">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex min-w-0 items-center gap-2.5">
+                                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] bg-white/14 text-white backdrop-blur-sm">
+                                                                <Icon className="h-[18px] w-[18px]" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/68">
+                                                                    {getWalletTypeLabel(wallet.type)}
+                                                                </p>
+                                                                <h3 className="mt-1 truncate text-lg font-semibold tracking-tight sm:text-xl">
+                                                                    {wallet.name}
+                                                                </h3>
+                                                                {wallet.accountNumber ? (
+                                                                    <p className="truncate text-xs text-white/70">
+                                                                        {wallet.accountNumber}
+                                                                    </p>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Button
+                                                                aria-label={copy.edit}
+                                                                className="h-8 w-8 rounded-full border-white/15 bg-white/12 text-white backdrop-blur-sm hover:bg-white/18 hover:text-white"
+                                                                onClick={() => openEdit(wallet)}
+                                                                size="icon"
+                                                                variant="ghost"
+                                                            >
+                                                                <PencilLine className="h-3.5 w-3.5" />
+                                                                <span className="sr-only">{copy.edit}</span>
+                                                            </Button>
+                                                            <Button
+                                                                aria-label={copy.delete}
+                                                                className="h-8 w-8 rounded-full border-white/15 bg-white/12 text-white backdrop-blur-sm hover:bg-white/18 hover:text-white"
+                                                                onClick={() => setPendingDelete(wallet)}
+                                                                size="icon"
+                                                                variant="ghost"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                                <span className="sr-only">{copy.delete}</span>
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <p className="text-[10px] uppercase tracking-[0.18em] text-white/68">
+                                                                {copy.balanceSeriesLabel}
+                                                            </p>
+                                                            <p className="mt-1 text-[1.85rem] font-semibold tracking-tight sm:text-[2.05rem]">
+                                                                {formatCurrency(wallet.balance)}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between gap-3 border-t border-white/18 pt-3">
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {wallet.hasTransactions ? (
+                                                                    <Badge className="border-white/18 bg-white/12 text-white" variant="outline">
+                                                                        {copy.hasHistory}
+                                                                    </Badge>
+                                                                ) : null}
+                                                            </div>
+                                                            <button
+                                                                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/16 bg-white/14 px-2.5 text-[11px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+                                                                onClick={() => setExpandedWalletId(wallet._id)}
+                                                                type="button"
+                                                            >
+                                                                <ChartPie className="h-3.5 w-3.5" />
+                                                                {copy.walletAllocation}
+                                                                <ChevronRight className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="rounded-[calc(var(--app-radius-md)-2px)] bg-white/12 p-2.5">
-                                                    <Icon className="h-[18px] w-[18px]" />
-                                                </div>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    <div className="flex items-end justify-between gap-3">
-                                                <div className={`min-w-0 ${wallet.imageUrl ? "pr-20 sm:pr-24" : ""}`}>
-                                                    <p className="mb-2 text-[1.55rem] font-semibold tracking-tight text-white sm:text-[1.75rem]">
-                                                        {formatCurrency(wallet.balance)}
-                                                    </p>
-                                                    <p className="text-sm font-medium sm:text-[15px]">{wallet.name}</p>
-                                                    <p className="truncate text-[11px] text-white/70">
-                                                        {wallet.currency}
-                                                        {wallet.accountNumber
-                                                            ? ` • ${wallet.accountNumber}`
-                                                            : ""}
-                                                    </p>
-                                                </div>
-                                                {wallet.hasTransactions ? (
-                                                    <Badge className="border-white/20 bg-white/10 px-2 py-0.5 text-[10px] text-white" variant="outline">
-                                                        {copy.hasHistory}
-                                                    </Badge>
-                                                ) : null}
                                             </div>
 
-                                            <div className="flex items-center justify-end gap-2">
-                                                <Button
-                                                    className="h-8 rounded-full border-white/15 bg-white/12 px-3 text-[11px] text-white backdrop-blur-sm hover:bg-white/18 hover:text-white"
-                                                    onClick={() => openEdit(wallet)}
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    <PencilLine className="h-3 w-3" />
-                                                    {copy.edit}
-                                                </Button>
-                                                <Button
-                                                    className="h-8 w-8 rounded-full bg-white/12 text-white backdrop-blur-sm hover:bg-white/18 hover:text-white"
-                                                    onClick={() => setPendingDelete(wallet)}
-                                                    size="icon"
-                                                    variant="ghost"
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
+                                            <div className="min-h-[262px] w-1/2 shrink-0 p-4 sm:min-h-[286px] sm:p-5">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                                            {copy.walletAllocationDetails}
+                                                        </p>
+                                                        <h3 className="mt-1 truncate text-base font-semibold text-foreground">
+                                                            {wallet.name}
+                                                        </h3>
+                                                    </div>
+                                                    <button
+                                                        className="h-8 rounded-full border border-border bg-background px-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                        onClick={() => setExpandedWalletId(null)}
+                                                        type="button"
+                                                    >
+                                                        {copy.backToCard}
+                                                    </button>
                                                 </div>
+
+                                                <div className="mt-4 grid grid-cols-2 gap-2">
+                                                    <div className="rounded-[var(--app-radius-md)] bg-muted/35 p-3">
+                                                        <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                                                            {copy.freeToSpend}
+                                                        </p>
+                                                        <p className="mt-1 text-sm font-semibold text-foreground">
+                                                            {formatCurrency(freeAmount)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="rounded-[var(--app-radius-md)] bg-muted/35 p-3">
+                                                        <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                                                            {copy.budgetReserved}
+                                                        </p>
+                                                        <p className="mt-1 text-sm font-semibold text-foreground">
+                                                            {formatCurrency(reservedAmount)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-muted">
+                                                    {allocationSegments.length > 0 ? (
+                                                        allocationSegments.map((segment) => (
+                                                            <div
+                                                                key={segment.key}
+                                                                style={{
+                                                                    backgroundColor: segment.color,
+                                                                    width: `${(segment.amount / allocationTotal) * 100}%`,
+                                                                }}
+                                                            />
+                                                        ))
+                                                    ) : (
+                                                        <div className="h-full w-full bg-muted-foreground/20" />
+                                                    )}
+                                                </div>
+
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    <span
+                                                        className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
+                                                        style={{
+                                                            backgroundColor: hexToRgba(
+                                                                appearance.primaryColor,
+                                                                0.12,
+                                                            ),
+                                                            color: appearance.primaryColor,
+                                                        }}
+                                                    >
+                                                        {copy.freeToSpend}: {formatCurrency(freeAmount)}
+                                                    </span>
+                                                    {reserveItems
+                                                        .filter((item) => Number(item.remaining || 0) > 0)
+                                                        .slice(0, 3)
+                                                        .map((item, index) => (
+                                                            <span
+                                                                key={item._id}
+                                                                className="inline-flex max-w-full items-center truncate rounded-full px-2.5 py-1 text-[11px] font-medium"
+                                                                style={{
+                                                                    backgroundColor: hexToRgba(
+                                                                        getBudgetColor(item, index),
+                                                                        0.14,
+                                                                    ),
+                                                                    color: getBudgetColor(item, index),
+                                                                }}
+                                                            >
+                                                                {item.category}
+                                                            </span>
+                                                        ))}
+                                                </div>
+
+                                                <p
+                                                    className={`mt-3 text-xs ${
+                                                        oversubscribedAmount > 0
+                                                            ? "text-rose-600"
+                                                            : "text-muted-foreground"
+                                                    }`}
+                                                >
+                                                    {oversubscribedAmount > 0
+                                                        ? copy.oversubscribedWallet
+                                                        : reserveItems.length > 0
+                                                          ? `${copy.budgetReserved}: ${formatCurrency(reservedAmount)}`
+                                                          : copy.noBudgetReserve}
+                                                </p>
                                             </div>
                                         </div>
-                                    </Card>
+                                    </div>
                                 );
                             })}
                         </div>
@@ -1414,7 +1766,7 @@ const Wallets: React.FC = () => {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="h-[320px]">
+                                <div className="h-[160px] lg:h-[320px]">
                                     <LineChart
                                         data={chartData}
                                         options={{
@@ -1438,18 +1790,13 @@ const Wallets: React.FC = () => {
                                 {copy.internalTransferDesc}
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-3.5 sm:space-y-4">
                             {wallets.length >= 2 ? (
                                 <>
                                     <div>
                                         <label className="mb-2 block text-sm font-medium">{copy.fromWallet}</label>
                                         <Select
-                                            onChange={(event) =>
-                                                setTransferValues((current) => ({
-                                                    ...current,
-                                                    fromWalletId: event.target.value,
-                                                }))
-                                            }
+                                            onChange={handleFromWalletChange}
                                             value={transferValues.fromWalletId}
                                         >
                                             <option value="">{copy.selectSource}</option>
@@ -1463,16 +1810,11 @@ const Wallets: React.FC = () => {
                                     <div>
                                         <label className="mb-2 block text-sm font-medium">{copy.toWallet}</label>
                                         <Select
-                                            onChange={(event) =>
-                                                setTransferValues((current) => ({
-                                                    ...current,
-                                                    toWalletId: event.target.value,
-                                                }))
-                                            }
+                                            onChange={handleToWalletChange}
                                             value={transferValues.toWalletId}
                                         >
                                             <option value="">{copy.selectDestination}</option>
-                                            {wallets.map((wallet) => (
+                                            {transferDestinationWallets.map((wallet) => (
                                                 <option key={wallet._id} value={wallet._id}>
                                                     {wallet.name}
                                                 </option>
@@ -1482,15 +1824,11 @@ const Wallets: React.FC = () => {
                                     <div>
                                         <label className="mb-2 block text-sm font-medium">{copy.amount}</label>
                                         <Input
-                                            min={0}
-                                            onChange={(event) =>
-                                                setTransferValues((current) => ({
-                                                    ...current,
-                                                    amount: Number(event.target.value) || 0,
-                                                }))
-                                            }
-                                            type="number"
-                                            value={transferValues.amount}
+                                            inputMode="numeric"
+                                            onChange={handleTransferAmountChange}
+                                            placeholder={copy.startingBalancePlaceholder}
+                                            type="text"
+                                            value={transferAmountInput}
                                         />
                                     </div>
                                     <Button className="w-full sm:w-auto" disabled={submitting} onClick={handleTransfer}>
@@ -1520,149 +1858,189 @@ const Wallets: React.FC = () => {
 
             <Dialog
                 description={copy.formDescription}
+                className="max-w-3xl"
+                eyebrow={
+                    editing
+                        ? isVietnamese
+                            ? "Ch\u1ec9nh v\u00ed"
+                            : "Edit wallet"
+                        : isVietnamese
+                          ? "Thi\u1ebft l\u1eadp v\u00ed m\u1edbi"
+                          : "New wallet setup"
+                }
+                icon={WalletCards}
                 onClose={handleCloseModal}
                 open={modalOpen}
                 title={editing ? copy.editWallet : copy.createWalletTitle}
+                tone="wallet"
             >
-                <div className="space-y-4">
-                    <div ref={bindTargetRef(imageFieldRef, 'input[type="file"]')}>
-                        <label className="mb-2 block text-sm font-medium">{copy.cardImage}</label>
-                        <Input accept="image/*" onChange={handleImageChange} type="file" />
-                        {imagePreview ? (
-                            <img
-                                alt={copy.walletPreview}
-                                className="mt-3 h-36 w-full rounded-[var(--app-radius-lg)] object-cover"
-                                src={imagePreview}
-                            />
-                        ) : null}
-                    </div>
-
-                    <div ref={bindTargetRef(nameFieldRef, "input")}>
-                        <label className="mb-2 block text-sm font-medium">{copy.walletName}</label>
-                        <Input
-                            onChange={(event) =>
-                                setFormValues((current) => ({
-                                    ...current,
-                                    name: event.target.value,
-                                }))
-                            }
-                            placeholder={copy.walletNamePlaceholder}
-                            value={formValues.name}
-                        />
-                    </div>
-
-                    <div ref={bindTargetRef(accountNumberFieldRef, "input")}>
-                        <label className="mb-2 block text-sm font-medium">{copy.accountNumber}</label>
-                        <Input
-                            onChange={(event) =>
-                                setFormValues((current) => ({
-                                    ...current,
-                                    accountNumber: event.target.value,
-                                }))
-                            }
-                            value={formValues.accountNumber}
-                        />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div ref={bindTargetRef(typeFieldRef, "select")}>
-                            <label className="mb-2 block text-sm font-medium">{copy.walletType}</label>
-                            <Select
-                                onChange={(event) =>
-                                    setFormValues((current) => ({
-                                        ...current,
-                                        type: event.target.value as "cash" | "bank" | "ewallet",
-                                    }))
-                                }
-                                value={formValues.type}
-                            >
-                                <option value="cash">{walletTypeText.cash[language]}</option>
-                                <option value="bank">{walletTypeText.bank[language]}</option>
-                                <option value="ewallet">{walletTypeText.ewallet[language]}</option>
-                            </Select>
+                <div className="space-y-3">
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "Thi\u1ebft l\u1eadp t\u00ean hi\u1ec3n th\u1ecb, s\u1ed1 t\u00e0i kho\u1ea3n v\u00e0 h\u00ecnh \u1ea3nh \u0111\u1ec3 d\u1ec5 nh\u1eadn ra tr\u00ean mobile."
+                                : "Set the display name, account hint, and image so the wallet is easy to spot on mobile."
+                        }
+                        title={isVietnamese ? "Nh\u1eadn di\u1ec7n v\u00ed" : "Wallet identity"}
+                    >
+                        <div ref={bindTargetRef(imageFieldRef, 'input[type="file"]')}>
+                            <label className="mb-2 block text-sm font-medium">{copy.cardImage}</label>
+                            <Input accept="image/*" onChange={handleImageChange} type="file" />
+                            {imagePreview ? (
+                                <img
+                                    alt={copy.walletPreview}
+                                    className="mt-3 h-28 w-full rounded-[var(--app-radius-lg)] object-cover sm:h-36"
+                                    src={imagePreview}
+                                />
+                            ) : null}
                         </div>
-                        <div ref={bindTargetRef(currencyFieldRef, "select")}>
-                            <label className="mb-2 block text-sm font-medium">{copy.currency}</label>
-                            <Select
-                                onChange={(event) =>
-                                    setFormValues((current) => ({
-                                        ...current,
-                                        currency: event.target.value,
-                                    }))
-                                }
-                                value={formValues.currency}
-                            >
-                                <option value="VND">VND</option>
-                                <option value="USD">USD</option>
-                                <option value="EUR">EUR</option>
-                            </Select>
-                        </div>
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div ref={bindTargetRef(iconFieldRef, "input")}>
-                            <label className="mb-2 block text-sm font-medium">{copy.icon}</label>
-                            <Input
-                                list="wallet-icon-suggestions"
-                                onChange={(event) =>
-                                    setFormValues((current) => ({
-                                        ...current,
-                                        icon: event.target.value,
-                                    }))
-                                }
-                                placeholder={copy.iconPlaceholder}
-                                value={formValues.icon}
-                            />
-                            <datalist id="wallet-icon-suggestions">
-                                <option value="">{copy.auto}</option>
-                                {iconOptions.map((option) => (
-                                    <option
-                                        key={option.value}
-                                        label={language === "vi" ? option.vi : option.en}
-                                        value={option.value}
-                                    />
-                                ))}
-                            </datalist>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                {copy.iconHint}
-                            </p>
-                        </div>
-                        <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.accentColor}</label>
-                            <div className="flex flex-wrap gap-2">
-                                {colorOptions.map((color) => (
-                                    <button
-                                        key={color}
-                                        className={`h-10 w-10 rounded-[var(--app-radius-md)] border ${
-                                            formValues.color === color
-                                                ? "border-foreground"
-                                                : "border-border"
-                                        }`}
-                                        onClick={() =>
-                                            setFormValues((current) => ({
-                                                ...current,
-                                                color,
-                                            }))
-                                        }
-                                        style={{ backgroundColor: color }}
-                                        type="button"
-                                    />
-                                ))}
+                        <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                            <div ref={bindTargetRef(nameFieldRef, "input")}>
+                                <label className="mb-2 block text-sm font-medium">{copy.walletName}</label>
+                                <Input
+                                    onChange={(event) =>
+                                        setFormValues((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                        }))
+                                    }
+                                    placeholder={copy.walletNamePlaceholder}
+                                    value={formValues.name}
+                                />
+                            </div>
+                            <div ref={bindTargetRef(accountNumberFieldRef, "input")}>
+                                <label className="mb-2 block text-sm font-medium">{copy.accountNumber}</label>
+                                <Input
+                                    onChange={(event) =>
+                                        setFormValues((current) => ({
+                                            ...current,
+                                            accountNumber: event.target.value,
+                                        }))
+                                    }
+                                    value={formValues.accountNumber}
+                                />
                             </div>
                         </div>
-                    </div>
+                    </DialogSection>
 
-                    <div ref={bindTargetRef(balanceFieldRef, "input")}>
-                        <label className="mb-2 block text-sm font-medium">{copy.startingBalance}</label>
-                        <Input
-                            inputMode="numeric"
-                            onChange={handleInitialBalanceChange}
-                            placeholder={copy.startingBalancePlaceholder}
-                            value={initialBalanceInput}
-                        />
-                    </div>
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "Ch\u1ecdn lo\u1ea1i v\u00ed, \u0111\u1ed3ng ti\u1ec1n, icon v\u00e0 m\u00e0u nh\u1ea5n \u0111\u1ec3 danh s\u00e1ch v\u00ed d\u1ec5 qu\u00e9t h\u01a1n."
+                                : "Choose the wallet type, currency, icon, and accent for faster scanning."
+                        }
+                        title={isVietnamese ? "Thi\u1ebft l\u1eadp hi\u1ec3n th\u1ecb" : "Display setup"}
+                    >
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div ref={bindTargetRef(typeFieldRef, "select")}>
+                                <label className="mb-2 block text-sm font-medium">{copy.walletType}</label>
+                                <Select
+                                    onChange={(event) =>
+                                        setFormValues((current) => ({
+                                            ...current,
+                                            type: event.target.value as "cash" | "bank" | "ewallet",
+                                        }))
+                                    }
+                                    value={formValues.type}
+                                >
+                                    <option value="cash">{walletTypeText.cash[language]}</option>
+                                    <option value="bank">{walletTypeText.bank[language]}</option>
+                                    <option value="ewallet">{walletTypeText.ewallet[language]}</option>
+                                </Select>
+                            </div>
+                            <div ref={bindTargetRef(currencyFieldRef, "select")}>
+                                <label className="mb-2 block text-sm font-medium">{copy.currency}</label>
+                                <Select
+                                    onChange={(event) =>
+                                        setFormValues((current) => ({
+                                            ...current,
+                                            currency: event.target.value,
+                                        }))
+                                    }
+                                    value={formValues.currency}
+                                >
+                                    <option value="VND">VND</option>
+                                    <option value="USD">USD</option>
+                                    <option value="EUR">EUR</option>
+                                </Select>
+                            </div>
+                        </div>
 
-                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div ref={bindTargetRef(iconFieldRef, "input")}>
+                                <label className="mb-2 block text-sm font-medium">{copy.icon}</label>
+                                <Input
+                                    list="wallet-icon-suggestions"
+                                    onChange={(event) =>
+                                        setFormValues((current) => ({
+                                            ...current,
+                                            icon: event.target.value,
+                                        }))
+                                    }
+                                    placeholder={copy.iconPlaceholder}
+                                    value={formValues.icon}
+                                />
+                                <datalist id="wallet-icon-suggestions">
+                                    <option value="">{copy.auto}</option>
+                                    {iconOptions.map((option) => (
+                                        <option
+                                            key={option.value}
+                                            label={language === "vi" ? option.vi : option.en}
+                                            value={option.value}
+                                        />
+                                    ))}
+                                </datalist>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    {copy.iconHint}
+                                </p>
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.accentColor}</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {colorOptions.map((color) => (
+                                        <button
+                                            key={color}
+                                            className={`h-9 w-9 rounded-[var(--app-radius-md)] border sm:h-10 sm:w-10 ${
+                                                formValues.color === color
+                                                    ? "border-foreground"
+                                                    : "border-border"
+                                            }`}
+                                            onClick={() =>
+                                                setFormValues((current) => ({
+                                                    ...current,
+                                                    color,
+                                                }))
+                                            }
+                                            style={{ backgroundColor: color }}
+                                            type="button"
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </DialogSection>
+
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "S\u1ed1 d\u01b0 ban \u0111\u1ea7u l\u00e0 m\u1ed1c theo d\u00f5i, ch\u01b0a ph\u1ea3i l\u00e0 giao d\u1ecbch."
+                                : "The starting balance is your tracking baseline, not a new transaction."
+                        }
+                        title={isVietnamese ? "S\u1ed1 d\u01b0 kh\u1edfi t\u1ea1o" : "Opening balance"}
+                    >
+                        <div ref={bindTargetRef(balanceFieldRef, "input")}>
+                            <label className="mb-2 block text-sm font-medium">{copy.startingBalance}</label>
+                            <Input
+                                inputMode="numeric"
+                                onChange={handleInitialBalanceChange}
+                                placeholder={copy.startingBalancePlaceholder}
+                                value={initialBalanceInput}
+                            />
+                        </div>
+                    </DialogSection>
+
+                    <DialogFooter>
                         <Button className="w-full sm:w-auto" onClick={handleCloseModal} variant="outline">
                             {copy.cancel}
                         </Button>
@@ -1678,7 +2056,7 @@ const Wallets: React.FC = () => {
                                   ? copy.updateWallet
                                   : copy.createWallet}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </div>
             </Dialog>
 
@@ -1715,3 +2093,4 @@ const Wallets: React.FC = () => {
 };
 
 export default Wallets;
+

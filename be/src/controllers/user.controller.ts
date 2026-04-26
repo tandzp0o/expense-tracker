@@ -2,10 +2,11 @@ import { Request, Response } from "express";
 import User from "../models/User";
 import Goal from "../models/Goal";
 import Wallet from "../models/Wallet";
-import Transaction from "../models/Transaction";
+import Transaction, { TransactionStatus } from "../models/Transaction";
 import Budget from "../models/Budget";
 import { v2 as cloudinary } from "cloudinary";
 import { syncUserIdentity } from "../utils/user-identity";
+import { TRANSFER_CATEGORY } from "../utils/transaction-rules";
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -62,11 +63,24 @@ export const getProfile = async (req: any, res: Response) => {
 
         // Get transaction statistics
         const transactions = await Transaction.find({ userId });
+        const isCompletedLedgerTransaction = (transaction: any) =>
+            (!transaction.status ||
+                transaction.status === TransactionStatus.COMPLETED) &&
+            transaction.category !== TRANSFER_CATEGORY;
+
         const totalIncome = transactions
-            .filter((t) => t.type === "INCOME")
+            .filter(
+                (t) =>
+                    t.type === "INCOME" &&
+                    isCompletedLedgerTransaction(t),
+            )
             .reduce((sum, t) => sum + t.amount, 0);
         const totalExpense = transactions
-            .filter((t) => t.type === "EXPENSE")
+            .filter(
+                (t) =>
+                    t.type === "EXPENSE" &&
+                    isCompletedLedgerTransaction(t),
+            )
             .reduce((sum, t) => sum + t.amount, 0);
 
         const profile = {
@@ -167,6 +181,16 @@ export const uploadAvatar = async (req: any, res: Response) => {
 export const getProfileStats = async (req: any, res: Response) => {
     try {
         const userId = req.user.uid;
+        const buildCompletedStatusQuery = () => ({
+            $or: [
+                { status: TransactionStatus.COMPLETED },
+                { status: { $exists: false } },
+            ],
+        });
+        const isCompletedLedgerTransaction = (transaction: any) =>
+            (!transaction.status ||
+                transaction.status === TransactionStatus.COMPLETED) &&
+            transaction.category !== TRANSFER_CATEGORY;
 
         // Get wallet statistics
         const wallets = await Wallet.find({ userId });
@@ -201,26 +225,44 @@ export const getProfileStats = async (req: any, res: Response) => {
 
         const monthlyTransactions = await Transaction.find({
             userId,
+            ...buildCompletedStatusQuery(),
             date: { $gte: startOfCurrentMonth, $lte: endOfCurrentMonth },
         });
 
         const lastMonthTransactions = await Transaction.find({
             userId,
+            ...buildCompletedStatusQuery(),
             date: { $gte: startOfLastMonth, $lte: endOfLastMonth },
         });
 
         const monthlyIncome = monthlyTransactions
-            .filter((t) => t.type === "INCOME")
+            .filter(
+                (t) =>
+                    t.type === "INCOME" &&
+                    isCompletedLedgerTransaction(t),
+            )
             .reduce((sum, t) => sum + t.amount, 0);
         const monthlyExpense = monthlyTransactions
-            .filter((t) => t.type === "EXPENSE")
+            .filter(
+                (t) =>
+                    t.type === "EXPENSE" &&
+                    isCompletedLedgerTransaction(t),
+            )
             .reduce((sum, t) => sum + t.amount, 0);
 
         const lastMonthIncome = lastMonthTransactions
-            .filter((t) => t.type === "INCOME")
+            .filter(
+                (t) =>
+                    t.type === "INCOME" &&
+                    isCompletedLedgerTransaction(t),
+            )
             .reduce((sum, t) => sum + t.amount, 0);
         const lastMonthExpense = lastMonthTransactions
-            .filter((t) => t.type === "EXPENSE")
+            .filter(
+                (t) =>
+                    t.type === "EXPENSE" &&
+                    isCompletedLedgerTransaction(t),
+            )
             .reduce((sum, t) => sum + t.amount, 0);
 
         const incomeGrowth =
@@ -258,14 +300,23 @@ export const getProfileStats = async (req: any, res: Response) => {
 
             const trans = await Transaction.find({
                 userId,
+                ...buildCompletedStatusQuery(),
                 date: { $gte: start, $lte: end },
             });
 
             const inc = trans
-                .filter((t) => t.type === "INCOME")
+                .filter(
+                    (t) =>
+                        t.type === "INCOME" &&
+                        isCompletedLedgerTransaction(t),
+                )
                 .reduce((sum, t) => sum + t.amount, 0);
             const exp = trans
-                .filter((t) => t.type === "EXPENSE")
+                .filter(
+                    (t) =>
+                        t.type === "EXPENSE" &&
+                        isCompletedLedgerTransaction(t),
+                )
                 .reduce((sum, t) => sum + t.amount, 0);
 
             history.push({

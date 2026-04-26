@@ -94,14 +94,14 @@ export const buildMobileNavigationItems = (language: Language) => {
     const items = buildNavigationItems(language);
     return [
         items[0],
-        items[2],
+        items[1],
         {
             to: "/transactions",
             label: text[language].add,
             icon: Plus,
             isPrimary: true,
         },
+        items[4],
         items[5],
-        items[8],
     ] as const;
 };

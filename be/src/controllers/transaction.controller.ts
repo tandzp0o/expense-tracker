@@ -1,10 +1,31 @@
 import { Request, Response } from "express";
-import Transaction, { TransactionType } from "../models/Transaction";
-import Wallet from "../models/Wallet";
+import { ClientSession, Types } from "mongoose";
 import Budget from "../models/Budget";
 import Goal from "../models/Goal";
-import { Types } from "mongoose";
+import Transaction, {
+    ITransaction,
+    TransactionStatus,
+    TransactionType,
+} from "../models/Transaction";
+import Wallet from "../models/Wallet";
 import { touchTransactionCacheState } from "../utils/transaction-cache";
+import {
+    assertNonNegativeLedgerValue,
+    ensureTransactionDateAllowed,
+    ensureTransferCategoryNotUsed,
+    getGoalDeltaForTransaction,
+    getWalletDeltaForTransaction,
+    isLedgerAffectingStatus,
+    isTransferCategory,
+    isTransferTransaction,
+    normalizeTransactionStatus,
+    normalizeTransactionType,
+    parseTransactionDateInput,
+    parseWholeMoneyAmount,
+    supportsManualTransactionEditing,
+    TransactionRuleError,
+    TRANSFER_CATEGORY,
+} from "../utils/transaction-rules";
 
 const parsePositiveInt = (value: unknown, fallback: number) => {
     const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -14,20 +35,26 @@ const parsePositiveInt = (value: unknown, fallback: number) => {
 const escapeRegex = (value: string) =>
     value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const buildCompletedStatusQuery = () => ({
+    $or: [
+        { status: TransactionStatus.COMPLETED },
+        { status: { $exists: false } },
+    ],
+});
+
+const completedStatusExpression = {
+    $eq: [{ $ifNull: ["$status", TransactionStatus.COMPLETED] }, TransactionStatus.COMPLETED],
+};
+
 const buildTransactionQuery = (userId: string, reqQuery: any) => {
-    const {
-        startDate,
-        endDate,
-        type,
-        category,
-        walletId,
-        note,
-    } = reqQuery;
+    const { startDate, endDate, type, category, walletId, note, status } =
+        reqQuery;
     const query: any = { userId };
 
     if (walletId) query.walletId = walletId;
     if (type) query.type = type;
     if (category) query.category = category;
+    if (status) query.status = status;
 
     const normalizedNote =
         typeof note === "string" ? note.trim() : String(note || "").trim();
@@ -44,14 +71,356 @@ const buildTransactionQuery = (userId: string, reqQuery: any) => {
     return query;
 };
 
+const handleControllerError = (
+    res: Response,
+    error: unknown,
+    defaultMessage: string,
+) => {
+    if (error instanceof TransactionRuleError) {
+        return res.status(error.status).json({
+            success: false,
+            message: error.message,
+            ...(error.details ? { details: error.details } : {}),
+        });
+    }
+
+    const errorMessage =
+        error instanceof Error ? error.message : "Unknown server error";
+    return res.status(500).json({
+        success: false,
+        message: defaultMessage,
+        error: errorMessage,
+    });
+};
+
+const parseCategory = (value: unknown) => {
+    const category = String(value || "").trim();
+    if (!category) {
+        throw new TransactionRuleError(400, "Category is required");
+    }
+
+    return category;
+};
+
+const parseOptionalCategory = (value: unknown) => String(value || "").trim();
+
+const normalizeOptionalNote = (value: unknown) => {
+    const note = String(value || "").trim();
+    return note || undefined;
+};
+
+const applyWalletDelta = (
+    wallet: any,
+    delta: number,
+    insufficientMessage: string,
+) => {
+    const nextBalance = Number(wallet.balance) + delta;
+    assertNonNegativeLedgerValue(nextBalance, insufficientMessage);
+    wallet.balance = nextBalance;
+};
+
+const applyGoalDelta = (goal: any, delta: number) => {
+    const nextAmount = Number(goal.currentAmount || 0) + delta;
+    assertNonNegativeLedgerValue(
+        nextAmount,
+        "Goal balance cannot become negative",
+    );
+    goal.currentAmount = nextAmount;
+    syncGoalStatus(goal);
+};
+
+const transactionTouchesLedger = (status: TransactionStatus) =>
+    isLedgerAffectingStatus(status);
+
+const applyTransactionLedgerEffects = ({
+    transactionType,
+    transactionStatus,
+    amount,
+    wallet,
+    goal,
+}: {
+    transactionType: TransactionType;
+    transactionStatus: TransactionStatus;
+    amount: number;
+    wallet: any;
+    goal?: any;
+}) => {
+    if (!transactionTouchesLedger(transactionStatus)) {
+        return;
+    }
+
+    applyWalletDelta(
+        wallet,
+        getWalletDeltaForTransaction(transactionType, amount),
+        "Insufficient wallet balance",
+    );
+
+    const goalDelta = getGoalDeltaForTransaction(transactionType, amount);
+    if (goal && goalDelta !== 0) {
+        applyGoalDelta(goal, goalDelta);
+    }
+};
+
+const revertTransactionLedgerEffects = ({
+    transactionType,
+    transactionStatus,
+    amount,
+    wallet,
+    goal,
+}: {
+    transactionType: TransactionType;
+    transactionStatus: TransactionStatus;
+    amount: number;
+    wallet: any;
+    goal?: any;
+}) => {
+    if (!transactionTouchesLedger(transactionStatus)) {
+        return;
+    }
+
+    applyWalletDelta(
+        wallet,
+        -getWalletDeltaForTransaction(transactionType, amount),
+        "Wallet does not have enough balance to reverse this transaction",
+    );
+
+    const goalDelta = getGoalDeltaForTransaction(transactionType, amount);
+    if (goal && goalDelta !== 0) {
+        applyGoalDelta(goal, -goalDelta);
+    }
+};
+
+const syncGoalStatus = (goal: any) => {
+    const deadline = goal.deadline ? new Date(goal.deadline) : null;
+
+    if (deadline && new Date() > deadline) {
+        goal.status = "expired";
+        return;
+    }
+
+    goal.status =
+        Number(goal.currentAmount) >= Number(goal.targetAmount)
+            ? "completed"
+            : "active";
+};
+
+const loadWalletForUser = async (
+    walletId: unknown,
+    userId: string,
+    session: ClientSession,
+) => {
+    const wallet = await Wallet.findOne({ _id: walletId, userId }).session(
+        session,
+    );
+    if (!wallet) {
+        throw new TransactionRuleError(404, "Wallet not found");
+    }
+
+    return wallet;
+};
+
+const loadGoalForUser = async (
+    goalId: unknown,
+    userId: string,
+    session: ClientSession,
+) => {
+    const goal = await Goal.findOne({ _id: goalId, userId }).session(session);
+    if (!goal) {
+        throw new TransactionRuleError(404, "Goal not found");
+    }
+
+    return goal;
+};
+
+const loadBudgetForUser = async (
+    budgetId: unknown,
+    userId: string,
+    session: ClientSession,
+) => {
+    const budget = await Budget.findOne({ _id: budgetId, userId }).session(
+        session,
+    );
+    if (!budget) {
+        throw new TransactionRuleError(404, "Budget not found");
+    }
+
+    return budget;
+};
+
+const resolveBudgetCategoryForWallet = ({
+    budget,
+    walletId,
+    providedCategory,
+}: {
+    budget: any;
+    walletId: unknown;
+    providedCategory?: string;
+}) => {
+    if (String(budget.walletId) !== String(walletId)) {
+        throw new TransactionRuleError(
+            400,
+            "Selected budget does not belong to the chosen wallet",
+        );
+    }
+
+    const budgetCategory = String(budget.category || "").trim();
+    if (!budgetCategory) {
+        throw new TransactionRuleError(
+            400,
+            "Selected budget is missing a valid category",
+        );
+    }
+
+    if (providedCategory && providedCategory !== budgetCategory) {
+        throw new TransactionRuleError(
+            400,
+            "Selected category does not match the chosen budget",
+        );
+    }
+
+    return budgetCategory;
+};
+
+const assertBudgetMatchesTransactionDate = ({
+    budget,
+    transactionDate,
+}: {
+    budget: any;
+    transactionDate: Date;
+}) => {
+    const month = transactionDate.getMonth() + 1;
+    const year = transactionDate.getFullYear();
+
+    if (budget.month !== month || budget.year !== year) {
+        throw new TransactionRuleError(
+            400,
+            "Budget does not belong to the selected transaction month",
+        );
+    }
+};
+
+const assertBudgetCapacity = async ({
+    budgetId,
+    userId,
+    amount,
+    transactionDate,
+    excludedTransactionId,
+    session,
+}: {
+    budgetId: unknown;
+    userId: string;
+    amount: number;
+    transactionDate: Date;
+    excludedTransactionId?: Types.ObjectId;
+    session: ClientSession;
+}) => {
+    const budget = await loadBudgetForUser(budgetId, userId, session);
+    const month = transactionDate.getMonth() + 1;
+    const year = transactionDate.getFullYear();
+
+    if (budget.month !== month || budget.year !== year) {
+        throw new TransactionRuleError(
+            400,
+            "Budget does not belong to the selected transaction month",
+        );
+    }
+
+    const spent = await Transaction.aggregate([
+        {
+            $match: {
+                userId,
+                budgetId: new Types.ObjectId(String(budgetId)),
+                type: TransactionType.EXPENSE,
+                ...buildCompletedStatusQuery(),
+                ...(excludedTransactionId
+                    ? { _id: { $ne: excludedTransactionId } }
+                    : {}),
+                date: {
+                    $gte: new Date(year, month - 1, 1),
+                    $lt: new Date(year, month, 1),
+                },
+            },
+        },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]).session(session);
+
+    const totalSpent = spent[0]?.total || 0;
+    if (totalSpent + amount > budget.amount) {
+        throw new TransactionRuleError(
+            400,
+            "Budget limit would be exceeded by this expense",
+            {
+                budgetAmount: budget.amount,
+                currentSpent: totalSpent,
+                requestedAmount: amount,
+            },
+        );
+    }
+};
+
+const syncWalletTransactionFlag = async (
+    wallet: any,
+    userId: string,
+    session: ClientSession,
+) => {
+    const remainingTransactions = await Transaction.countDocuments({
+        userId,
+        walletId: wallet._id,
+    }).session(session);
+
+    wallet.hasTransactions = remainingTransactions > 0;
+    await wallet.save({ session });
+};
+
+const getTransferCandidates = async (
+    transaction: ITransaction & { createdAt?: Date },
+    session: ClientSession,
+) => {
+    if (transaction.transferGroupId) {
+        return Transaction.find({
+            userId: transaction.userId,
+            transferGroupId: transaction.transferGroupId,
+        }).session(session);
+    }
+
+    if (!isTransferCategory(transaction.category)) {
+        return [transaction];
+    }
+
+    const createdAt = transaction.createdAt
+        ? new Date(transaction.createdAt)
+        : new Date(transaction.date);
+    const counterpart = await Transaction.findOne({
+        _id: { $ne: transaction._id },
+        userId: transaction.userId,
+        category: TRANSFER_CATEGORY,
+        amount: transaction.amount,
+        type:
+            transaction.type === TransactionType.INCOME
+                ? TransactionType.EXPENSE
+                : TransactionType.INCOME,
+        walletId: { $ne: transaction.walletId },
+        createdAt: {
+            $gte: new Date(createdAt.getTime() - 5 * 60 * 1000),
+            $lte: new Date(createdAt.getTime() + 5 * 60 * 1000),
+        },
+    })
+        .sort({ createdAt: 1 })
+        .session(session);
+
+    return counterpart ? [transaction, counterpart] : [transaction];
+};
+
 export const createTransaction = async (req: any, res: Response) => {
     const session = await Transaction.startSession();
     session.startTransaction();
 
     try {
+        const userId = req.user.uid;
         const {
             walletId,
             type,
+            status,
             amount,
             category,
             date,
@@ -61,197 +430,279 @@ export const createTransaction = async (req: any, res: Response) => {
             isSystemGenerated,
             isDeletable,
         } = req.body;
-        const userId = req.user.uid;
 
-        // Kiểm tra ví có tồn tại và thuộc về người dùng không
-        const wallet = await Wallet.findOne({ _id: walletId, userId }).session(
-            session,
+        const normalizedType = normalizeTransactionType(type);
+        const normalizedAmount = parseWholeMoneyAmount(amount);
+        const normalizedStatus =
+            status !== undefined
+                ? normalizeTransactionStatus(status)
+                : TransactionStatus.COMPLETED;
+        const normalizedDate = ensureTransactionDateAllowed(
+            parseTransactionDateInput(date),
+            normalizedStatus,
+            Boolean(isSystemGenerated),
         );
-        if (!wallet) {
-            await session.abortTransaction();
-            return res.status(404).json({ message: "Không tìm thấy ví" });
-        }
+        const providedCategory = parseOptionalCategory(category);
+        const normalizedNote = normalizeOptionalNote(note);
 
-        // Validate budgetId if provided
-        if (budgetId) {
-            const budget = await Budget.findOne({
-                _id: budgetId,
-                userId,
-            }).session(session);
-            if (!budget) {
-                await session.abortTransaction();
-                return res
-                    .status(404)
-                    .json({ message: "Không tìm thấy ngân sách" });
-            }
-        }
-
-        // Validate goalId if provided
-        if (goalId) {
-            const goal = await Goal.findOne({ _id: goalId, userId }).session(
-                session,
+        if (normalizedType === TransactionType.ADJUSTMENT) {
+            throw new TransactionRuleError(
+                400,
+                "Adjustment transactions require a dedicated flow",
             );
-            if (!goal) {
-                await session.abortTransaction();
-                return res
-                    .status(404)
-                    .json({ message: "Không tìm thấy mục tiêu" });
-            }
         }
 
-        // Handle different transaction types
-        if (type === TransactionType.ADJUSTMENT) {
-            // Adjustment transactions không kiểm tra số dư
-            // Cập nhật số dư theo direction (INCOME/EXPENSE)
-            const direction = req.body.direction || "income";
-            if (direction === "income") {
-                wallet.balance += amount;
-            } else {
-                wallet.balance = Math.max(wallet.balance - amount, 0);
-            }
-        } else if (type === TransactionType.GOAL_DEPOSIT) {
-            // Kiểm tra số dư ví
-            if (wallet.balance < amount) {
-                await session.abortTransaction();
-                return res
-                    .status(400)
-                    .json({ message: "Số dư không đủ để tiết kiệm" });
-            }
-            // Trừ tiền ví
-            wallet.balance -= amount;
-            // Cộng tiền vào mục tiêu
-            const goal = await Goal.findById(goalId).session(session);
-            if (goal) {
-                goal.currentAmount = (goal.currentAmount || 0) + amount;
-                await goal.save({ session });
-            }
-        } else if (type === TransactionType.GOAL_WITHDRAW) {
-            // Cộng tiền vào ví
-            wallet.balance += amount;
-            // Trừ tiền từ mục tiêu
-            const goal = await Goal.findById(goalId).session(session);
-            if (goal) {
-                goal.currentAmount = Math.max(
-                    (goal.currentAmount || 0) - amount,
-                    0,
-                );
-                await goal.save({ session });
-            }
+        if (budgetId && normalizedType !== TransactionType.EXPENSE) {
+            throw new TransactionRuleError(
+                400,
+                "Budgets can only be linked to expense transactions",
+            );
+        }
+
+        if (
+            goalId &&
+            normalizedType !== TransactionType.GOAL_DEPOSIT &&
+            normalizedType !== TransactionType.GOAL_WITHDRAW
+        ) {
+            throw new TransactionRuleError(
+                400,
+                "Goals can only be linked to goal deposit or withdrawal transactions",
+            );
+        }
+
+        const wallet = await loadWalletForUser(walletId, userId, session);
+        let normalizedCategory = providedCategory;
+        let budget: any = null;
+        let goal: any = null;
+
+        if (budgetId) {
+            budget = await loadBudgetForUser(budgetId, userId, session);
+            normalizedCategory = resolveBudgetCategoryForWallet({
+                budget,
+                walletId: wallet._id,
+                providedCategory,
+            });
+            assertBudgetMatchesTransactionDate({
+                budget,
+                transactionDate: normalizedDate,
+            });
         } else {
-            // Kiểm tra số dư nếu là giao dịch chi tiêu
-            if (type === TransactionType.EXPENSE && wallet.balance < amount) {
-                await session.abortTransaction();
-                return res.status(400).json({ message: "Số dư không đủ" });
-            }
-
-            // Kiểm tra ngân sách nếu có budgetId
-            if (budgetId && type === TransactionType.EXPENSE) {
-                const budget = await Budget.findById(budgetId).session(session);
-                if (budget) {
-                    // Tính tổng đã chi trong tháng cho ngân sách này
-                    const month = new Date(date || new Date()).getMonth() + 1;
-                    const year = new Date(date || new Date()).getFullYear();
-                    const spent = await Transaction.aggregate([
-                        {
-                            $match: {
-                                userId,
-                                budgetId: new Types.ObjectId(
-                                    budgetId as string,
-                                ),
-                                type: TransactionType.EXPENSE,
-                                date: {
-                                    $gte: new Date(year, month - 1, 1),
-                                    $lt: new Date(year, month, 1),
-                                },
-                            },
-                        },
-                        { $group: { _id: null, total: { $sum: "$amount" } } },
-                    ]);
-                    const totalSpent = spent[0]?.total || 0;
-                    if (totalSpent + amount > budget.amount) {
-                        await session.abortTransaction();
-                        return res.status(400).json({
-                            message:
-                                "Vượt ngân sách. Ngân sách: " +
-                                budget.amount +
-                                ", Đã chi: " +
-                                totalSpent +
-                                ", Giao dịch: " +
-                                amount,
-                        });
-                    }
-                }
-            }
-
-            // Cập nhật số dư ví cho INCOME/EXPENSE
-            wallet.balance =
-                type === TransactionType.INCOME
-                    ? wallet.balance + amount
-                    : wallet.balance - amount;
+            normalizedCategory = parseCategory(providedCategory);
         }
 
-        // Tạo giao dịch
+        ensureTransferCategoryNotUsed(normalizedCategory);
+
+        if (
+            normalizedType === TransactionType.EXPENSE &&
+            budgetId &&
+            transactionTouchesLedger(normalizedStatus)
+        ) {
+            await assertBudgetCapacity({
+                budgetId,
+                userId,
+                amount: normalizedAmount,
+                transactionDate: normalizedDate,
+                session,
+            });
+        }
+
+        if (
+            normalizedType === TransactionType.GOAL_DEPOSIT ||
+            normalizedType === TransactionType.GOAL_WITHDRAW
+        ) {
+            if (!goalId) {
+                throw new TransactionRuleError(
+                    400,
+                    "A goal is required for goal transfers",
+                );
+            }
+
+            goal = await loadGoalForUser(goalId, userId, session);
+        }
+
+        if (
+            normalizedType === TransactionType.GOAL_WITHDRAW &&
+            transactionTouchesLedger(normalizedStatus) &&
+            Number(goal.currentAmount || 0) < normalizedAmount
+        ) {
+            throw new TransactionRuleError(
+                400,
+                "Goal balance is not sufficient for this withdrawal",
+            );
+        }
+
+        applyTransactionLedgerEffects({
+            transactionType: normalizedType,
+            transactionStatus: normalizedStatus,
+            amount: normalizedAmount,
+            wallet,
+            goal,
+        });
+
+        wallet.hasTransactions = true;
+
         const transaction = new Transaction({
             userId,
             walletId,
-            type,
-            amount,
-            category,
-            date: date || new Date(),
-            note,
+            type: normalizedType,
+            status: normalizedStatus,
+            amount: normalizedAmount,
+            category: normalizedCategory,
+            date: normalizedDate,
+            note: normalizedNote,
             budgetId: budgetId || undefined,
             goalId: goalId || undefined,
-            isSystemGenerated: isSystemGenerated || false,
-            isDeletable: isDeletable !== undefined ? isDeletable : true,
+            isSystemGenerated: Boolean(isSystemGenerated),
+            isDeletable: isDeletable !== undefined ? Boolean(isDeletable) : true,
         });
 
-        await Promise.all([
-            transaction.save({ session }),
-            wallet.save({ session }),
-        ]);
-
-        // Set hasTransactions = true cho wallet nếu đây là giao dịch đầu tiên (không phải adjustment)
-        if (!wallet.hasTransactions && type !== TransactionType.ADJUSTMENT) {
-            wallet.hasTransactions = true;
-            await wallet.save({ session });
+        await transaction.save({ session });
+        await wallet.save({ session });
+        if (goal) {
+            await goal.save({ session });
         }
-
         await touchTransactionCacheState(userId, req.user, session);
         await session.commitTransaction();
-        res.status(201).json(transaction);
+
+        return res.status(201).json(transaction);
     } catch (error) {
         await session.abortTransaction();
-        const errorMessage =
-            error instanceof Error
-                ? error.message
-                : "Đã xảy ra lỗi không xác định";
-        res.status(500).json({
-            message: "Lỗi khi tạo giao dịch",
-            error: errorMessage,
-        });
+        return handleControllerError(res, error, "Failed to create transaction");
     } finally {
         session.endSession();
     }
 };
 
-export const getStatementReport = async (req: Request, res: Response) => {
+export const createInternalTransfer = async (req: any, res: Response) => {
+    const session = await Transaction.startSession();
+    session.startTransaction();
+
+    try {
+        const userId = req.user.uid;
+        const {
+            fromWalletId,
+            toWalletId,
+            amount,
+            date,
+            sourceNote,
+            destinationNote,
+        } = req.body;
+
+        if (!fromWalletId || !toWalletId) {
+            throw new TransactionRuleError(
+                400,
+                "Both source and destination wallets are required",
+            );
+        }
+
+        if (String(fromWalletId) === String(toWalletId)) {
+            throw new TransactionRuleError(
+                400,
+                "Source and destination wallets must be different",
+            );
+        }
+
+        const normalizedAmount = parseWholeMoneyAmount(amount);
+        const normalizedDate = ensureTransactionDateAllowed(
+            parseTransactionDateInput(date),
+            TransactionStatus.COMPLETED,
+        );
+        const fromWallet = await loadWalletForUser(fromWalletId, userId, session);
+        const toWallet = await loadWalletForUser(toWalletId, userId, session);
+
+        if (String(fromWallet.currency || "VND") !== String(toWallet.currency || "VND")) {
+            throw new TransactionRuleError(
+                400,
+                "Internal transfers require the same currency on both wallets",
+            );
+        }
+
+        applyWalletDelta(
+            fromWallet,
+            -normalizedAmount,
+            "Insufficient wallet balance",
+        );
+        applyWalletDelta(toWallet, normalizedAmount, "Wallet balance overflow");
+
+        fromWallet.hasTransactions = true;
+        toWallet.hasTransactions = true;
+
+        const transferGroupId = new Types.ObjectId().toHexString();
+        const expenseTransaction = new Transaction({
+            userId,
+            walletId: fromWallet._id,
+            transferPeerWalletId: toWallet._id,
+            transferGroupId,
+            type: TransactionType.EXPENSE,
+            status: TransactionStatus.COMPLETED,
+            amount: normalizedAmount,
+            category: TRANSFER_CATEGORY,
+            date: normalizedDate,
+            note: normalizeOptionalNote(sourceNote),
+            isSystemGenerated: true,
+            isDeletable: true,
+        });
+        const incomeTransaction = new Transaction({
+            userId,
+            walletId: toWallet._id,
+            transferPeerWalletId: fromWallet._id,
+            transferGroupId,
+            type: TransactionType.INCOME,
+            status: TransactionStatus.COMPLETED,
+            amount: normalizedAmount,
+            category: TRANSFER_CATEGORY,
+            date: normalizedDate,
+            note: normalizeOptionalNote(destinationNote),
+            isSystemGenerated: true,
+            isDeletable: true,
+        });
+
+        await expenseTransaction.save({ session });
+        await incomeTransaction.save({ session });
+        await fromWallet.save({ session });
+        await toWallet.save({ session });
+
+        await touchTransactionCacheState(userId, req.user, session);
+        await session.commitTransaction();
+
+        return res.status(201).json({
+            success: true,
+            data: {
+                transferGroupId,
+                transactions: [expenseTransaction, incomeTransaction],
+            },
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        return handleControllerError(
+            res,
+            error,
+            "Failed to create internal transfer",
+        );
+    } finally {
+        session.endSession();
+    }
+};
+
+export const getStatementReport = async (req: any, res: Response) => {
     try {
         const { walletId, startDate, endDate } = req.query;
+        const userId = req.user.uid;
 
-        // 1. Lấy thông tin ví để lấy số dư ban đầu
-        const wallet = await Wallet.findById(walletId);
+        const wallet = await Wallet.findOne({ _id: walletId, userId });
         if (!wallet) {
             return res.status(404).json({
                 success: false,
-                message: "Không tìm thấy ví",
+                message: "Wallet not found",
             });
         }
 
-        // 2. Lấy tổng thu/chi từ lúc tạo ví đến trước ngày bắt đầu
         const periodBeforeStart = await Transaction.aggregate([
             {
                 $match: {
+                    userId,
                     walletId: new Types.ObjectId(walletId as string),
+                    ...buildCompletedStatusQuery(),
                     date: { $lt: new Date(startDate as string) },
                 },
             },
@@ -260,54 +711,49 @@ export const getStatementReport = async (req: Request, res: Response) => {
                     _id: null,
                     totalIncome: {
                         $sum: {
-                            $cond: [{ $eq: ["$type", "INCOME"] }, "$amount", 0],
+                            $cond: [{ $eq: ["$type", TransactionType.INCOME] }, "$amount", 0],
                         },
                     },
                     totalExpense: {
                         $sum: {
-                            $cond: [
-                                { $eq: ["$type", "EXPENSE"] },
-                                "$amount",
-                                0,
-                            ],
+                            $cond: [{ $eq: ["$type", TransactionType.EXPENSE] }, "$amount", 0],
                         },
                     },
                 },
             },
         ]);
 
-        // 3. Lấy giao dịch trong kỳ
         const transactions = await Transaction.find({
+            userId,
             walletId,
+            ...buildCompletedStatusQuery(),
             date: {
                 $gte: new Date(startDate as string),
                 $lte: new Date(endDate as string),
             },
-        }).sort({ date: 1 });
+        }).sort({ date: 1, createdAt: 1 });
 
-        // 4. Tính toán tổng thu/chi trong kỳ
         const periodTotals = transactions.reduce(
-            (acc, t) => {
-                if (t.type === "INCOME") {
-                    acc.totalIncome += t.amount;
-                } else {
-                    acc.totalExpense += t.amount;
+            (acc, transaction) => {
+                if (transaction.type === TransactionType.INCOME) {
+                    acc.totalIncome += transaction.amount;
+                } else if (transaction.type === TransactionType.EXPENSE) {
+                    acc.totalExpense += transaction.amount;
                 }
+
                 return acc;
             },
             { totalIncome: 0, totalExpense: 0 },
         );
 
-        // 5. Tính số dư
         const startBalance =
-            wallet.initialBalance +
-            (periodBeforeStart[0]?.totalIncome || 0) -
-            (periodBeforeStart[0]?.totalExpense || 0);
-
+            Number(wallet.initialBalance || 0) +
+            Number(periodBeforeStart[0]?.totalIncome || 0) -
+            Number(periodBeforeStart[0]?.totalExpense || 0);
         const endBalance =
             startBalance + periodTotals.totalIncome - periodTotals.totalExpense;
 
-        res.json({
+        return res.json({
             success: true,
             data: {
                 initialBalance: wallet.initialBalance,
@@ -319,13 +765,11 @@ export const getStatementReport = async (req: Request, res: Response) => {
             },
         });
     } catch (error) {
-        console.error("Lỗi khi lấy báo cáo sao kê:", error);
-        res.status(500).json({
-            success: false,
-            message: "Lỗi khi lấy báo cáo sao kê",
-            error:
-                error instanceof Error ? error.message : "Lỗi không xác định",
-        });
+        return handleControllerError(
+            res,
+            error,
+            "Failed to load statement report",
+        );
     }
 };
 
@@ -350,7 +794,13 @@ export const getTransactions = async (req: any, res: Response) => {
                         income: {
                             $sum: {
                                 $cond: [
-                                    { $eq: ["$type", TransactionType.INCOME] },
+                                    {
+                                        $and: [
+                                            { $eq: ["$type", TransactionType.INCOME] },
+                                            completedStatusExpression,
+                                            { $ne: ["$category", TRANSFER_CATEGORY] },
+                                        ],
+                                    },
                                     "$amount",
                                     0,
                                 ],
@@ -359,7 +809,13 @@ export const getTransactions = async (req: any, res: Response) => {
                         expense: {
                             $sum: {
                                 $cond: [
-                                    { $eq: ["$type", TransactionType.EXPENSE] },
+                                    {
+                                        $and: [
+                                            { $eq: ["$type", TransactionType.EXPENSE] },
+                                            completedStatusExpression,
+                                            { $ne: ["$category", TRANSFER_CATEGORY] },
+                                        ],
+                                    },
                                     "$amount",
                                     0,
                                 ],
@@ -372,7 +828,9 @@ export const getTransactions = async (req: any, res: Response) => {
                 .sort({ date: -1, createdAt: -1 })
                 .skip(skip)
                 .limit(pageSize)
-                .select("_id walletId type amount category date note createdAt")
+                .select(
+                    "_id walletId budgetId type status amount category date note createdAt transferGroupId isSystemGenerated",
+                )
                 .populate("walletId", "name")
                 .lean(),
         ]);
@@ -383,17 +841,16 @@ export const getTransactions = async (req: any, res: Response) => {
             expense: 0,
         };
         const total = aggregateRow.total;
-        const summary = {
-            income: aggregateRow.income,
-            expense: aggregateRow.expense,
-            profit: aggregateRow.income - aggregateRow.expense,
-        };
 
-        res.json({
+        return res.json({
             success: true,
             data: {
                 transactions,
-                summary,
+                summary: {
+                    income: aggregateRow.income,
+                    expense: aggregateRow.expense,
+                    profit: aggregateRow.income - aggregateRow.expense,
+                },
                 total,
                 pagination: {
                     total,
@@ -404,56 +861,48 @@ export const getTransactions = async (req: any, res: Response) => {
             },
         });
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách giao dịch:", error);
-        res.status(500).json({
-            success: false,
-            message: "Lỗi khi lấy danh sách giao dịch",
-            error:
-                error instanceof Error ? error.message : "Lỗi không xác định",
-        });
+        return handleControllerError(
+            res,
+            error,
+            "Failed to load transactions",
+        );
     }
 };
-/**
- * Lấy danh sách giao dịch theo ví
- */
+
 export const getTransactionsByWallet = async (req: any, res: Response) => {
     try {
         const { walletId } = req.params;
         const userId = req.user.uid;
 
-        // Kiểm tra ví có tồn tại và thuộc về người dùng không
         const wallet = await Wallet.findOne({ _id: walletId, userId });
         if (!wallet) {
             return res.status(404).json({
                 success: false,
-                message: "Không tìm thấy ví",
+                message: "Wallet not found",
             });
         }
 
         const transactions = await Transaction.find({ walletId, userId })
             .sort({ date: -1, createdAt: -1 })
-            .select("_id walletId type amount category date note createdAt")
+            .select(
+                "_id walletId budgetId type status amount category date note createdAt transferGroupId isSystemGenerated",
+            )
             .populate("walletId", "name")
             .lean();
 
-        res.json({
+        return res.json({
             success: true,
             data: transactions,
         });
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách giao dịch theo ví:", error);
-        res.status(500).json({
-            success: false,
-            message: "Lỗi khi lấy danh sách giao dịch",
-            error:
-                error instanceof Error ? error.message : "Lỗi không xác định",
-        });
+        return handleControllerError(
+            res,
+            error,
+            "Failed to load wallet transactions",
+        );
     }
 };
 
-/**
- * Lấy thông tin chi tiết một giao dịch
- */
 export const getTransactionById = async (req: any, res: Response) => {
     try {
         const { id } = req.params;
@@ -467,163 +916,202 @@ export const getTransactionById = async (req: any, res: Response) => {
         if (!transaction) {
             return res.status(404).json({
                 success: false,
-                message: "Không tìm thấy giao dịch",
+                message: "Transaction not found",
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             data: transaction,
         });
     } catch (error) {
-        console.error("Lỗi khi lấy thông tin giao dịch:", error);
-        res.status(500).json({
-            success: false,
-            message: "Lỗi khi lấy thông tin giao dịch",
-            error:
-                error instanceof Error ? error.message : "Lỗi không xác định",
-        });
+        return handleControllerError(
+            res,
+            error,
+            "Failed to load transaction details",
+        );
     }
 };
 
-/**
- * Cập nhật thông tin giao dịch
- */
 export const updateTransaction = async (req: any, res: Response) => {
     const session = await Transaction.startSession();
     session.startTransaction();
 
     try {
         const { id } = req.params;
-        const { walletId, type, amount, category, date, note } = req.body;
         const userId = req.user.uid;
-
-        // Tìm giao dịch hiện tại và kiểm tra quyền sở hữu
         const currentTransaction = await Transaction.findOne({
             _id: id,
             userId,
         }).session(session);
 
         if (!currentTransaction) {
-            await session.abortTransaction();
-            return res.status(404).json({
-                success: false,
-                message:
-                    "Không tìm thấy giao dịch hoặc bạn không có quyền chỉnh sửa",
-            });
+            throw new TransactionRuleError(404, "Transaction not found");
         }
 
-        // Kiểm tra ví cũ
-        const oldWallet = await Wallet.findById(
-            currentTransaction.walletId,
-        ).session(session);
-        if (!oldWallet) {
-            await session.abortTransaction();
-            return res.status(404).json({
-                success: false,
-                message: "Không tìm thấy ví cũ",
-            });
+        if (isTransferTransaction(currentTransaction)) {
+            throw new TransactionRuleError(
+                400,
+                "Transfer transactions must be recreated from the wallet transfer flow",
+            );
         }
 
-        // Kiểm tra ví mới (nếu có thay đổi)
-        let newWallet = oldWallet;
-        if (walletId && walletId !== currentTransaction.walletId.toString()) {
-            const foundWallet = await Wallet.findOne({
-                _id: walletId,
-                userId,
-            }).session(session);
-            if (!foundWallet) {
-                await session.abortTransaction();
-                return res.status(404).json({
-                    success: false,
-                    message: "Không tìm thấy ví mới",
-                });
-            }
-            newWallet = foundWallet as any; // Type assertion since we've already checked it's not null
+        if (!supportsManualTransactionEditing(currentTransaction.type)) {
+            throw new TransactionRuleError(
+                400,
+                "This transaction type cannot be edited from this screen",
+            );
         }
 
-        // Hoàn tác số dư từ ví cũ
-        if (currentTransaction.type === TransactionType.INCOME) {
-            oldWallet.balance =
-                Number(oldWallet.balance) - Number(currentTransaction.amount);
-        } else {
-            oldWallet.balance =
-                Number(oldWallet.balance) + Number(currentTransaction.amount);
+        const currentStatus =
+            currentTransaction.status || TransactionStatus.COMPLETED;
+
+        const nextType =
+            req.body.type !== undefined
+                ? normalizeTransactionType(req.body.type)
+                : currentTransaction.type;
+        if (!supportsManualTransactionEditing(nextType)) {
+            throw new TransactionRuleError(
+                400,
+                "This transaction type cannot be edited from this screen",
+            );
         }
 
-        // Cập nhật số dư cho ví mới
-        if (type === TransactionType.INCOME) {
-            newWallet.balance = Number(newWallet.balance) + Number(amount);
-        } else {
-            // Kiểm tra số dư nếu là giao dịch chi tiêu
-            if (newWallet.balance < amount) {
-                await session.abortTransaction();
-                return res.status(400).json({
-                    success: false,
-                    message: "Số dư không đủ",
-                });
-            }
-            newWallet.balance = Number(newWallet.balance) - Number(amount);
-        }
-
-        // Cập nhật giao dịch
-        const updatedTransaction = await Transaction.findByIdAndUpdate(
-            id,
-            {
-                walletId: walletId || currentTransaction.walletId,
-                type: type || currentTransaction.type,
-                amount: amount || currentTransaction.amount,
-                category: category || currentTransaction.category,
-                date: date || currentTransaction.date,
-                note: note !== undefined ? note : currentTransaction.note,
-            },
-            { new: true, session },
+        const nextAmount =
+            req.body.amount !== undefined
+                ? parseWholeMoneyAmount(req.body.amount)
+                : Number(currentTransaction.amount);
+        const nextStatus =
+            req.body.status !== undefined
+                ? normalizeTransactionStatus(req.body.status)
+                : currentStatus;
+        const nextDate = ensureTransactionDateAllowed(
+            req.body.date !== undefined
+                ? parseTransactionDateInput(req.body.date)
+                : new Date(currentTransaction.date),
+            nextStatus,
+            Boolean(currentTransaction.isSystemGenerated),
         );
+        const providedNextCategory =
+            req.body.category !== undefined
+                ? parseOptionalCategory(req.body.category)
+                : parseOptionalCategory(currentTransaction.category);
+        const nextNote =
+            req.body.note !== undefined
+                ? normalizeOptionalNote(req.body.note)
+                : currentTransaction.note;
+        const nextBudgetId =
+            req.body.budgetId !== undefined
+                ? req.body.budgetId || undefined
+                : currentTransaction.budgetId;
 
-        if (!updatedTransaction) {
-            await session.abortTransaction();
-            return res.status(404).json({
-                success: false,
-                message: "Không thể cập nhật giao dịch",
+        if (nextBudgetId && nextType !== TransactionType.EXPENSE) {
+            throw new TransactionRuleError(
+                400,
+                "Budgets can only be linked to expense transactions",
+            );
+        }
+
+        const oldWallet = await loadWalletForUser(
+            currentTransaction.walletId,
+            userId,
+            session,
+        );
+        const nextWallet =
+            req.body.walletId &&
+            String(req.body.walletId) !== String(currentTransaction.walletId)
+                ? await loadWalletForUser(req.body.walletId, userId, session)
+                : oldWallet;
+        const walletChanged = String(oldWallet._id) !== String(nextWallet._id);
+        let nextCategory = providedNextCategory;
+
+        if (nextBudgetId) {
+            const nextBudget = await loadBudgetForUser(
+                nextBudgetId,
+                userId,
+                session,
+            );
+            nextCategory = resolveBudgetCategoryForWallet({
+                budget: nextBudget,
+                walletId: nextWallet._id,
+                providedCategory: providedNextCategory,
+            });
+            assertBudgetMatchesTransactionDate({
+                budget: nextBudget,
+                transactionDate: nextDate,
+            });
+        } else {
+            nextCategory = parseCategory(providedNextCategory);
+        }
+
+        ensureTransferCategoryNotUsed(nextCategory);
+
+        revertTransactionLedgerEffects({
+            transactionType: currentTransaction.type,
+            transactionStatus: currentStatus,
+            amount: Number(currentTransaction.amount),
+            wallet: oldWallet,
+        });
+
+        if (
+            nextType === TransactionType.EXPENSE &&
+            nextBudgetId &&
+            transactionTouchesLedger(nextStatus)
+        ) {
+            await assertBudgetCapacity({
+                budgetId: nextBudgetId,
+                userId,
+                amount: nextAmount,
+                transactionDate: nextDate,
+                excludedTransactionId: new Types.ObjectId(String(currentTransaction._id)),
+                session,
             });
         }
 
-        // Lưu các thay đổi
-        const savePromises: Promise<any>[] = [oldWallet.save({ session })];
+        applyTransactionLedgerEffects({
+            transactionType: nextType,
+            transactionStatus: nextStatus,
+            amount: nextAmount,
+            wallet: nextWallet,
+        });
 
-        if (walletId !== currentTransaction.walletId.toString()) {
-            savePromises.push(newWallet.save({ session }));
+        currentTransaction.walletId = nextWallet._id as any;
+        currentTransaction.type = nextType;
+        currentTransaction.status = nextStatus;
+        currentTransaction.amount = nextAmount;
+        currentTransaction.category = nextCategory;
+        currentTransaction.date = nextDate;
+        currentTransaction.note = nextNote;
+        currentTransaction.budgetId = nextBudgetId as any;
+
+        nextWallet.hasTransactions = true;
+
+        await currentTransaction.save({ session });
+        await oldWallet.save({ session });
+        if (walletChanged) {
+            await nextWallet.save({ session });
         }
 
-        savePromises.push(updatedTransaction.save({ session }));
-        await Promise.all(savePromises);
+        if (walletChanged) {
+            await syncWalletTransactionFlag(oldWallet, userId, session);
+        }
 
         await touchTransactionCacheState(userId, req.user, session);
         await session.commitTransaction();
 
-        res.json({
+        return res.json({
             success: true,
-            data: updatedTransaction,
-            message: "Cập nhật giao dịch thành công",
+            data: currentTransaction,
+            message: "Transaction updated successfully",
         });
     } catch (error) {
         await session.abortTransaction();
-        const errorMessage =
-            error instanceof Error
-                ? error.message
-                : "Đã xảy ra lỗi không xác định";
-        res.status(500).json({
-            message: "Lỗi khi cập nhật giao dịch",
-            error: errorMessage,
-        });
+        return handleControllerError(res, error, "Failed to update transaction");
     } finally {
         session.endSession();
     }
 };
 
-/**
- * Xóa một giao dịch
- */
 export const deleteTransaction = async (req: any, res: Response) => {
     const session = await Transaction.startSession();
     session.startTransaction();
@@ -631,65 +1119,120 @@ export const deleteTransaction = async (req: any, res: Response) => {
     try {
         const { id } = req.params;
         const userId = req.user.uid;
-
-        // Tìm giao dịch cần xóa
         const transaction = await Transaction.findOne({
             _id: new Types.ObjectId(id),
             userId,
         }).session(session);
 
         if (!transaction) {
-            console.error(
-                `[DeleteTransaction] 404 Not Found: TransactionID=${id}, UserUID=${userId}`,
-            );
-            await session.abortTransaction();
-            return res.status(404).json({
-                success: false,
-                message:
-                    "Không tìm thấy giao dịch để xóa hoặc bạn không có quyền",
-                debug: { id, userId }, // Giúp debug cho user trong lúc phát triển
-            });
+            throw new TransactionRuleError(404, "Transaction not found");
         }
 
-        // Tìm và cập nhật số dư ví
-        const wallet = await Wallet.findById(transaction.walletId).session(
+        const linkedTransactions = await getTransferCandidates(
+            transaction as any,
             session,
         );
+        const uniqueTransactions = linkedTransactions.filter(
+            (candidate, index, items) =>
+                items.findIndex(
+                    (item) => String(item._id) === String(candidate._id),
+                ) === index,
+        );
 
-        if (wallet) {
-            // Hoàn tác số dư nếu ví tồn tại
-            if (transaction.type === TransactionType.INCOME) {
-                wallet.balance =
-                    Number(wallet.balance) - Number(transaction.amount);
-            } else {
-                wallet.balance =
-                    Number(wallet.balance) + Number(transaction.amount);
+        const walletIds = [
+            ...new Set(uniqueTransactions.map((entry) => String(entry.walletId))),
+        ];
+        const wallets = await Wallet.find({
+            _id: { $in: walletIds.map((walletId) => new Types.ObjectId(walletId)) },
+            userId,
+        }).session(session);
+        const walletMap = new Map(
+            wallets.map((wallet) => [String(wallet._id), wallet]),
+        );
+        const goalMap = new Map<string, any>();
+
+        for (const entry of uniqueTransactions) {
+            if (entry.type === TransactionType.ADJUSTMENT) {
+                throw new TransactionRuleError(
+                    400,
+                    "Adjustment transactions cannot be deleted safely",
+                );
             }
+
+            const wallet = walletMap.get(String(entry.walletId));
+            if (!wallet) {
+                throw new TransactionRuleError(404, "Wallet not found");
+            }
+
+            applyWalletDelta(
+                wallet,
+                -getWalletDeltaForTransaction(entry.type, Number(entry.amount)),
+                "Wallet does not have enough balance to reverse this transaction",
+            );
+
+            if (
+                entry.goalId &&
+                (entry.type === TransactionType.GOAL_DEPOSIT ||
+                    entry.type === TransactionType.GOAL_WITHDRAW)
+            ) {
+                const goalKey = String(entry.goalId);
+                let goal = goalMap.get(goalKey);
+                if (!goal) {
+                    goal = await loadGoalForUser(goalKey, userId, session);
+                    goalMap.set(goalKey, goal);
+                }
+
+                if (entry.type === TransactionType.GOAL_DEPOSIT) {
+                    goal.currentAmount = Math.max(
+                        Number(goal.currentAmount || 0) - Number(entry.amount),
+                        0,
+                    );
+                } else {
+                    goal.currentAmount =
+                        Number(goal.currentAmount || 0) + Number(entry.amount);
+                }
+
+                syncGoalStatus(goal);
+            }
+        }
+
+        for (const wallet of wallets) {
             await wallet.save({ session });
         }
 
-        // Xóa giao dịch
-        await Transaction.deleteOne({ _id: id }).session(session);
+        for (const goal of Array.from(goalMap.values())) {
+            await goal.save({ session });
+        }
+
+        await Transaction.deleteMany({
+            _id: {
+                $in: uniqueTransactions.map(
+                    (entry) => new Types.ObjectId(String(entry._id)),
+                ),
+            },
+        }).session(session);
+
+        for (const wallet of wallets) {
+            await syncWalletTransactionFlag(wallet, userId, session);
+        }
 
         await touchTransactionCacheState(userId, req.user, session);
         await session.commitTransaction();
 
-        res.json({
+        return res.json({
             success: true,
-            message: "Xóa giao dịch thành công",
-            data: { id: transaction._id },
+            message:
+                uniqueTransactions.length > 1
+                    ? "Transfer deleted successfully"
+                    : "Transaction deleted successfully",
+            data: {
+                id: transaction._id,
+                deletedCount: uniqueTransactions.length,
+            },
         });
     } catch (error) {
         await session.abortTransaction();
-        const errorMessage =
-            error instanceof Error
-                ? error.message
-                : "Đã xảy ra lỗi không xác định";
-        res.status(500).json({
-            success: false,
-            message: "Lỗi khi xóa giao dịch",
-            error: errorMessage,
-        });
+        return handleControllerError(res, error, "Failed to delete transaction");
     } finally {
         session.endSession();
     }

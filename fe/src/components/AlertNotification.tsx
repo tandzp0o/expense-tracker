@@ -1,5 +1,5 @@
 import React from "react";
-import { ConfirmDialog } from "./ui/confirm-dialog";
+import { ConfirmDialog } from "./ui/dialog";
 
 interface AlertNotificationProps {
     visible: boolean;

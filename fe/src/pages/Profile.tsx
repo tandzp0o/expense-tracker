@@ -311,22 +311,28 @@ const Profile: React.FC = () => {
             ? "Một vài giao dịch mới nhất để bạn theo dõi nhanh."
             : "A few of your latest transactions for quick review.",
     };
+    const loginEmailNote = isVietnamese
+        ? "Email này được dùng để đăng nhập."
+        : "This email is used for sign-in.";
+    const displayNameHint = isVietnamese
+        ? "Tên hiển thị chỉ dùng trong ứng dụng, không ảnh hưởng email đăng nhập."
+        : "Display name is only shown in the app and does not affect sign-in email.";
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
             <PageHeader
                 description={copy.description}
                 title={copy.title}
             />
 
-            <div className="grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
+            <div className="grid gap-4 sm:gap-6 xl:grid-cols-[0.9fr,1.1fr]">
                 <Card className="overflow-hidden">
                     <div className="h-28 bg-[linear-gradient(135deg,var(--app-primary-soft-strong),rgba(15,23,42,0.85))]" />
-                    <CardContent className="-mt-12 space-y-6 p-6">
+                    <CardContent className="-mt-10 space-y-4 p-4 sm:-mt-12 sm:space-y-6 sm:p-6">
                         <div className="flex items-end gap-4">
                             <Avatar
                                 alt={profile.displayName}
-                                className="h-24 w-24 border-4 border-card text-xl"
+                                className="h-20 w-20 border-4 border-card text-xl sm:h-24 sm:w-24"
                                 fallback={profile.displayName}
                                 src={
                                     profile.avatar?.startsWith("/")
@@ -372,6 +378,9 @@ const Profile: React.FC = () => {
                                 <div>
                                     <p className="font-medium">{copy.email}</p>
                                     <p className="text-muted-foreground">{profile.email}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {loginEmailNote}
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-start gap-3">
@@ -405,13 +414,15 @@ const Profile: React.FC = () => {
                     </CardContent>
                 </Card>
 
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                     <div className="metric-card-grid">
                         <MetricCard
                             icon={CalendarDays}
                             subtitle={`${stats?.growth || 0}% ${copy.vsPreviousMonth}`}
                             title={copy.totalBalance}
-                            value={formatCurrency(stats?.totalBalance || profile.totalBalance)}
+                            value={formatCurrency(stats?.totalBalance || profile.totalBalance, "VND", {
+                                displayMode: "full",
+                            })}
                         />
                         <MetricCard
                             icon={CalendarDays}
@@ -456,6 +467,9 @@ const Profile: React.FC = () => {
                                             }
                                             value={formValues.displayName}
                                         />
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                            {displayNameHint}
+                                        </p>
                                     </div>
                                     <div>
                                         <label className="mb-2 block text-sm font-medium">
@@ -546,7 +560,7 @@ const Profile: React.FC = () => {
                                             {recentTransactions.map((transaction) => (
                                                 <div
                                                     key={transaction._id}
-                                                    className="flex items-center justify-between rounded-[var(--app-radius-lg)] border border-border px-4 py-3"
+                                                    className="flex items-center justify-between rounded-[var(--app-radius-lg)] border border-border px-3 py-2.5 sm:px-4 sm:py-3"
                                                 >
                                                     <div>
                                                         <p className="font-medium">

@@ -48,7 +48,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
     useEffect(() => {
         const syncScrollState = () => {
-            setIsScrolled(window.scrollY > 16);
+            setIsScrolled(window.scrollY > 56);
         };
 
         syncScrollState();

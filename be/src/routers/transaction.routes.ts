@@ -2,6 +2,7 @@ import express from 'express';
 import { verifyFirebaseToken } from '../middleware/auth';
 import { 
   createTransaction, 
+  createInternalTransfer,
   getTransactions,
   getTransactionById,
   updateTransaction,
@@ -40,6 +41,7 @@ router.get('/statement-report', verifyFirebaseToken, getStatementReport);
  * @access  Private
  */
 router.post('/', verifyFirebaseToken, createTransaction);
+router.post('/transfer', verifyFirebaseToken, createInternalTransfer);
 
 /**
  * @route   GET /api/transactions/:id

@@ -246,8 +246,19 @@ export const updateWallet = [
             }
 
             // Balance update (không qua initialBalance logic)
-            if (balance !== undefined) {
-                wallet.balance = Number(balance);
+            if (
+                balance !== undefined &&
+                Number(balance) !== Number(wallet.balance)
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Current wallet balance cannot be edited directly. Create a transaction or adjustment instead.",
+                    requiresAdjustment: true,
+                    walletId: wallet._id,
+                    currentBalance: wallet.balance,
+                    targetBalance: Number(balance),
+                });
             }
 
             await wallet.save();

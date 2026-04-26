@@ -1,19 +1,19 @@
-# AlertNotification Component
+# Thành phần `AlertNotification`
 
 ## Mô tả
 
-Component `AlertNotification` dùng để hiển thị thông báo xác nhận khi người dùng muốn cập nhật hoặc xóa các entity quan trọng như ví, giao dịch, ngân sách và mục tiêu.
+Thành phần `AlertNotification` dùng để hiển thị thông báo xác nhận khi người dùng muốn cập nhật hoặc xóa các thực thể quan trọng như ví, giao dịch, ngân sách và mục tiêu.
 
-## Props
+## Thuộc tính
 
-- `visible`: boolean - Hiển thị/ẩn modal
-- `onConfirm`: () => void - Callback khi người dùng xác nhận
-- `onCancel`: () => void - Callback khi người dùng hủy
+- `visible`: boolean - Hiển thị hoặc ẩn modal
+- `onConfirm`: () => void - Hàm gọi lại khi người dùng xác nhận
+- `onCancel`: () => void - Hàm gọi lại khi người dùng hủy
 - `title`: string - Tiêu đề thông báo
 - `content`: string - Nội dung chi tiết
-- `confirmText`: string - Text nút xác nhận (mặc định: "Xác nhận")
-- `cancelText`: string - Text nút hủy (Mặc định: "Hủy")
-- `type`: "warning" | "error" - Loại thông báo (Mặc định: "warning")
+- `confirmText`: string - Nhãn nút xác nhận, mặc định là `"Xác nhận"`
+- `cancelText`: string - Nhãn nút hủy, mặc định là `"Hủy"`
+- `type`: "warning" | "error" - Loại thông báo, mặc định là `"warning"`
 
 ## Cách sử dụng
 
@@ -66,12 +66,12 @@ const confirmDelete = async () => {
 
 - ✅ `Wallets_new.tsx` - Xác nhận xóa ví
 - ✅ `Budgets_new.tsx` - Xác nhận xóa ngân sách
-- ✅ `Transactions_new.tsx` - Cần cập nhật để sử dụng component mới
-- ⏸ `Goals_new.tsx` - Cần cập nhật (có lỗi state khác biệt)
+- ✅ `Transactions_new.tsx` - Cần cập nhật để dùng thành phần mới
+- ⏸ `Goals_new.tsx` - Cần cập nhật thêm do khác biệt state
 
 ## Lợi ích
 
-- UI đồng nhất cho tất cả thông báo xác nhận
-- Tùy chỉnh màu sắc (warning/error)
-- Tiếng Việt đầy đủ
-- Dễ dàng tùy chỉnh nội dung
+- UI thống nhất cho mọi thông báo xác nhận
+- Có thể tùy chỉnh màu sắc theo mức độ cảnh báo
+- Nội dung tiếng Việt đầy đủ
+- Dễ điều chỉnh lại nội dung theo từng ngữ cảnh

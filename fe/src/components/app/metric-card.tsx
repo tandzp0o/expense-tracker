@@ -34,7 +34,7 @@ export const MetricCard: React.FC<{
                     </p>
                     {subtitle ? (
                         <p
-                            className="text-[10px] leading-4 text-muted-foreground sm:text-[11px]"
+                            className="hidden text-[10px] leading-4 text-muted-foreground lg:block lg:text-[11px]"
                             style={oneLineClampStyle}
                             title={subtitle}
                         >

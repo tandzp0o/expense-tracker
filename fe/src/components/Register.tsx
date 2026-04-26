@@ -2,13 +2,13 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
-import { useTheme } from "../contexts/ThemeContext";
+import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
 import { useToast } from "../contexts/ToastContext";
 import { hexToRgba } from "../lib/utils";
 import { Spinner } from "./ui/spinner";
 import AuthShell from "./auth/AuthShell";
 
-const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{1,28}[a-z0-9]$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const Register: React.FC = () => {
     const navigate = useNavigate();
@@ -17,7 +17,6 @@ const Register: React.FC = () => {
     const { appearance } = useTheme();
     const { toast } = useToast();
     const [formValues, setFormValues] = useState({
-        username: "",
         email: "",
         password: "",
         confirmPassword: "",
@@ -30,58 +29,57 @@ const Register: React.FC = () => {
             isVietnamese
                 ? {
                       tagline: "Digital Atelier of Wealth",
-                      title: "Tạo tài khoản mới",
+                      title: "Tao tai khoan moi",
                       description:
-                          "Chọn username để đăng nhập như tandzp0o, sau đó bạn có thể bổ sung tên hiển thị và thông tin cá nhân trong hồ sơ.",
-                      username: "Username",
-                      usernamePlaceholder: "ví dụ: tandzp0o",
-                      usernameHint:
-                          "Dùng 3-30 ký tự gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang.",
+                          "Dang ky bang email va mat khau. He thong se tu tao username noi bo tu email cua ban.",
                       email: "Email",
                       emailPlaceholder: "you@example.com",
-                      password: "Mật khẩu",
-                      passwordPlaceholder: "Tối thiểu 6 ký tự",
-                      confirmPassword: "Nhập lại mật khẩu",
-                      confirmPasswordPlaceholder: "Nhập lại mật khẩu",
-                      register: "Đăng ký",
-                      registering: "Đang tạo tài khoản...",
-                      divider: "Hoặc",
-                      continueWithGoogle: "Đăng ký với Google",
+                      emailHint:
+                          "Email nay se duoc dung de dang nhap. Ten hien thi co the doi sau trong ho so.",
+                      password: "Mat khau",
+                      passwordPlaceholder: "Toi thieu 6 ky tu",
+                      confirmPassword: "Nhap lai mat khau",
+                      confirmPasswordPlaceholder: "Nhap lai mat khau",
+                      invalidEmail: "Vui long nhap email hop le.",
+                      register: "Dang ky",
+                      registering: "Dang tao tai khoan...",
+                      divider: "Hoac",
+                      continueWithGoogle: "Dang ky voi Google",
                       googleHelper:
-                          "Nếu bạn muốn, bạn vẫn có thể bắt đầu nhanh bằng Google.",
-                      bottomNote: "Đã có tài khoản?",
-                      bottomAction: "Đăng nhập",
+                          "Neu muon, ban van co the bat dau nhanh bang Google.",
+                      bottomNote: "Da co tai khoan?",
+                      bottomAction: "Dang nhap",
                       footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
                       footerLinks: [
-                          "Chính sách",
-                          "Điều khoản",
-                          "Bảo mật",
-                          "Liên hệ",
+                          "Chinh sach",
+                          "Dieu khoan",
+                          "Bao mat",
+                          "Lien he",
                       ],
-                      registerErrorTitle: "Đăng ký thất bại",
-                      registerSuccessTitle: "Tạo tài khoản thành công",
+                      registerErrorTitle: "Dang ky that bai",
+                      registerSuccessTitle: "Tao tai khoan thanh cong",
                       registerSuccessDescription:
-                          "Tài khoản đã sẵn sàng. Bạn sẽ được chuyển vào ứng dụng.",
-                      googleError: "Không thể xác thực với Google. Vui lòng thử lại.",
-                      infoTitle: "Thông tin đang cập nhật",
+                          "Tai khoan da san sang. Ban se duoc chuyen vao ung dung.",
+                      googleError:
+                          "Khong the xac thuc voi Google. Vui long thu lai.",
+                      infoTitle: "Thong tin dang cap nhat",
                       infoDescription:
-                          "Mục này chưa có hành động riêng trong giao diện hiện tại.",
+                          "Muc nay chua co hanh dong rieng trong giao dien hien tai.",
                   }
                 : {
                       tagline: "Digital Atelier of Wealth",
                       title: "Create a new account",
                       description:
-                          "Choose a username such as tandzp0o for sign-in, then complete your display name and profile details later.",
-                      username: "Username",
-                      usernamePlaceholder: "for example: tandzp0o",
-                      usernameHint:
-                          "Use 3-30 characters with letters, numbers, dot, underscore, or hyphen.",
+                          "Sign up with your email and password. The app will generate an internal username from your email automatically.",
                       email: "Email",
                       emailPlaceholder: "you@example.com",
+                      emailHint:
+                          "This email will be used for sign-in. You can change your display name later in profile.",
                       password: "Password",
                       passwordPlaceholder: "At least 6 characters",
                       confirmPassword: "Confirm password",
                       confirmPasswordPlaceholder: "Enter password again",
+                      invalidEmail: "Please enter a valid email address.",
                       register: "Register",
                       registering: "Creating account...",
                       divider: "Or",
@@ -110,33 +108,33 @@ const Register: React.FC = () => {
         [isVietnamese],
     );
 
-    const primaryBorder = hexToRgba(appearance.primaryColor, 0.28);
-    const buttonGradient = `linear-gradient(135deg, ${appearance.primaryColor} 0%, rgba(5, 12, 28, 0.96) 100%)`;
+    const themeColors = getAppearanceGradientColors(appearance);
+    const primaryBorder = hexToRgba(themeColors.primary, 0.28);
+    const buttonGradient = `linear-gradient(135deg, ${themeColors.primary} 0%, ${themeColors.secondary} 52%, rgba(5, 12, 28, 0.96) 100%)`;
     const isBusy = submitting || googleLoading || loading;
 
     const validateForm = () => {
-        const username = formValues.username.trim().toLowerCase();
         const email = formValues.email.trim();
 
-        if (!username || !email || !formValues.password || !formValues.confirmPassword) {
+        if (!email || !formValues.password || !formValues.confirmPassword) {
             return isVietnamese
-                ? "Vui lòng nhập đầy đủ username, email và mật khẩu."
-                : "Please fill in your username, email, and password.";
+                ? "Vui long nhap day du email va mat khau."
+                : "Please fill in your email and password.";
         }
 
-        if (!USERNAME_PATTERN.test(username)) {
-            return copy.usernameHint;
+        if (!EMAIL_PATTERN.test(email)) {
+            return copy.invalidEmail;
         }
 
         if (formValues.password.length < 6) {
             return isVietnamese
-                ? "Mật khẩu phải có ít nhất 6 ký tự."
+                ? "Mat khau phai co it nhat 6 ky tu."
                 : "Password must contain at least 6 characters.";
         }
 
         if (formValues.password !== formValues.confirmPassword) {
             return isVietnamese
-                ? "Mật khẩu nhập lại không khớp."
+                ? "Mat khau nhap lai khong khop."
                 : "Password confirmation does not match.";
         }
 
@@ -161,7 +159,6 @@ const Register: React.FC = () => {
             await registerWithEmail({
                 email: formValues.email.trim(),
                 password: formValues.password,
-                username: formValues.username.trim().toLowerCase(),
             });
 
             toast({
@@ -176,7 +173,7 @@ const Register: React.FC = () => {
                 description:
                     error.message ||
                     (isVietnamese
-                        ? "Không thể tạo tài khoản. Vui lòng thử lại."
+                        ? "Khong the tao tai khoan. Vui long thu lai."
                         : "Could not create your account. Please try again."),
                 variant: "destructive",
             });
@@ -223,37 +220,11 @@ const Register: React.FC = () => {
             <form className="space-y-6" onSubmit={handleSubmit}>
                 <div className="space-y-2">
                     <label className="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300/85">
-                        {copy.username}
-                    </label>
-                    <div className="group relative">
-                        <input
-                            autoCapitalize="none"
-                            autoComplete="username"
-                            className="w-full rounded-t-xl border-b border-white/10 bg-white/[0.045] px-4 py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
-                            onChange={(event) =>
-                                setFormValues((current) => ({
-                                    ...current,
-                                    username: event.target.value.toLowerCase(),
-                                }))
-                            }
-                            placeholder={copy.usernamePlaceholder}
-                            type="text"
-                            value={formValues.username}
-                        />
-                        <div
-                            className="absolute bottom-0 left-0 h-[2px] w-0 transition-all duration-700 ease-in-out group-focus-within:w-full"
-                            style={{ backgroundColor: appearance.primaryColor }}
-                        />
-                    </div>
-                    <p className="px-1 text-xs text-slate-400">{copy.usernameHint}</p>
-                </div>
-
-                <div className="space-y-2">
-                    <label className="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300/85">
                         {copy.email}
                     </label>
                     <div className="group relative">
                         <input
+                            autoCapitalize="none"
                             autoComplete="email"
                             className="w-full rounded-t-xl border-b border-white/10 bg-white/[0.045] px-4 py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                             onChange={(event) =>
@@ -271,6 +242,7 @@ const Register: React.FC = () => {
                             style={{ backgroundColor: appearance.primaryColor }}
                         />
                     </div>
+                    <p className="px-1 text-xs text-slate-400">{copy.emailHint}</p>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">

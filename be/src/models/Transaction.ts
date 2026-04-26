@@ -8,12 +8,23 @@ export enum TransactionType {
     ADJUSTMENT = "ADJUSTMENT",
 }
 
+export enum TransactionStatus {
+    SCHEDULED = "SCHEDULED",
+    PENDING = "PENDING",
+    COMPLETED = "COMPLETED",
+    FAILED = "FAILED",
+    CANCELLED = "CANCELLED",
+}
+
 export interface ITransaction extends Document {
     userId: string;
     walletId: string;
+    transferPeerWalletId?: string;
+    transferGroupId?: string;
     budgetId?: string;
     goalId?: string;
     type: TransactionType;
+    status: TransactionStatus;
     amount: number;
     category: string;
     date: Date;
@@ -26,12 +37,21 @@ export interface ITransaction extends Document {
 const TransactionSchema: Schema = new Schema({
     userId: { type: String, required: true, index: true },
     walletId: { type: Schema.Types.ObjectId, ref: "Wallet", required: true },
+    transferPeerWalletId: { type: Schema.Types.ObjectId, ref: "Wallet" },
+    transferGroupId: { type: String, index: true },
     budgetId: { type: Schema.Types.ObjectId, ref: "Budget" },
     goalId: { type: Schema.Types.ObjectId, ref: "Goal" },
     type: {
         type: String,
         enum: Object.values(TransactionType),
         required: true,
+    },
+    status: {
+        type: String,
+        enum: Object.values(TransactionStatus),
+        default: TransactionStatus.COMPLETED,
+        required: true,
+        index: true,
     },
     amount: { type: Number, required: true, min: 0 },
     isSystemGenerated: { type: Boolean, default: false },
@@ -44,7 +64,9 @@ const TransactionSchema: Schema = new Schema({
 
 TransactionSchema.index({ userId: 1, date: -1, createdAt: -1 });
 TransactionSchema.index({ userId: 1, walletId: 1, date: -1, createdAt: -1 });
+TransactionSchema.index({ userId: 1, transferGroupId: 1 });
 TransactionSchema.index({ userId: 1, type: 1, date: -1, createdAt: -1 });
+TransactionSchema.index({ userId: 1, status: 1, date: -1, createdAt: -1 });
 TransactionSchema.index({ userId: 1, category: 1, date: -1, createdAt: -1 });
 
 export default mongoose.model<ITransaction>("Transaction", TransactionSchema);

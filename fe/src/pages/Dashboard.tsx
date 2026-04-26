@@ -7,6 +7,8 @@ import {
   ArrowUpRight,
   Briefcase,
   Car,
+  ChartPie,
+  ChevronRight,
   CreditCard,
   Download,
   HeartPulse,
@@ -14,18 +16,19 @@ import {
   Landmark,
     Plus,
   ShoppingBag,
+  Sparkles,
   Target,
   Trash2,
   TrendingUp,
   Wallet,
 } from "lucide-react";
 import { auth } from "../firebase/config";
-import { goalApi, transactionApi, walletApi } from "../services/api";
+import { budgetApi, goalApi, transactionApi, walletApi } from "../services/api";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
-import { useTheme } from "../contexts/ThemeContext";
+import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
 import { cn, hexToRgba } from "../lib/utils";
 import { PageHeader } from "../components/app/page-header";
 import {
@@ -38,9 +41,9 @@ import {
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Spinner } from "../components/ui/spinner";
-import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Progress } from "../components/ui/progress";
 import { Select } from "../components/ui/select";
+import { ConfirmDialog } from "../components/ui/dialog";
 import BarChart from "../components/charts/BarChart";
 import LineChart from "../components/charts/LineChart";
 import PieChart from "../components/charts/PieChart";
@@ -48,10 +51,12 @@ import PieChart from "../components/charts/PieChart";
 interface Transaction {
   _id: string;
   type: string;
+  status?: "SCHEDULED" | "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
   amount: number | string;
   category: string;
   date: string;
   note?: string;
+  transferGroupId?: string;
   walletId?:
     | string
     | {
@@ -68,6 +73,32 @@ interface WalletItem {
   type?: string;
   color?: string;
   currency?: string;
+  accountNumber?: string;
+  imageUrl?: string;
+}
+
+interface WalletBudgetItem {
+  _id: string;
+  walletId: string;
+  walletName: string;
+  category: string;
+  amount: number;
+  spent: number;
+  remaining: number;
+  color?: string;
+}
+
+interface WalletBudgetSummaryItem {
+  walletId: string;
+  totalBudget: number;
+  totalSpent: number;
+  totalRemaining: number;
+  overspent: number;
+  items: WalletBudgetItem[];
+}
+
+interface WalletBudgetSummaryResponse {
+  walletSummaries: WalletBudgetSummaryItem[];
 }
 
 interface GoalItem {
@@ -90,13 +121,6 @@ const PERIOD_MONTHS: Record<PeriodFilter, number> = {
   "12m": 12,
 };
 
-const WALLET_GRADIENTS = [
-  "linear-gradient(135deg, #10b981 0%, #047857 100%)",
-  "linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%)",
-  "linear-gradient(135deg, #8b5cf6 0%, #4338ca 100%)",
-  "linear-gradient(135deg, #fb923c 0%, #e11d48 100%)",
-];
-
 const PIE_FALLBACK_COLORS = [
   "#f59e0b",
   "#06b6d4",
@@ -104,6 +128,15 @@ const PIE_FALLBACK_COLORS = [
   "#ef4444",
   "#14b8a6",
   "#3b82f6",
+];
+
+const BUDGET_SEGMENT_COLORS = [
+  "#22c55e",
+  "#f59e0b",
+  "#06b6d4",
+  "#ec4899",
+  "#8b5cf6",
+  "#ef4444",
 ];
 
 const parseAmount = (raw: unknown) => {
@@ -136,6 +169,24 @@ const getChartRadius = (preset: "compact" | "balanced" | "rounded") => {
   }
 };
 
+const buildSparklinePath = (values: number[]) => {
+  if (values.length === 0) {
+    return "";
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, 1);
+
+  return values
+    .map((value, index) => {
+      const x = values.length === 1 ? 50 : (index / (values.length - 1)) * 100;
+      const y = 40 - ((value - min) / range) * 32;
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+};
+
 const getWalletId = (walletId: Transaction["walletId"]) => {
   if (typeof walletId === "string") return walletId;
   return walletId?._id || "";
@@ -149,8 +200,25 @@ const getWalletName = (walletId: Transaction["walletId"], fallback: string) => {
   return walletId?.name || fallback;
 };
 
+const getTransactionStatus = (transaction: Pick<Transaction, "status">) =>
+  transaction.status || "COMPLETED";
+
+const isTransferTransaction = (
+  transaction: Pick<Transaction, "category" | "transferGroupId">,
+) => transaction.category === "Transfer" || Boolean(transaction.transferGroupId);
+
 const isCashflowTransaction = (transaction: Transaction) =>
-  transaction.type === "INCOME" || transaction.type === "EXPENSE";
+  (transaction.type === "INCOME" || transaction.type === "EXPENSE") &&
+  getTransactionStatus(transaction) === "COMPLETED" &&
+  !isTransferTransaction(transaction);
+
+const transactionStatusText = {
+  COMPLETED: { vi: "Đã ghi nhận", en: "Completed" },
+  SCHEDULED: { vi: "Đã lên lịch", en: "Scheduled" },
+  PENDING: { vi: "Đang chờ", en: "Pending" },
+  FAILED: { vi: "Thất bại", en: "Failed" },
+  CANCELLED: { vi: "Đã hủy", en: "Cancelled" },
+} as const;
 
 const sumByType = (transactions: Transaction[], type: "INCOME" | "EXPENSE") =>
   transactions
@@ -318,6 +386,8 @@ const Dashboard: React.FC = () => {
   const [wallets, setWallets] = useState<WalletItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<GoalItem[]>([]);
+  const [budgetSummary, setBudgetSummary] =
+    useState<WalletBudgetSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("6m");
   const [selectedWallet, setSelectedWallet] = useState("all");
@@ -325,6 +395,7 @@ const Dashboard: React.FC = () => {
     useState<TransactionFilter>("ALL");
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [expandedWalletId, setExpandedWalletId] = useState<string | null>(null);
   const fetchRequestRef = useRef(0);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
   const [transactionPanelHeight, setTransactionPanelHeight] = useState<
@@ -391,6 +462,12 @@ const Dashboard: React.FC = () => {
             "Danh sách ví hiện tại theo dạng card để xem nhanh số dư và tỷ trọng",
           manageWallets: "Quản lý ví",
           availableBalance: "Số dư hiện tại",
+          allocation: "Phân bổ",
+          allocationDetails: "Chi tiết phân bổ",
+          backToCard: "Quay lại",
+          freeToSpend: "Có thể chi",
+          budgetReserved: "Giữ cho ngân sách",
+          noBudgetReserve: "Chưa gắn ngân sách tháng này",
           share: "Tỷ trọng",
           active: "Đang chọn",
           noWallets: "Chưa có ví nào để hiển thị.",
@@ -484,6 +561,12 @@ const Dashboard: React.FC = () => {
           "Wallet cards let you scan balances and portfolio share quickly",
         manageWallets: "Manage wallets",
         availableBalance: "Available balance",
+        allocation: "Allocation",
+        allocationDetails: "Allocation details",
+        backToCard: "Back",
+        freeToSpend: "Free to spend",
+        budgetReserved: "Reserved",
+        noBudgetReserve: "No budgets linked this month",
         share: "Share",
         active: "Active",
         noWallets: "No wallet available to display.",
@@ -584,7 +667,8 @@ const Dashboard: React.FC = () => {
         .toISOString();
       const endDate = dayjs().endOf("month").toISOString();
 
-      const [walletsRes, transactionRes, goalsRes] = await Promise.all([
+      const [walletsRes, transactionRes, goalsRes, budgetSummaryRes] =
+        await Promise.all([
         walletApi.getWallets(token),
         transactionApi.getTransactions(
           {
@@ -596,7 +680,14 @@ const Dashboard: React.FC = () => {
           token,
         ),
         goalApi.getGoals(token),
-      ]);
+        budgetApi.getBudgetSummary(
+          {
+            month: dayjs().month() + 1,
+            year: dayjs().year(),
+          },
+          token,
+        ),
+        ]);
 
       if (fetchRequestRef.current !== requestId) {
         return;
@@ -605,6 +696,7 @@ const Dashboard: React.FC = () => {
       setWallets(walletsRes?.wallets || []);
       setTransactions(transactionRes?.data?.transactions || []);
       setGoals(Array.isArray(goalsRes) ? goalsRes : goalsRes?.data || []);
+      setBudgetSummary(budgetSummaryRes || null);
     } catch (error: any) {
       if (fetchRequestRef.current !== requestId) {
         return;
@@ -632,6 +724,8 @@ const Dashboard: React.FC = () => {
     setWallets([]);
     setTransactions([]);
     setGoals([]);
+    setBudgetSummary(null);
+    setExpandedWalletId(null);
   }, [currentUser?.uid]);
 
   useEffect(() => {
@@ -729,6 +823,27 @@ const Dashboard: React.FC = () => {
     appearance.mode === "dark"
       ? "rgba(148, 163, 184, 0.14)"
       : "rgba(148, 163, 184, 0.18)";
+  const themeColors = getAppearanceGradientColors(appearance);
+  const themedSurfaceGradient =
+    appearance.mode === "dark"
+      ? `linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, ${hexToRgba(
+          themeColors.primary,
+          0.32,
+        )} 44%, ${hexToRgba(
+          themeColors.secondary,
+          0.34,
+        )} 58%, rgba(15, 23, 42, 0.92) 100%)`
+      : `linear-gradient(135deg, ${hexToRgba(
+          themeColors.primary,
+          0.18,
+        )} 0%, rgba(255, 255, 255, 0.94) 46%, ${hexToRgba(
+          themeColors.secondary,
+          0.32,
+        )} 100%)`;
+  const themedActionGradient = `linear-gradient(135deg, ${hexToRgba(
+    themeColors.primary,
+    0.96,
+  )} 0%, ${hexToRgba(themeColors.secondary, 0.78)} 54%, rgba(15, 23, 42, 0.86) 100%)`;
 
   const sharedLegend = {
     position: "bottom" as const,
@@ -820,6 +935,101 @@ const Dashboard: React.FC = () => {
     () => previousTransactions.filter(isCashflowTransaction),
     [previousTransactions],
   );
+
+  const walletScopedCashflowTransactions = useMemo(
+    () => walletScopedTransactions.filter(isCashflowTransaction),
+    [walletScopedTransactions],
+  );
+
+  const currentWeekStart = useMemo(() => {
+    const today = dayjs().startOf("day");
+    return today.subtract((today.day() + 6) % 7, "day");
+  }, []);
+
+  const weeklyExpenseBuckets = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, index) => {
+        const day = currentWeekStart.add(index, "day");
+        const value = walletScopedCashflowTransactions
+          .filter(
+            (transaction) =>
+              transaction.type === "EXPENSE" &&
+              dayjs(transaction.date).isSame(day, "day"),
+          )
+          .reduce(
+            (total, transaction) => total + parseAmount(transaction.amount),
+            0,
+          );
+
+        return {
+          label: isVietnamese
+            ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"][index]
+            : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index],
+          value,
+        };
+      }),
+    [currentWeekStart, isVietnamese, walletScopedCashflowTransactions],
+  );
+
+  const currentWeekExpense = useMemo(
+    () => weeklyExpenseBuckets.reduce((total, item) => total + item.value, 0),
+    [weeklyExpenseBuckets],
+  );
+
+  const previousWeekExpense = useMemo(() => {
+    const previousStart = currentWeekStart.subtract(7, "day");
+    const previousEnd = currentWeekStart.subtract(1, "millisecond");
+
+    return walletScopedCashflowTransactions
+      .filter((transaction) => {
+        const value = dayjs(transaction.date).valueOf();
+        return (
+          transaction.type === "EXPENSE" &&
+          value >= previousStart.valueOf() &&
+          value <= previousEnd.valueOf()
+        );
+      })
+      .reduce((total, transaction) => total + parseAmount(transaction.amount), 0);
+  }, [currentWeekStart, walletScopedCashflowTransactions]);
+
+  const monthExpenseSparkline = useMemo(() => {
+    const buckets = Array.from({ length: 5 }, () => 0);
+    const monthStart = dayjs().startOf("month");
+    const monthEnd = dayjs().endOf("month");
+
+    walletScopedCashflowTransactions
+      .filter((transaction) => {
+        const date = dayjs(transaction.date);
+        return (
+          transaction.type === "EXPENSE" &&
+          date.valueOf() >= monthStart.valueOf() &&
+          date.valueOf() <= monthEnd.valueOf()
+        );
+      })
+      .forEach((transaction) => {
+        const date = dayjs(transaction.date);
+        const bucketIndex = Math.min(Math.floor((date.date() - 1) / 7), 4);
+        buckets[bucketIndex] += parseAmount(transaction.amount);
+      });
+
+    return buckets;
+  }, [walletScopedCashflowTransactions]);
+
+  const mobileWeekMaxExpense = Math.max(
+    ...weeklyExpenseBuckets.map((item) => item.value),
+    1,
+  );
+  const weeklyExpenseChange =
+    previousWeekExpense > 0
+      ? ((previousWeekExpense - currentWeekExpense) / previousWeekExpense) * 100
+      : 0;
+  const weeklyExpenseChangeLabel =
+    previousWeekExpense > 0
+      ? `${weeklyExpenseChange >= 0 ? "↓" : "↑"} ${Math.abs(
+          weeklyExpenseChange,
+        ).toFixed(0)}%`
+      : "";
+  const mobileSparklinePath = buildSparklinePath(monthExpenseSparkline);
 
   const totalIncome = useMemo(
     () => sumByType(currentCashflowTransactions, "INCOME"),
@@ -1051,14 +1261,39 @@ const Dashboard: React.FC = () => {
             ? (parseAmount(wallet.balance) / allWalletBalance) * 100
             : 0,
         background:
-          wallet.color && wallet.color.startsWith("#")
-            ? `linear-gradient(135deg, ${wallet.color} 0%, ${hexToRgba(
-                wallet.color,
+          wallet.imageUrl
+            ? `linear-gradient(180deg, rgba(2, 6, 23, 0.14) 0%, rgba(2, 6, 23, 0.62) 72%, rgba(2, 6, 23, 0.88) 100%), url("${wallet.imageUrl}")`
+            : wallet.color && wallet.color.startsWith("#")
+              ? `linear-gradient(180deg, ${hexToRgba(
+                  wallet.color,
+                  0.72,
+                )} 0%, ${hexToRgba(wallet.color, 0.92)} 54%, rgba(2, 6, 23, 0.94) 100%)`
+            : `linear-gradient(180deg, ${hexToRgba(
+                themeColors.primary,
                 0.72,
-              )} 100%)`
-            : WALLET_GRADIENTS[index % WALLET_GRADIENTS.length],
+              )} 0%, ${hexToRgba(
+                themeColors.secondary,
+                0.9,
+              )} 58%, rgba(2, 6, 23, 0.94) 100%)`,
       })),
-    [allWalletBalance, wallets],
+    [allWalletBalance, themeColors.primary, themeColors.secondary, wallets],
+  );
+
+  const walletBudgetSummaryMap = useMemo(
+    () =>
+      new Map(
+        (budgetSummary?.walletSummaries || []).map((summary) => [
+          summary.walletId,
+          summary,
+        ]),
+      ),
+    [budgetSummary],
+  );
+
+  const getBudgetColor = useCallback(
+    (budget: WalletBudgetItem, index: number) =>
+      budget.color || BUDGET_SEGMENT_COLORS[index % BUDGET_SEGMENT_COLORS.length],
+    [],
   );
 
   const axisTick = (value: number | string) =>
@@ -1073,13 +1308,120 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="space-y-3 lg:hidden">
+        <div
+          className="overflow-hidden rounded-[calc(var(--app-radius-xl)+4px)] border border-white/70 p-4 shadow-soft dark:border-white/10"
+          style={{ backgroundImage: themedSurfaceGradient }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {copy.myBalance}
+              </p>
+              <p className="mt-2 text-[2rem] font-semibold tracking-tight text-foreground">
+                {formatCurrency(
+                  dashboardBalance,
+                  selectedWalletItem?.currency || "VND",
+                  {
+                  displayMode: "full",
+                  },
+                )}
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-primary dark:border-white/10 dark:bg-white/10">
+              <Sparkles className="h-3.5 w-3.5" />
+              {isVietnamese ? "AI đang học thói quen" : "AI learning your habits"}
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-white/50 pt-4 dark:border-white/10">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                {isVietnamese ? "Vào" : "In"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-emerald-600">
+                {formatCurrency(totalIncome)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                {isVietnamese ? "Ra" : "Out"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-rose-600">
+                {formatCurrency(totalExpense)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                {isVietnamese ? "Để dành" : "Saved"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-primary">
+                {formatCurrency(goalSummary.totalSaved)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="rounded-[var(--app-radius-xl)] border border-white/70 px-4 py-3 text-white shadow-soft dark:border-white/10"
+          style={{ backgroundImage: themedActionGradient }}
+        >
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/18">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/78">
+                {isVietnamese ? "Trợ lý AI" : "AI copilot"}
+              </p>
+              <p className="mt-1 text-sm font-semibold">
+                {netProfit >= 0
+                  ? isVietnamese
+                    ? "Tuần này bạn đang giữ nhịp chi tiêu ổn định, có thể đẩy thêm vào mục tiêu."
+                    : "Your spending rhythm is stable this week, so you can push a bit more into goals."
+                  : isVietnamese
+                    ? "Chi tiêu đang cao hơn nhịp thường lệ, AI sẽ ưu tiên nhắc các nhóm dễ cắt giảm."
+                    : "Spending is running above your usual rhythm, so AI will prioritize easier categories to trim."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden gap-2 rounded-[var(--app-radius-xl)] border border-border/70 bg-card/80 p-2 shadow-soft">
+          <Select
+            className="w-full"
+            onChange={(event) =>
+              setSelectedPeriod(event.target.value as PeriodFilter)
+            }
+            value={selectedPeriod}
+          >
+            <option value="3m">{copy.periods["3m"]}</option>
+            <option value="6m">{copy.periods["6m"]}</option>
+            <option value="12m">{copy.periods["12m"]}</option>
+          </Select>
+
+          <Select
+            className="w-full"
+            onChange={(event) => setSelectedWallet(event.target.value)}
+            value={selectedWallet}
+          >
+            <option value="all">{copy.allWallets}</option>
+            {wallets.map((wallet) => (
+              <option key={wallet._id} value={wallet._id}>
+                {wallet.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+
       <PageHeader
         actions={
           <div className="flex w-full flex-col gap-3 lg:items-end">
             <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
               <Button
-                className="h-9 whitespace-nowrap px-3 text-xs sm:text-sm"
+                className="hidden h-9 whitespace-nowrap px-3 text-xs lg:inline-flex sm:text-sm"
                 onClick={() => navigate("/analytics")}
                 variant="outline"
               >
@@ -1087,7 +1429,7 @@ const Dashboard: React.FC = () => {
                 {copy.reportButton}
               </Button>
               <Button
-                className="h-9 whitespace-nowrap px-3 text-xs sm:text-sm"
+                className="hidden h-9 whitespace-nowrap px-3 text-xs lg:inline-flex sm:text-sm"
                 onClick={() => navigate("/transactions")}
               >
                 <Plus className="h-4 w-4" />
@@ -1124,10 +1466,13 @@ const Dashboard: React.FC = () => {
           </div>
         }
         description={copy.headerDescription}
+        hideActionsOnMobile
+        hideDescriptionOnMobile
+        hideTitleOnMobile
         title={copy.headerTitle}
       />
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="hidden gap-3 lg:grid lg:grid-cols-2 xl:grid-cols-4">
         <DashboardStatCard
           description={
             selectedWallet === "all"
@@ -1139,7 +1484,13 @@ const Dashboard: React.FC = () => {
           icon={Wallet}
           iconClassName="bg-primary-soft text-primary"
           title={copy.myBalance}
-          value={formatCurrency(dashboardBalance)}
+          value={formatCurrency(
+            dashboardBalance,
+            selectedWalletItem?.currency || "VND",
+            {
+              displayMode: "full",
+            },
+          )}
         />
         <DashboardStatCard
           description={formatDeltaText(totalIncome, previousIncome)}
@@ -1179,7 +1530,87 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* chart */}
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div
+        className="overflow-hidden rounded-[calc(var(--app-radius-xl)+4px)] border border-white/70 p-4 shadow-soft lg:hidden dark:border-white/10"
+        style={{ backgroundImage: themedSurfaceGradient }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {isVietnamese ? "Tuần này" : "This week"}
+            </p>
+            <div className="mt-1 flex flex-wrap items-end gap-2">
+              <p className="text-[1.55rem] font-semibold leading-none tracking-tight text-foreground">
+                {formatCurrency(currentWeekExpense)}
+              </p>
+              {weeklyExpenseChangeLabel ? (
+                <span
+                  className={cn(
+                    "text-xs font-semibold",
+                    weeklyExpenseChange >= 0
+                      ? "text-emerald-600"
+                      : "text-rose-600",
+                  )}
+                >
+                  {weeklyExpenseChangeLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="min-w-[92px]">
+            <p className="mb-1 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {isVietnamese ? "Tháng này" : "This month"}
+            </p>
+            <svg
+              aria-hidden="true"
+              className="h-10 w-24"
+              preserveAspectRatio="none"
+              viewBox="0 0 100 44"
+            >
+              <path
+                d={mobileSparklinePath}
+                fill="none"
+                stroke={appearance.primaryColor}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="4"
+              />
+            </svg>
+          </div>
+        </div>
+
+        <div className="mt-5 grid h-24 grid-cols-7 items-end gap-2">
+          {weeklyExpenseBuckets.map((item, index) => {
+            const height = Math.max((item.value / mobileWeekMaxExpense) * 100, 16);
+            const isToday = currentWeekStart.add(index, "day").isSame(dayjs(), "day");
+
+            return (
+              <div key={item.label} className="flex h-full flex-col justify-end gap-2">
+                <div
+                  className="rounded-t-[var(--app-radius-md)] rounded-b-sm"
+                  style={{
+                    height: `${height}%`,
+                    background: isToday
+                      ? themedActionGradient
+                      : hexToRgba(themeColors.secondary, 0.58),
+                  }}
+                />
+                <span
+                  className={cn(
+                    "text-center text-[10px] font-medium",
+                    isToday ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {item.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="hidden gap-4 sm:gap-6 lg:grid xl:grid-cols-3">
         <Card className="overflow-hidden">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div className="space-y-1">
@@ -1191,7 +1622,7 @@ const Dashboard: React.FC = () => {
             <Badge variant="outline">{periodLabel}</Badge>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="h-[18rem]">
+            <div className="h-36 lg:h-[18rem]">
               <LineChart
                 data={incomeChartData}
                 options={{
@@ -1218,14 +1649,6 @@ const Dashboard: React.FC = () => {
               />
             </div>
 
-            <div className="rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4">
-              <p className="text-sm font-medium text-foreground">
-                {copy.totalIncome}
-              </p>
-              <p className="mt-2 text-lg font-semibold text-emerald-600">
-                {formatCurrency(totalIncome)}
-              </p>
-            </div>
           </CardContent>
         </Card>
 
@@ -1238,7 +1661,7 @@ const Dashboard: React.FC = () => {
             <Badge variant="outline">{copy.monthExpense}</Badge>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="h-[18rem]">
+            <div className="h-36 lg:h-[18rem]">
               <BarChart
                 data={expenseChartData}
                 options={{
@@ -1265,14 +1688,6 @@ const Dashboard: React.FC = () => {
               />
             </div>
 
-            <div className="rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4">
-              <p className="text-sm font-medium text-foreground">
-                {copy.totalExpense}
-              </p>
-              <p className="mt-2 text-lg font-semibold text-rose-600">
-                {formatCurrency(totalExpense)}
-              </p>
-            </div>
           </CardContent>
         </Card>
 
@@ -1287,7 +1702,7 @@ const Dashboard: React.FC = () => {
           <CardContent className="space-y-4">
             {expenseCategories.length > 0 ? (
               <>
-                <div className="h-[18rem]">
+                <div className="h-36 lg:h-[18rem]">
                   <PieChart
                     data={summaryChartData}
                     options={{
@@ -1329,7 +1744,7 @@ const Dashboard: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="flex min-h-[18rem] items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-6 text-center text-sm text-muted-foreground">
+              <div className="flex min-h-36 items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-6 text-center text-sm text-muted-foreground lg:min-h-[18rem]">
                 {copy.noExpenseData}
               </div>
             )}
@@ -1338,7 +1753,7 @@ const Dashboard: React.FC = () => {
       </div>
 
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
         <div
           className="min-w-0 xl:min-h-0"
           style={
@@ -1355,7 +1770,7 @@ const Dashboard: React.FC = () => {
                 <CardDescription>{copy.transactionsDesc}</CardDescription>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="hidden flex-wrap items-center gap-1.5 md:flex">
                 {(["ALL", "INCOME", "EXPENSE"] as const).map((type) => (
                   <Button
                     className="h-8 whitespace-nowrap rounded-full px-2.5 text-xs"
@@ -1387,6 +1802,7 @@ const Dashboard: React.FC = () => {
                 recentTransactions.slice(0, 10).map((transaction) => {
                   const isIncome = transaction.type === "INCOME";
                   const isExpense = transaction.type === "EXPENSE";
+                  const transactionStatus = getTransactionStatus(transaction);
                   const transactionLabel =
                     transaction.note ||
                     transaction.category ||
@@ -1434,6 +1850,13 @@ const Dashboard: React.FC = () => {
                                   ? copy.transactionLabels.EXPENSE
                                   : copy.transactionLabels.OTHER}
                             </Badge>
+                            {transactionStatus !== "COMPLETED" ? (
+                              <Badge variant="outline">
+                                {transactionStatusText[transactionStatus][
+                                  isVietnamese ? "vi" : "en"
+                                ]}
+                              </Badge>
+                            ) : null}
                           </div>
                           <p className="hidden">
                             {walletName} • {transaction.category || copy.genericCategory}
@@ -1472,7 +1895,7 @@ const Dashboard: React.FC = () => {
                   );
                 })
               ) : (
-                <div className="flex min-h-[240px] items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-6 text-center text-sm text-muted-foreground">
+              <div className="flex min-h-[200px] items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-4 text-center text-sm text-muted-foreground sm:min-h-[240px] sm:px-6">
                   {copy.noTransactions}
                 </div>
               )}
@@ -1480,7 +1903,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6" ref={rightColumnRef}>
+        <div className="flex min-w-0 flex-col gap-4 sm:gap-6" ref={rightColumnRef}>
           {/* section saving */}
           <Card className="overflow-hidden">
             <CardHeader className="flex flex-col gap-4 border-b border-border/70 md:flex-row md:items-start md:justify-between">
@@ -1498,9 +1921,9 @@ const Dashboard: React.FC = () => {
               </Button>
             </CardHeader>
 
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 sm:pt-6">
               {goalSummary.featuredGoal ? (
-                <div className="rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-5 md:p-6">
+                <div className="rounded-[var(--app-radius-lg)] border border-border/70 bg-muted/20 p-4 sm:p-5 md:p-6">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
@@ -1538,7 +1961,7 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-5 space-y-2">
+                  <div className="mt-4 space-y-2">
                     <div className="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-muted-foreground">
                       <span>{copy.progress}</span>
                       <span>
@@ -1553,7 +1976,7 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-6 text-center">
+                <div className="flex min-h-[192px] flex-col items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-4 text-center sm:min-h-[220px] sm:px-6">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[var(--app-radius-lg)] bg-primary-soft text-primary">
                     <Target className="h-6 w-6" />
                   </div>
@@ -1588,9 +2011,9 @@ const Dashboard: React.FC = () => {
               </Button>
             </CardHeader>
 
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 sm:pt-6">
               {walletCards.length > 0 ? (
-                <div className="flex flex-nowrap gap-3 overflow-x-auto overflow-y-hidden py-1">
+                <div className="flex flex-nowrap gap-2.5 overflow-x-auto overflow-y-hidden py-1 sm:gap-3">
                   {walletCards.map((wallet) => {
                     const normalizedType = normalizeText(wallet.type || "");
                     const walletTypeLabel = normalizedType.includes("bank")
@@ -1600,70 +2023,215 @@ const Dashboard: React.FC = () => {
                         : normalizedType.includes("cash")
                           ? copy.walletTypes.cash
                           : copy.walletTypes.other;
+                    const walletBudgetSummary =
+                      walletBudgetSummaryMap.get(wallet._id);
+                    const reserveItems = (
+                      walletBudgetSummary?.items || []
+                    ).filter(
+                      (item) =>
+                        Number(item.remaining || 0) > 0 ||
+                        Number(item.spent || 0) > 0,
+                    );
+                    const reservedAmount = reserveItems.reduce(
+                      (sum, item) => sum + Number(item.remaining || 0),
+                      0,
+                    );
+                    const freeAmount = Math.max(
+                      parseAmount(wallet.balance) - reservedAmount,
+                      0,
+                    );
+                    const allocationTotal = Math.max(
+                      parseAmount(wallet.balance),
+                      reservedAmount,
+                      1,
+                    );
+                    const allocationSegments = [
+                      ...(freeAmount > 0
+                        ? [
+                            {
+                              key: `${wallet._id}-free`,
+                              label: copy.freeToSpend,
+                              amount: freeAmount,
+                              color: appearance.primaryColor,
+                            },
+                          ]
+                        : []),
+                      ...reserveItems
+                        .filter((item) => Number(item.remaining || 0) > 0)
+                        .map((item, index) => ({
+                          key: item._id,
+                          label: item.category,
+                          amount: Number(item.remaining || 0),
+                          color: getBudgetColor(item, index),
+                        })),
+                    ];
+                    const isExpanded = expandedWalletId === wallet._id;
 
                     return (
                       <div
                         key={wallet._id}
-                        className="relative min-w-[236px] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] p-4 text-white shadow-sm sm:min-w-[260px] sm:p-5"
-                        style={{
-                          backgroundImage: wallet.background,
-                        }}
+                        className="relative min-w-[236px] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] border border-white/12 bg-card shadow-sm sm:min-w-[286px]"
                       >
-                        <div className="pointer-events-none absolute inset-0">
-                          <div className="absolute right-0 top-0 h-36 w-36 translate-x-10 -translate-y-10 rounded-full bg-white/10" />
-                          <div className="absolute bottom-0 left-0 h-28 w-28 -translate-x-8 translate-y-8 rounded-full bg-white/10" />
-                        </div>
+                        <div
+                          className="flex w-[200%] transition-transform duration-300 ease-out"
+                          style={{
+                            transform: isExpanded
+                              ? "translateX(-50%)"
+                              : "translateX(0)",
+                          }}
+                        >
+                          <div
+                            className="relative min-h-[216px] w-1/2 shrink-0 overflow-hidden p-4 text-white sm:min-h-[238px] sm:p-5"
+                            style={{
+                              backgroundImage: wallet.background,
+                              backgroundPosition: "center",
+                              backgroundSize: "cover",
+                            }}
+                          >
+                            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.18)_0%,rgba(2,6,23,0.36)_42%,rgba(2,6,23,0.88)_100%)]" />
+                            <div className="relative z-10 flex h-full flex-col justify-between gap-4">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0 space-y-1.5">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/72">
+                                    {walletTypeLabel}
+                                  </p>
+                                  <h3 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
+                                    {wallet.name}
+                                  </h3>
+                                  {wallet.accountNumber ? (
+                                    <p className="truncate text-xs text-white/68">
+                                      {wallet.accountNumber}
+                                    </p>
+                                  ) : null}
+                                </div>
 
-                        <div className="relative z-10 flex h-full flex-col gap-5">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="space-y-1.5">
-                              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/72">
-                                {walletTypeLabel}
-                              </p>
-                              <h3 className="text-lg font-semibold tracking-tight sm:text-xl">
-                                {wallet.name}
-                              </h3>
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-2px)] bg-white/14 backdrop-blur-sm sm:h-10 sm:w-10">
+                                  {normalizedType.includes("bank") ? (
+                                    <Landmark className="h-4 w-4 sm:h-5 sm:w-5" />
+                                  ) : normalizedType.includes("ewallet") ? (
+                                    <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
+                                  ) : (
+                                    <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/68">
+                                    {copy.availableBalance}
+                                  </p>
+                                  <p className="mt-1 text-[1.45rem] font-semibold tracking-tight sm:text-[1.8rem]">
+                                    {formatCurrency(parseAmount(wallet.balance))}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-3 border-t border-white/18 pt-3 text-xs text-white/78">
+                                  <span>
+                                    {copy.share}: {wallet.share.toFixed(0)}%
+                                  </span>
+                                  <button
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/16 bg-white/14 px-2.5 text-[11px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+                                    onClick={() => setExpandedWalletId(wallet._id)}
+                                    type="button"
+                                  >
+                                    <ChartPie className="h-3.5 w-3.5" />
+                                    {copy.allocation}
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="min-h-[216px] w-1/2 shrink-0 bg-card p-4 text-foreground sm:min-h-[238px] sm:p-5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                  {copy.allocationDetails}
+                                </p>
+                                <h3 className="mt-1 truncate text-base font-semibold">
+                                  {wallet.name}
+                                </h3>
+                              </div>
+                              <button
+                                className="h-8 rounded-full border border-border bg-background px-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                onClick={() => setExpandedWalletId(null)}
+                                type="button"
+                              >
+                                {copy.backToCard}
+                              </button>
                             </div>
 
-                            <div className="flex h-9 w-9 items-center justify-center rounded-[calc(var(--app-radius-md)-2px)] bg-white/12 sm:h-10 sm:w-10">
-                              {normalizedType.includes("bank") ? (
-                                <Landmark className="h-4 w-4 sm:h-5 sm:w-5" />
-                              ) : normalizedType.includes("ewallet") ? (
-                                <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-muted">
+                              {allocationSegments.length > 0 ? (
+                                allocationSegments.map((segment) => (
+                                  <div
+                                    key={segment.key}
+                                    style={{
+                                      backgroundColor: segment.color,
+                                      width: `${(segment.amount / allocationTotal) * 100}%`,
+                                    }}
+                                  />
+                                ))
                               ) : (
-                                <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
+                                <div className="h-full w-full bg-muted-foreground/20" />
+                              )}
+                            </div>
+
+                            <div className="mt-4 space-y-2.5">
+                              <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-muted/35 px-3 py-2">
+                                <span className="text-xs text-muted-foreground">
+                                  {copy.freeToSpend}
+                                </span>
+                                <span className="text-sm font-semibold">
+                                  {formatCurrency(freeAmount)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-muted/35 px-3 py-2">
+                                <span className="text-xs text-muted-foreground">
+                                  {copy.budgetReserved}
+                                </span>
+                                <span className="text-sm font-semibold">
+                                  {formatCurrency(reservedAmount)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {reserveItems.length > 0 ? (
+                                reserveItems
+                                  .filter((item) => Number(item.remaining || 0) > 0)
+                                  .slice(0, 3)
+                                  .map((item, index) => (
+                                    <span
+                                      key={item._id}
+                                      className="inline-flex max-w-full items-center truncate rounded-full px-2 py-1 text-[10px] font-medium"
+                                      style={{
+                                        backgroundColor: hexToRgba(
+                                          getBudgetColor(item, index),
+                                          0.14,
+                                        ),
+                                        color: getBudgetColor(item, index),
+                                      }}
+                                    >
+                                      {item.category}
+                                    </span>
+                                  ))
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  {copy.noBudgetReserve}
+                                </span>
                               )}
                             </div>
                           </div>
-
-                          <div className="space-y-2.5">
-                            <div>
-                              <p className="text-[10px] uppercase tracking-[0.18em] text-white/68">
-                                {copy.availableBalance}
-                              </p>
-                              <p className="mt-1.5 text-[1.45rem] font-semibold tracking-tight sm:text-[1.7rem]">
-                                {formatCurrency(parseAmount(wallet.balance))}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center justify-between text-xs text-white/80">
-                              <span>{copy.share}</span>
-                              <span>{wallet.share.toFixed(0)}%</span>
-                            </div>
-                          </div>
                         </div>
-
-                        {selectedWallet === wallet._id ? (
-                          <span className="absolute right-3 top-3 rounded-full bg-white/14 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                            {copy.active}
-                          </span>
-                        ) : null}
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="flex min-h-[220px] items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-6 text-center text-sm text-muted-foreground">
+                <div className="flex min-h-[192px] items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-4 text-center text-sm text-muted-foreground sm:min-h-[220px] sm:px-6">
                   {copy.noWallets}
                 </div>
               )}

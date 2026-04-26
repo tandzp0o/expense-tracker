@@ -12,9 +12,22 @@
     --app-border: rgba(148, 163, 184, 0.24);
     --app-input: rgba(255, 255, 255, 0.95);
     --app-primary: #2563eb;
+    --app-secondary: #2563eb;
     --app-primary-foreground: #ffffff;
+    --app-secondary-foreground: #ffffff;
     --app-primary-soft: rgba(37, 99, 235, 0.14);
     --app-primary-soft-strong: rgba(37, 99, 235, 0.22);
+    --app-secondary-soft: rgba(37, 99, 235, 0.14);
+    --app-secondary-soft-strong: rgba(37, 99, 235, 0.22);
+    --app-gradient: linear-gradient(135deg, var(--app-primary) 0%, var(--app-secondary) 100%);
+    --app-gradient-soft: linear-gradient(135deg, var(--app-primary-soft) 0%, var(--app-secondary-soft-strong) 100%);
+    --app-page-background:
+        radial-gradient(circle at 10% 4%, var(--app-primary-soft-strong), transparent 30%),
+        radial-gradient(circle at 88% 2%, var(--app-secondary-soft-strong), transparent 28%),
+        radial-gradient(circle at 52% 112%, var(--app-secondary-soft), transparent 36%),
+        linear-gradient(180deg, rgba(255, 251, 244, 0.94) 0%, rgba(243, 247, 255, 0.96) 48%, rgba(248, 250, 252, 0.98) 100%);
+    --app-content-panel-background: rgb(185, 206, 242);
+    --app-main-surface-background: rgb(165, 193, 238);
     --app-ring: rgba(37, 99, 235, 0.3);
     --app-font-family: "Inter", "Segoe UI", sans-serif;
     --app-font-size: 16px;
@@ -49,10 +62,9 @@
     body {
         margin: 0;
         min-height: 100vh;
-        background:
-            radial-gradient(circle at top left, var(--app-primary-soft-strong), transparent 28%),
-            radial-gradient(circle at top right, rgba(15, 23, 42, 0.05), transparent 26%),
-            var(--app-background);
+        background: var(--app-page-background);
+        background-attachment: fixed;
+        background-color: var(--app-background);
         color: var(--app-foreground);
         font-family: var(--app-font-family);
         -webkit-font-smoothing: antialiased;
@@ -92,7 +104,23 @@
 
 @layer components {
     .app-shell {
-        @apply min-h-screen bg-background text-foreground;
+        position: relative;
+        isolation: isolate;
+        min-height: 100vh;
+        background: var(--app-page-background);
+        background-attachment: fixed;
+        color: var(--app-foreground);
+    }
+
+    .app-shell::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background:
+            radial-gradient(circle at 18% 22%, var(--app-primary-soft), transparent 24%),
+            radial-gradient(circle at 82% 16%, var(--app-secondary-soft-strong), transparent 22%);
     }
 
     .metric-card-grid {
@@ -106,15 +134,41 @@
         backdrop-filter: blur(18px);
     }
 
+    .app-content-panel {
+        border-color: color-mix(in srgb, white 46%, var(--app-border));
+        background: var(--app-content-panel-background);
+        box-shadow:
+            0 28px 70px -46px rgba(15, 23, 42, 0.58),
+            inset 0 1px 0 rgba(255, 255, 255, 0.22);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    .app-main-surface {
+        border-top: 1px solid color-mix(in srgb, white 44%, var(--app-border));
+        border-bottom-left-radius: var(--app-radius-xl);
+        border-bottom-right-radius: var(--app-radius-xl);
+        background: var(--app-main-surface-background);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.28),
+            inset 0 18px 34px rgba(255, 255, 255, 0.1);
+    }
+
+    .app-sidebar-panel {
+        background: color-mix(in srgb, var(--app-card) 74%, transparent);
+        backdrop-filter: blur(20px) saturate(142%);
+        -webkit-backdrop-filter: blur(20px) saturate(142%);
+    }
+
     .app-header-shell {
         position: relative;
         overflow: visible;
         border-radius: calc(var(--app-radius-xl) + 2px);
         border: 1px solid transparent;
-        background: color-mix(in srgb, var(--app-card) 18%, transparent);
+        background: transparent;
         box-shadow: none;
-        backdrop-filter: blur(8px) saturate(115%);
-        -webkit-backdrop-filter: blur(8px) saturate(115%);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
         transition:
             background 220ms ease,
             border-color 220ms ease,
@@ -130,10 +184,11 @@
         border-radius: inherit;
         pointer-events: none;
         background:
-            radial-gradient(circle at 14% 18%, rgba(255, 255, 255, 0.34), transparent 28%),
-            radial-gradient(circle at 84% 10%, rgba(255, 255, 255, 0.18), transparent 22%),
+            radial-gradient(circle at 14% 18%, var(--app-primary-soft-strong), transparent 28%),
+            radial-gradient(circle at 84% 10%, var(--app-secondary-soft-strong), transparent 22%),
             linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 45%);
         opacity: 0;
+        filter: blur(6px);
         transition: opacity 220ms ease;
     }
 
@@ -141,17 +196,39 @@
         transform: translateY(2px);
         border-color: color-mix(in srgb, white 42%, var(--app-border));
         background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08)),
-            color-mix(in srgb, var(--app-card) 84%, transparent);
+            linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.08)),
+            color-mix(in srgb, var(--app-card) 58%, transparent);
         box-shadow:
-            0 22px 54px -30px rgba(15, 23, 42, 0.4),
-            inset 0 1px 0 rgba(255, 255, 255, 0.42);
+            0 22px 54px -28px rgba(15, 23, 42, 0.56),
+            inset 0 1px 0 rgba(255, 255, 255, 0.34);
         backdrop-filter: blur(24px) saturate(185%);
         -webkit-backdrop-filter: blur(24px) saturate(185%);
     }
 
     .app-header-shell.is-scrolled::before {
-        opacity: 0.9;
+        opacity: 0.44;
+    }
+
+    .mobile-bottom-nav {
+        border-color: color-mix(in srgb, white 54%, var(--app-border));
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.08)),
+            color-mix(in srgb, var(--app-card) 48%, transparent);
+        box-shadow:
+            0 28px 70px -28px rgba(15, 23, 42, 0.82),
+            0 10px 28px -22px rgba(15, 23, 42, 0.55),
+            inset 0 1px 0 rgba(255, 255, 255, 0.38);
+        backdrop-filter: blur(26px) saturate(175%);
+        -webkit-backdrop-filter: blur(26px) saturate(175%);
+    }
+
+    .mobile-bottom-nav-sheen {
+        background:
+            radial-gradient(circle at 18% 8%, var(--app-primary-soft-strong), transparent 34%),
+            radial-gradient(circle at 82% 0%, var(--app-secondary-soft-strong), transparent 32%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.03));
+        opacity: 0.68;
+        filter: blur(2px);
     }
 
     .app-header-user-trigger {
@@ -187,26 +264,71 @@
     }
 }
 
+@media (min-width: 1024px) {
+    .app-content-panel {
+        background: var(--app-content-panel-background);
+    }
+}
+
 :root[data-theme="dark"] .app-header-shell {
-    background: rgba(9, 17, 31, 0.14);
+    border-color: transparent;
+    background: transparent;
     box-shadow: none;
 }
 
 :root[data-theme="dark"] .app-header-shell::before {
     background:
-        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.08), transparent 24%),
-        radial-gradient(circle at 82% 12%, rgba(96, 165, 250, 0.09), transparent 20%),
+        radial-gradient(circle at 18% 12%, var(--app-primary-soft-strong), transparent 24%),
+        radial-gradient(circle at 82% 12%, var(--app-secondary-soft-strong), transparent 20%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 45%);
 }
 
 :root[data-theme="dark"] .app-header-shell.is-scrolled {
     border-color: rgba(255, 255, 255, 0.08);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.02)),
-        color-mix(in srgb, var(--app-card) 90%, transparent);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)),
+        color-mix(in srgb, var(--app-card) 56%, transparent);
     box-shadow:
-        0 24px 58px -30px rgba(2, 6, 23, 0.88),
+        0 24px 58px -28px rgba(2, 6, 23, 0.92),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .app-content-panel {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--app-content-panel-background);
+    box-shadow:
+        0 30px 80px -42px rgba(2, 6, 23, 0.92),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] .app-main-surface {
+    border-top-color: rgba(255, 255, 255, 0.07);
+    background: var(--app-main-surface-background);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+:root[data-theme="dark"] .app-sidebar-panel {
+    background: color-mix(in srgb, var(--app-card) 56%, transparent);
+}
+
+:root[data-theme="dark"] .mobile-bottom-nav {
+    border-color: rgba(255, 255, 255, 0.1);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.018)),
+        color-mix(in srgb, var(--app-card) 48%, transparent);
+    box-shadow:
+        0 28px 70px -26px rgba(2, 6, 23, 0.95),
+        0 10px 28px -22px rgba(2, 6, 23, 0.86),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .mobile-bottom-nav-sheen {
+    opacity: 0.46;
+}
+
+:root[data-theme="dark"] body {
+    background: var(--app-page-background);
+    background-color: var(--app-background);
 }
 
 :root[data-theme="dark"] .app-header-user-trigger {

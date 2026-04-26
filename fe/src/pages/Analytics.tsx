@@ -6,13 +6,14 @@ import {
     CircleDollarSign,
     PiggyBank,
     ReceiptText,
+    Sparkles,
 } from "lucide-react";
 import { auth } from "../firebase/config";
 import { transactionApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
-import { useTheme } from "../contexts/ThemeContext";
+import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
 import { hexToRgba } from "../lib/utils";
 import { PageHeader } from "../components/app/page-header";
 import { MetricCard } from "../components/app/metric-card";
@@ -392,6 +393,21 @@ const Analytics: React.FC = () => {
         return [health, spending, direction];
     }, [breakdown, filteredTransactions, isVietnamese, savingRate, stats.expense, stats.income, stats.net]);
 
+    const themeColors = getAppearanceGradientColors(appearance);
+    const mobileHeroGradient =
+        appearance.mode === "dark"
+            ? `linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, ${hexToRgba(
+                  themeColors.primary,
+                  0.38,
+              )} 44%, ${hexToRgba(themeColors.secondary, 0.36)} 64%, rgba(15, 23, 42, 0.9) 100%)`
+            : `linear-gradient(135deg, ${hexToRgba(
+                  themeColors.primary,
+                  0.92,
+              )} 0%, ${hexToRgba(
+                  themeColors.secondary,
+                  0.7,
+              )} 52%, rgba(15, 23, 42, 0.84) 100%)`;
+
     if (loading) {
         return (
             <div className="flex min-h-[420px] items-center justify-center">
@@ -401,10 +417,92 @@ const Analytics: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-3 lg:hidden">
+                <div
+                    className="overflow-hidden rounded-[calc(var(--app-radius-xl)+4px)] border border-white/70 p-4 text-white shadow-soft dark:border-white/10"
+                    style={{ backgroundImage: mobileHeroGradient }}
+                >
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72">
+                                {isVietnamese ? "Tóm tắt từ AI" : "AI summary"}
+                            </p>
+                            <h2 className="mt-2 text-xl font-semibold leading-tight">
+                                {stats.net >= 0
+                                    ? isVietnamese
+                                        ? "Khoảng này bạn đang giữ chênh lệch dương khá ổn."
+                                        : "You are holding a healthy positive net in this range."
+                                    : isVietnamese
+                                        ? "Khoảng này đang âm, nên ưu tiên nhìn lại các nhóm chi tiêu lớn."
+                                        : "This range is negative, so revisit the largest spend groups first."}
+                            </h2>
+                        </div>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/12 px-2.5 py-1 text-[11px] font-semibold">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            AI
+                        </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                        <div className="rounded-[var(--app-radius-lg)] border border-white/18 bg-white/10 p-3">
+                            <p className="text-[10px] uppercase tracking-[0.16em] text-white/68">
+                                {copy.income}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold">
+                                {formatCurrency(stats.income)}
+                            </p>
+                        </div>
+                        <div className="rounded-[var(--app-radius-lg)] border border-white/18 bg-white/10 p-3">
+                            <p className="text-[10px] uppercase tracking-[0.16em] text-white/68">
+                                {copy.expense}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold">
+                                {formatCurrency(stats.expense)}
+                            </p>
+                        </div>
+                        <div className="rounded-[var(--app-radius-lg)] border border-white/18 bg-white/10 p-3">
+                            <p className="text-[10px] uppercase tracking-[0.16em] text-white/68">
+                                {copy.savingRate}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold">
+                                {Math.round(savingRate)}%
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="hidden gap-2 rounded-[var(--app-radius-xl)] border border-border/70 bg-card/80 p-2 shadow-soft">
+                    <Select
+                        onChange={(event) => setSelectedPeriod(event.target.value)}
+                        value={selectedPeriod}
+                    >
+                        <option value="current_month">{copy.currentMonth}</option>
+                        <option value="last_month">{copy.lastMonth}</option>
+                        <option value="last_3_months">{copy.last3Months}</option>
+                        <option value="last_6_months">{copy.last6Months}</option>
+                        <option value="custom">{copy.customRange}</option>
+                    </Select>
+                    {selectedPeriod === "custom" ? (
+                        <div className="grid grid-cols-2 gap-2">
+                            <Input
+                                onChange={(event) => setCustomStart(event.target.value)}
+                                type="date"
+                                value={customStart}
+                            />
+                            <Input
+                                onChange={(event) => setCustomEnd(event.target.value)}
+                                type="date"
+                                value={customEnd}
+                            />
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+
             <PageHeader
                 actions={
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-2.5 sm:gap-3">
                         <Select
                             onChange={(event) => setSelectedPeriod(event.target.value)}
                             value={selectedPeriod}
@@ -432,10 +530,13 @@ const Analytics: React.FC = () => {
                     </div>
                 }
                 description={copy.pageDescription}
+                hideActionsOnMobile
+                hideDescriptionOnMobile
+                hideTitleOnMobile
                 title={copy.pageTitle}
             />
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="hidden gap-3 lg:grid lg:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                     icon={CircleDollarSign}
                     subtitle={copy.filteredIncome}
@@ -462,7 +563,7 @@ const Analytics: React.FC = () => {
                 />
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[1.6fr,1fr]">
+            <div className="grid gap-4 sm:gap-6 xl:grid-cols-[1.6fr,1fr]">
                 <Card>
                     <CardHeader>
                         <CardTitle>{copy.sixMonthTrend}</CardTitle>
@@ -471,7 +572,7 @@ const Analytics: React.FC = () => {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="h-[320px]">
+                        <div className="h-[160px] lg:h-[320px]">
                             <LineChart
                                 data={chartData}
                                 options={{
@@ -536,7 +637,7 @@ const Analytics: React.FC = () => {
             </div>
 
             <Card className="overflow-hidden">
-                <CardContent className="grid gap-6 p-6 md:grid-cols-[1.3fr,0.7fr]">
+                <CardContent className="grid gap-4 p-4 sm:gap-6 sm:p-6 md:grid-cols-[1.3fr,0.7fr]">
                     <div>
                         <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
                             {copy.insight}
@@ -556,7 +657,7 @@ const Analytics: React.FC = () => {
                             ))}
                         </div>
                     </div>
-                    <div className="rounded-[var(--app-radius-lg)] bg-primary-soft p-5">
+                    <div className="rounded-[var(--app-radius-lg)] bg-primary-soft p-4 sm:p-5">
                         <p className="text-sm text-muted-foreground">{copy.savingRate}</p>
                         <p className="mt-2 text-3xl font-semibold text-primary">
                             {Math.round(savingRate)}%

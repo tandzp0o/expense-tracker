@@ -15,11 +15,10 @@ import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
 import { PageHeader } from "../components/app/page-header";
 import { EmptyState } from "../components/app/empty-state";
-import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent } from "../components/ui/card";
-import { Dialog } from "../components/ui/dialog";
+import { ConfirmDialog, Dialog, DialogFooter, DialogSection } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Spinner } from "../components/ui/spinner";
 import { Textarea } from "../components/ui/textarea";
@@ -650,164 +649,206 @@ const DishSuggestions: React.FC = () => {
 
             <Dialog
                 description={copy.formDescription}
+                className="max-w-3xl"
+                eyebrow={
+                    editingDish
+                        ? isVietnamese
+                            ? "Ch\u1ec9nh m\u00f3n"
+                            : "Edit dish"
+                        : isVietnamese
+                          ? "M\u00f3n m\u1edbi"
+                          : "New dish"
+                }
+                icon={UtensilsCrossed}
                 onClose={() => setModalOpen(false)}
                 open={modalOpen}
                 title={editingDish ? copy.editDish : copy.createDish}
+                tone="dish"
             >
-                <div className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-3">
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "L\u01b0u t\u00ean m\u00f3n, gi\u00e1 v\u00e0 m\u00f4 t\u1ea3 ng\u1eafn \u0111\u1ec3 d\u1ec5 quy\u1ebft \u0111\u1ecbnh."
+                                : "Capture the dish name, price, and a short description first."
+                        }
+                        title={isVietnamese ? "Th\u00f4ng tin m\u00f3n" : "Dish details"}
+                    >
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.dishName}</label>
+                                <Input
+                                    onChange={(event) =>
+                                        setFormValues((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                        }))
+                                    }
+                                    value={formValues.name}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">{copy.price}</label>
+                                <Input
+                                    min={0}
+                                    onChange={(event) =>
+                                        setFormValues((current) => ({
+                                            ...current,
+                                            price: Number(event.target.value) || 0,
+                                        }))
+                                    }
+                                    type="number"
+                                    value={formValues.price}
+                                />
+                            </div>
+                        </div>
+
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.dishName}</label>
+                            <label className="mb-2 block text-sm font-medium">{copy.description}</label>
+                            <Textarea
+                                onChange={(event) =>
+                                    setFormValues((current) => ({
+                                        ...current,
+                                        description: event.target.value,
+                                    }))
+                                }
+                                value={formValues.description}
+                            />
+                        </div>
+                    </DialogSection>
+
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "G\u1eafn \u0111\u1ecba \u0111i\u1ec3m v\u00e0 th\u1ebb h\u01b0\u01a1ng v\u1ecb \u0111\u1ec3 l\u1ecdc nhanh khi c\u1ea7n."
+                                : "Add location and taste tags so filtering feels more useful."
+                        }
+                        title={isVietnamese ? "Ph\u00e2n bi\u1ec7t v\u00e0 g\u1ee3i \u00fd" : "Discovery details"}
+                    >
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.address}</label>
                             <Input
                                 onChange={(event) =>
                                     setFormValues((current) => ({
                                         ...current,
-                                        name: event.target.value,
+                                        address: event.target.value,
                                     }))
                                 }
-                                value={formValues.name}
+                                value={formValues.address}
                             />
                         </div>
+
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.price}</label>
-                            <Input
-                                min={0}
-                                onChange={(event) =>
-                                    setFormValues((current) => ({
-                                        ...current,
-                                        price: Number(event.target.value) || 0,
-                                    }))
-                                }
-                                type="number"
-                                value={formValues.price}
-                            />
+                            <label className="mb-2 block text-sm font-medium">{copy.tasteTags}</label>
+                            <div className="flex flex-wrap gap-2">
+                                {preferenceOptions.map((preference) => {
+                                    const active = formValues.preferences.includes(preference.value);
+                                    return (
+                                        <button
+                                            key={preference.value}
+                                            className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                                                active
+                                                    ? "border-primary bg-primary-soft text-primary"
+                                                    : "border-border text-muted-foreground hover:bg-muted/70"
+                                            }`}
+                                            onClick={() => handleTogglePreference(preference.value)}
+                                            type="button"
+                                        >
+                                            {language === "vi" ? preference.vi : preference.en}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
+                    </DialogSection>
 
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.description}</label>
-                        <Textarea
-                            onChange={(event) =>
-                                setFormValues((current) => ({
-                                    ...current,
-                                    description: event.target.value,
-                                }))
-                            }
-                            value={formValues.description}
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.address}</label>
-                        <Input
-                            onChange={(event) =>
-                                setFormValues((current) => ({
-                                    ...current,
-                                    address: event.target.value,
-                                }))
-                            }
-                            value={formValues.address}
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.tasteTags}</label>
-                        <div className="flex flex-wrap gap-2">
-                            {preferenceOptions.map((preference) => {
-                                const active = formValues.preferences.includes(preference.value);
-                                return (
-                                    <button
-                                        key={preference.value}
-                                        className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                                            active
-                                                ? "border-primary bg-primary-soft text-primary"
-                                                : "border-border text-muted-foreground hover:bg-muted/70"
-                                        }`}
-                                        onClick={() => handleTogglePreference(preference.value)}
-                                        type="button"
-                                    >
-                                        {language === "vi" ? preference.vi : preference.en}
-                                    </button>
-                                );
-                            })}
+                    <DialogSection
+                        description={
+                            isVietnamese
+                                ? "H\u00ecnh \u1ea3nh gi\u00fap modal random v\u00e0 card m\u00f3n d\u1ec5 nh\u00ecn h\u01a1n."
+                                : "Images make both the cards and random dish modal much clearer."
+                        }
+                        title={isVietnamese ? "B\u1ed9 \u1ea3nh" : "Image set"}
+                    >
+                        <div>
+                            <label className="mb-2 block text-sm font-medium">{copy.images}</label>
+                            <Input accept="image/*" multiple onChange={handleImageUpload} type="file" />
+                            <div className="mt-3 grid grid-cols-3 gap-3">
+                                {formValues.existingImages.map((image) => (
+                                    <div key={image} className="relative">
+                                        <img
+                                            alt="Existing dish"
+                                            className="h-24 w-full rounded-[var(--app-radius-lg)] object-cover"
+                                            src={image}
+                                        />
+                                        <button
+                                            className="absolute right-2 top-2 rounded-full bg-slate-950/70 px-2 py-1 text-xs text-white"
+                                            onClick={() =>
+                                                setFormValues((current) => ({
+                                                    ...current,
+                                                    existingImages: current.existingImages.filter(
+                                                        (item) => item !== image,
+                                                    ),
+                                                }))
+                                            }
+                                            type="button"
+                                        >
+                                            {copy.remove}
+                                        </button>
+                                    </div>
+                                ))}
+                                {formValues.newImages.map((image) => (
+                                    <div key={`${image.name}-${image.lastModified}`} className="relative">
+                                        <img
+                                            alt={image.name}
+                                            className="h-24 w-full rounded-[var(--app-radius-lg)] object-cover"
+                                            src={URL.createObjectURL(image)}
+                                        />
+                                        <button
+                                            className="absolute right-2 top-2 rounded-full bg-slate-950/70 px-2 py-1 text-xs text-white"
+                                            onClick={() =>
+                                                setFormValues((current) => ({
+                                                    ...current,
+                                                    newImages: current.newImages.filter(
+                                                        (item) =>
+                                                            item.name !== image.name ||
+                                                            item.lastModified !== image.lastModified,
+                                                    ),
+                                                }))
+                                            }
+                                            type="button"
+                                        >
+                                            {copy.remove}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    </DialogSection>
 
-                    <div>
-                        <label className="mb-2 block text-sm font-medium">{copy.images}</label>
-                        <Input accept="image/*" multiple onChange={handleImageUpload} type="file" />
-                        <div className="mt-3 grid grid-cols-3 gap-3">
-                            {formValues.existingImages.map((image) => (
-                                <div key={image} className="relative">
-                                    <img
-                                        alt="Existing dish"
-                                        className="h-24 w-full rounded-[var(--app-radius-lg)] object-cover"
-                                        src={image}
-                                    />
-                                    <button
-                                        className="absolute right-2 top-2 rounded-full bg-slate-950/70 px-2 py-1 text-xs text-white"
-                                        onClick={() =>
-                                            setFormValues((current) => ({
-                                                ...current,
-                                                existingImages: current.existingImages.filter(
-                                                    (item) => item !== image,
-                                                ),
-                                            }))
-                                        }
-                                        type="button"
-                                    >
-                                        {copy.remove}
-                                    </button>
-                                </div>
-                            ))}
-                            {formValues.newImages.map((image) => (
-                                <div key={`${image.name}-${image.lastModified}`} className="relative">
-                                    <img
-                                        alt={image.name}
-                                        className="h-24 w-full rounded-[var(--app-radius-lg)] object-cover"
-                                        src={URL.createObjectURL(image)}
-                                    />
-                                    <button
-                                        className="absolute right-2 top-2 rounded-full bg-slate-950/70 px-2 py-1 text-xs text-white"
-                                        onClick={() =>
-                                            setFormValues((current) => ({
-                                                ...current,
-                                                newImages: current.newImages.filter(
-                                                    (item) =>
-                                                        item.name !== image.name ||
-                                                        item.lastModified !== image.lastModified,
-                                                ),
-                                            }))
-                                        }
-                                        type="button"
-                                    >
-                                        {copy.remove}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3">
-                        <Button onClick={() => setModalOpen(false)} variant="outline">
+                    <DialogFooter>
+                        <Button className="w-full sm:w-auto" onClick={() => setModalOpen(false)} variant="outline">
                             {copy.cancel}
                         </Button>
-                        <Button disabled={saving} onClick={handleSubmit}>
+                        <Button className="w-full sm:w-auto" disabled={saving} onClick={handleSubmit}>
                             {saving
                                 ? copy.saving
                                 : editingDish
                                   ? copy.updateDish
                                   : copy.createDish}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </div>
             </Dialog>
 
             <Dialog
                 description={copy.randomDishDesc}
+                eyebrow={isVietnamese ? "G\u1ee3i \u00fd nhanh" : "Quick pick"}
+                icon={Dices}
                 onClose={() => setRandomDish(null)}
                 open={!!randomDish}
                 title={copy.randomDishTitle}
+                tone="dish"
             >
                 {randomDish ? (
                     <div className="space-y-4">

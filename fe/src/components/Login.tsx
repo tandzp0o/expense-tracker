@@ -2,11 +2,43 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
-import { useTheme } from "../contexts/ThemeContext";
+import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
 import { useToast } from "../contexts/ToastContext";
 import { hexToRgba } from "../lib/utils";
 import { Spinner } from "./ui/spinner";
 import AuthShell from "./auth/AuthShell";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+
+    if (
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        typeof (error as { message?: unknown }).message === "string"
+    ) {
+        return (error as { message: string }).message;
+    }
+
+    return "";
+};
+
+const getErrorCode = (error: unknown) => {
+    if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        typeof (error as { code?: unknown }).code === "string"
+    ) {
+        return (error as { code: string }).code;
+    }
+
+    return "";
+};
 
 const Login: React.FC = () => {
     const navigate = useNavigate();
@@ -15,7 +47,7 @@ const Login: React.FC = () => {
     const { appearance } = useTheme();
     const { toast } = useToast();
     const [formValues, setFormValues] = useState({
-        identifier: "",
+        email: "",
         password: "",
     });
     const [submitting, setSubmitting] = useState(false);
@@ -26,45 +58,63 @@ const Login: React.FC = () => {
             isVietnamese
                 ? {
                       tagline: "Digital Atelier of Wealth",
-                      title: "Đăng nhập vào FinTrack",
+                      title: "Dang nhap vao FinTrack",
                       description:
-                          "Sử dụng email hoặc username để đăng nhập, hoặc tiếp tục với Google nếu bạn đã quen thuộc.",
-                      identifier: "Email hoặc username",
-                      identifierPlaceholder: "ví dụ: abc123 hoặc you@example.com",
-                      password: "Mật khẩu",
-                      passwordPlaceholder: "Nhập mật khẩu của bạn",
-                      forgotPassword: "Quên mật khẩu?",
-                      login: "Đăng nhập",
-                      divider: "Hoặc",
-                      continueWithGoogle: "Tiếp tục với Google",
-                      signingIn: "Đang đăng nhập...",
+                          "Dang nhap bang email va mat khau, hoac tiep tuc voi Google neu ban da quen thuoc.",
+                      email: "Email dang nhap",
+                      emailPlaceholder: "you@example.com",
+                      emailHint:
+                          "Ten hien thi trong ho so khong duoc dung de dang nhap.",
+                      password: "Mat khau",
+                      passwordPlaceholder: "Nhap mat khau cua ban",
+                      forgotPassword: "Quen mat khau?",
+                      login: "Dang nhap",
+                      divider: "Hoac",
+                      continueWithGoogle: "Tiep tuc voi Google",
+                      signingIn: "Dang dang nhap...",
                       googleHelper:
-                          "Tài khoản Google vẫn được hỗ trợ song song trong phiên bản này.",
-                      bottomNote: "Chưa có tài khoản?",
-                      bottomAction: "Đăng ký",
+                          "Tai khoan Google van duoc ho tro song song trong phien ban nay.",
+                      bottomNote: "Chua co tai khoan?",
+                      bottomAction: "Dang ky",
                       footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
                       footerLinks: [
-                          "Chính sách",
-                          "Điều khoản",
-                          "Bảo mật",
-                          "Liên hệ",
+                          "Chinh sach",
+                          "Dieu khoan",
+                          "Bao mat",
+                          "Lien he",
                       ],
-                      forgotTitle: "Đặt lại mật khẩu",
+                      forgotTitle: "Dat lai mat khau",
                       forgotDescription:
-                          "Nếu đây là tài khoản Google, hãy dùng nút Google. Nếu là tài khoản mật khẩu, hiện tại bạn cần đặt lại mật khẩu trong Firebase Console hoặc luồng quản trị.",
-                      loginErrorTitle: "Đăng nhập thất bại",
-                      googleError: "Không thể xác thực với Google. Vui lòng thử lại.",
-                      infoTitle: "Thông tin đang cập nhật",
+                          "Neu day la tai khoan Google, hay dung nut Google. Neu la tai khoan mat khau, hien tai ban can dat lai mat khau trong Firebase Console hoac luong quan tri.",
+                      loginErrorTitle: "Dang nhap that bai",
+                      missingCredentials:
+                          "Vui long nhap day du email va mat khau.",
+                      invalidEmail: "Vui long nhap email hop le.",
+                      accountNotRegistered:
+                          "Tai khoan nay chua duoc dang ky. Vui long dang ky truoc.",
+                      invalidCredentials:
+                          "Email hoac mat khau khong dung.",
+                      googleOnlyAccount:
+                          "Tai khoan nay dang dung Google. Hay chon dang nhap voi Google.",
+                      tooManyRequests:
+                          "Ban thu sai qua nhieu lan. Vui long thu lai sau it phut.",
+                      genericLoginError:
+                          "Khong the dang nhap. Vui long kiem tra thong tin va thu lai.",
+                      googleError:
+                          "Khong the xac thuc voi Google. Vui long thu lai.",
+                      infoTitle: "Thong tin dang cap nhat",
                       infoDescription:
-                          "Mục này chưa có hành động riêng trong giao diện hiện tại.",
+                          "Muc nay chua co hanh dong rieng trong giao dien hien tai.",
                   }
                 : {
                       tagline: "Digital Atelier of Wealth",
                       title: "Sign in to FinTrack",
                       description:
-                          "Use your email or username and password, or continue with Google if you already use it.",
-                      identifier: "Email or username",
-                      identifierPlaceholder: "for example: tandzp0o or you@example.com",
+                          "Sign in with your email and password, or continue with Google if you already use it.",
+                      email: "Sign-in email",
+                      emailPlaceholder: "you@example.com",
+                      emailHint:
+                          "Your profile display name is not used for sign-in.",
                       password: "Password",
                       passwordPlaceholder: "Enter your password",
                       forgotPassword: "Forgot password?",
@@ -87,6 +137,19 @@ const Login: React.FC = () => {
                       forgotDescription:
                           "If this is a Google account, use Google sign-in. For password accounts, reset currently needs to be handled in Firebase Console or your admin flow.",
                       loginErrorTitle: "Sign in failed",
+                      missingCredentials:
+                          "Please enter both your email and your password.",
+                      invalidEmail: "Please enter a valid email address.",
+                      accountNotRegistered:
+                          "This account is not registered yet. Please sign up first.",
+                      invalidCredentials:
+                          "Your email or password is incorrect.",
+                      googleOnlyAccount:
+                          "This account uses Google sign-in. Please continue with Google.",
+                      tooManyRequests:
+                          "Too many failed attempts. Please try again in a few minutes.",
+                      genericLoginError:
+                          "Could not sign in. Please check your credentials and try again.",
                       googleError:
                           "Could not authenticate with Google. Please try again.",
                       infoTitle: "Information pending",
@@ -96,19 +159,63 @@ const Login: React.FC = () => {
         [isVietnamese],
     );
 
-    const primaryBorder = hexToRgba(appearance.primaryColor, 0.28);
-    const buttonGradient = `linear-gradient(135deg, ${appearance.primaryColor} 0%, rgba(5, 12, 28, 0.96) 100%)`;
+    const themeColors = getAppearanceGradientColors(appearance);
+    const primaryBorder = hexToRgba(themeColors.primary, 0.28);
+    const buttonGradient = `linear-gradient(135deg, ${themeColors.primary} 0%, ${themeColors.secondary} 52%, rgba(5, 12, 28, 0.96) 100%)`;
     const isBusy = submitting || googleLoading || loading;
+
+    const getLoginErrorDescription = (error: unknown) => {
+        const code = getErrorCode(error);
+        const message = getErrorMessage(error);
+        const normalizedMessage = message.toLowerCase();
+
+        if (
+            normalizedMessage.includes("account not found") ||
+            code === "auth/user-not-found"
+        ) {
+            return copy.accountNotRegistered;
+        }
+
+        if (
+            normalizedMessage.includes("uses google sign-in") ||
+            normalizedMessage.includes("continue with google")
+        ) {
+            return copy.googleOnlyAccount;
+        }
+
+        if (code === "auth/too-many-requests") {
+            return copy.tooManyRequests;
+        }
+
+        if (
+            code === "auth/wrong-password" ||
+            code === "auth/invalid-credential" ||
+            code === "auth/invalid-login-credentials"
+        ) {
+            return copy.invalidCredentials;
+        }
+
+        return message || copy.genericLoginError;
+    };
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (!formValues.identifier.trim() || !formValues.password) {
+        const email = formValues.email.trim().toLowerCase();
+
+        if (!email || !formValues.password) {
             toast({
                 title: copy.loginErrorTitle,
-                description: isVietnamese
-                    ? "Vui lòng nhập đầy đủ email/username và mật khẩu."
-                    : "Please enter both your email or username and your password.",
+                description: copy.missingCredentials,
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if (!EMAIL_PATTERN.test(email)) {
+            toast({
+                title: copy.loginErrorTitle,
+                description: copy.invalidEmail,
                 variant: "destructive",
             });
             return;
@@ -116,18 +223,11 @@ const Login: React.FC = () => {
 
         setSubmitting(true);
         try {
-            await signInWithCredentials(
-                formValues.identifier.trim(),
-                formValues.password,
-            );
-        } catch (error: any) {
+            await signInWithCredentials(email, formValues.password);
+        } catch (error) {
             toast({
                 title: copy.loginErrorTitle,
-                description:
-                    error.message ||
-                    (isVietnamese
-                        ? "Không thể đăng nhập. Vui lòng kiểm tra thông tin và thử lại."
-                        : "Could not sign in. Please check your credentials and try again."),
+                description: getLoginErrorDescription(error),
                 variant: "destructive",
             });
         } finally {
@@ -180,27 +280,29 @@ const Login: React.FC = () => {
             <form className="space-y-6" onSubmit={handleSubmit}>
                 <div className="space-y-2">
                     <label className="px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300/85">
-                        {copy.identifier}
+                        {copy.email}
                     </label>
                     <div className="group relative">
                         <input
-                            autoComplete="username"
+                            autoCapitalize="none"
+                            autoComplete="email"
                             className="w-full rounded-t-xl border-b border-white/10 bg-white/[0.045] px-4 py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
                             onChange={(event) =>
                                 setFormValues((current) => ({
                                     ...current,
-                                    identifier: event.target.value,
+                                    email: event.target.value,
                                 }))
                             }
-                            placeholder={copy.identifierPlaceholder}
-                            type="text"
-                            value={formValues.identifier}
+                            placeholder={copy.emailPlaceholder}
+                            type="email"
+                            value={formValues.email}
                         />
                         <div
                             className="absolute bottom-0 left-0 h-[2px] w-0 transition-all duration-700 ease-in-out group-focus-within:w-full"
                             style={{ backgroundColor: appearance.primaryColor }}
                         />
                     </div>
+                    <p className="px-1 text-xs text-slate-400">{copy.emailHint}</p>
                 </div>
 
                 <div className="space-y-2">
@@ -294,7 +396,11 @@ const Login: React.FC = () => {
                         />
                     </svg>
                 )}
-                <span>{googleLoading || loading ? copy.signingIn : copy.continueWithGoogle}</span>
+                <span>
+                    {googleLoading || loading
+                        ? copy.signingIn
+                        : copy.continueWithGoogle}
+                </span>
             </button>
 
             <p className="mt-3 text-center text-xs text-slate-400">

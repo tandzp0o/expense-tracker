@@ -6,7 +6,18 @@ export const PageHeader: React.FC<{
     description?: string;
     actions?: React.ReactNode;
     className?: string;
-}> = ({ title, description, actions, className }) => (
+    hideTitleOnMobile?: boolean;
+    hideDescriptionOnMobile?: boolean;
+    hideActionsOnMobile?: boolean;
+}> = ({
+    title,
+    description,
+    actions,
+    className,
+    hideTitleOnMobile = true,
+    hideDescriptionOnMobile = true,
+    hideActionsOnMobile = false,
+}) => (
     <div
         className={cn(
             "flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between",
@@ -14,17 +25,32 @@ export const PageHeader: React.FC<{
         )}
     >
         <div className="min-w-0">
-            <h1 className="text-[1.35rem] font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
+            <h1
+                className={cn(
+                    "text-[1.35rem] font-semibold tracking-tight text-foreground sm:text-[1.75rem]",
+                    hideTitleOnMobile ? "hidden lg:block" : "",
+                )}
+            >
                 {title}
             </h1>
             {description ? (
-                <p className="mt-1 max-w-3xl text-[13px] leading-5 text-muted-foreground sm:text-sm sm:leading-6">
+                <p
+                    className={cn(
+                        "mt-1 max-w-3xl text-[13px] leading-5 text-muted-foreground sm:text-sm sm:leading-6",
+                        hideDescriptionOnMobile ? "hidden lg:block" : "",
+                    )}
+                >
                     {description}
                 </p>
             ) : null}
         </div>
         {actions ? (
-            <div className="flex w-full flex-wrap gap-2.5 sm:gap-3 lg:w-auto lg:justify-end [&>*]:w-full sm:[&>*]:w-auto">
+            <div
+                className={cn(
+                    "flex w-full flex-wrap gap-2.5 sm:gap-3 lg:w-auto lg:justify-end [&>*]:w-full sm:[&>*]:w-auto",
+                    hideActionsOnMobile ? "hidden lg:flex" : "",
+                )}
+            >
                 {actions}
             </div>
         ) : null}
