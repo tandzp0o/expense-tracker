@@ -47,14 +47,40 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     }, []);
 
     useEffect(() => {
+        let frameId: number | null = null;
+        let lastScrolled = window.scrollY > 88;
+
+        setIsScrolled(lastScrolled);
+
         const syncScrollState = () => {
-            setIsScrolled(window.scrollY > 56);
+            const nextScrolled = window.scrollY > 88;
+            if (nextScrolled === lastScrolled) {
+                return;
+            }
+
+            lastScrolled = nextScrolled;
+            setIsScrolled(nextScrolled);
         };
 
-        syncScrollState();
-        window.addEventListener("scroll", syncScrollState, { passive: true });
+        const handleScroll = () => {
+            if (frameId !== null) {
+                return;
+            }
 
-        return () => window.removeEventListener("scroll", syncScrollState);
+            frameId = window.requestAnimationFrame(() => {
+                frameId = null;
+                syncScrollState();
+            });
+        };
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+
+        return () => {
+            if (frameId !== null) {
+                window.cancelAnimationFrame(frameId);
+            }
+            window.removeEventListener("scroll", handleScroll);
+        };
     }, []);
 
     const currentPage = useMemo(
@@ -67,10 +93,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
     return (
         <header
-            className={cn(
-                "sticky top-0 z-40 px-2.5 transition-[padding] duration-200 sm:px-3 md:px-4",
-                isScrolled ? "pt-3" : "pt-1 md:pt-2",
-            )}
+            className="sticky top-0 z-40 px-2.5 pt-2 sm:px-3 md:px-4"
         >
             <div
                 className={cn(

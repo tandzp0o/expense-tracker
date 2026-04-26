@@ -1,6 +1,6 @@
 // public/sw.js - Ton Finance PWA Service Worker
 // ✅ Tăng version khi muốn force refresh cache cho user
-const CACHE_NAME = "ton-finance-cache-v3";
+const CACHE_NAME = "ton-finance-cache-v4";
 
 const ASSETS_TO_CACHE = [
     "/",

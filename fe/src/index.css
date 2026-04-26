@@ -172,9 +172,7 @@
         transition:
             background 220ms ease,
             border-color 220ms ease,
-            box-shadow 220ms ease,
-            transform 220ms ease,
-            backdrop-filter 220ms ease;
+            box-shadow 220ms ease;
     }
 
     .app-header-shell::before {
@@ -193,7 +191,6 @@
     }
 
     .app-header-shell.is-scrolled {
-        transform: translateY(2px);
         border-color: color-mix(in srgb, white 42%, var(--app-border));
         background:
             linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.08)),
@@ -267,6 +264,47 @@
 @media (min-width: 1024px) {
     .app-content-panel {
         background: var(--app-content-panel-background);
+    }
+}
+
+@media (max-width: 1023px) {
+    body,
+    .app-shell {
+        background-attachment: scroll;
+    }
+
+    .app-shell::before {
+        position: absolute;
+        opacity: 0.7;
+    }
+
+    .app-header-shell,
+    .app-header-shell.is-scrolled,
+    .app-header-user-trigger,
+    .app-header-user-trigger.is-scrolled {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    .app-header-shell {
+        transition:
+            background 160ms ease,
+            border-color 160ms ease,
+            box-shadow 160ms ease;
+    }
+
+    .app-header-shell::before {
+        filter: none;
+        transition: opacity 160ms ease;
+    }
+
+    .app-header-shell.is-scrolled {
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08)),
+            color-mix(in srgb, var(--app-card) 68%, transparent);
+        box-shadow:
+            0 14px 34px -24px rgba(15, 23, 42, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.28);
     }
 }
 

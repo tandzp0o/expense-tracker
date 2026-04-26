@@ -178,3 +178,12 @@
 - Header shell mặc định đã bỏ nền, shadow và blur để không còn trông như trạng thái đã scroll ngay khi vừa mở trang.
 - Chỉ khi cuộn quá 56px mới bật class `is-scrolled` để header có nền glass, shadow và viền nổi rõ.
 - Xác minh lại `npx tsc --noEmit` và `npm run build`: đều thành công.
+
+### Bổ sung tối ưu độ mượt khi scroll trên mobile
+
+- Tăng ngưỡng bật header nổi lên `88px` để phần đầu trang không bị đổi trạng thái quá sớm.
+- Header không còn đổi `padding-top` khi scroll, tránh reflow và cảm giác giật ở đoạn đầu.
+- Scroll listener của header chỉ cập nhật state khi vượt/ngược ngưỡng và được gom qua `requestAnimationFrame`.
+- Bỏ transition `transform` và `backdrop-filter` ở header; mobile dùng nền/shadow nhẹ hơn thay vì blur nặng trong lúc scroll.
+- Tắt `background-attachment: fixed` trên mobile cho `body` và `.app-shell` để giảm repaint khi cuộn.
+- Xác minh lại `npx tsc --noEmit` và `npm run build`: đều thành công.
