@@ -187,3 +187,27 @@
 - Bỏ transition `transform` và `backdrop-filter` ở header; mobile dùng nền/shadow nhẹ hơn thay vì blur nặng trong lúc scroll.
 - Tắt `background-attachment: fixed` trên mobile cho `body` và `.app-shell` để giảm repaint khi cuộn.
 - Xác minh lại `npx tsc --noEmit` và `npm run build`: đều thành công.
+
+### Bổ sung nút tải app và nén card ví mobile
+
+- Thêm nút `Tải xuống` ở header để chủ động gọi luồng cài đặt PWA thay vì chờ banner gợi ý của trình duyệt.
+- Cập nhật hook `usePWAInstall` để lắng nghe `beforeinstallprompt` ở cấp module, tránh bỏ lỡ prompt nếu event xuất hiện trước khi Header mount.
+- Hook cũng trả về trạng thái cài đặt, kết quả người dùng chọn và không dùng `alert` mặc định.
+- Nếu trình duyệt chưa cấp `beforeinstallprompt`, app hiển thị toast hướng dẫn thay vì im lặng.
+- Nén section ví trên Dashboard mobile: tiêu đề và nút quản lý nằm cùng hàng, mô tả ẩn trên mobile.
+- Nén card ví mobile: giảm chiều cao, đưa số dư lên cùng hàng với thông tin ví, thu nhỏ nút phân bổ và ẩn chip phân bổ phụ trên màn nhỏ.
+- Xác minh lại `npx tsc --noEmit` và `npm run build`: đều thành công.
+
+### Bổ sung thu gọn hàng thông tin ví mobile
+
+- Điều chỉnh hàng thông tin chính của card ví Dashboard trên mobile để không dùng `justify-between`, tránh thông tin ví và số dư bị đẩy xa nhau khi khoảng giữa trống.
+- Từ breakpoint `sm` trở lên vẫn giữ `justify-between` để bố cục desktop/tablet thoáng.
+- Xác minh lại `npx tsc --noEmit` và `npm run build`: đều thành công.
+
+### Bổ sung đổi màu thanh trạng thái trình duyệt mobile
+
+- Đổi `meta name="theme-color"` trong `public/index.html` sang `#000000` để thanh trạng thái Android/browser mobile hiển thị màu đen.
+- Đổi `apple-mobile-web-app-status-bar-style` sang `black` cho chế độ web app trên iOS.
+- Đổi `theme_color` và `background_color` trong `manifest.json` sang `#000000` để PWA/standalone đồng bộ màu đen.
+- Tăng service worker cache version từ `v4` lên `v5` để metadata mới không bị cache cũ giữ lại.
+- Xác minh lại `npx tsc --noEmit` và `npm run build`: đều thành công.

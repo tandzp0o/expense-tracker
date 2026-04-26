@@ -447,6 +447,7 @@ const ThemeSwitcher: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =
                 className="shrink-0"
                 onClick={() => setOpen(true)}
                 variant="outline"
+                size="sm"
             >
                 <Palette className="h-4 w-4" />
                 <span className="hidden sm:inline">

@@ -1996,13 +1996,18 @@ const Dashboard: React.FC = () => {
 
           {/* section wallet */}
           <Card className="overflow-hidden">
-            <CardHeader className="flex flex-col gap-4 border-b border-border/70 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-1">
-                <CardTitle>{copy.myWalletTitle}</CardTitle>
-                <CardDescription>{copy.myWalletDesc}</CardDescription>
+            <CardHeader className="flex-row items-start justify-between gap-3 border-b border-border/70 p-4 sm:p-5 lg:p-6">
+              <div className="min-w-0 space-y-0.5 sm:space-y-1">
+                <CardTitle className="text-base sm:text-lg">
+                  {copy.myWalletTitle}
+                </CardTitle>
+                <CardDescription className="hidden sm:block">
+                  {copy.myWalletDesc}
+                </CardDescription>
               </div>
 
               <Button
+                className="h-9 shrink-0 px-3 text-xs sm:text-sm"
                 onClick={() => navigate("/wallets")}
                 size="sm"
                 variant="outline"
@@ -2011,7 +2016,7 @@ const Dashboard: React.FC = () => {
               </Button>
             </CardHeader>
 
-            <CardContent className="pt-4 sm:pt-6">
+            <CardContent className="px-3 pb-4 pt-3 sm:p-5 lg:p-6">
               {walletCards.length > 0 ? (
                 <div className="flex flex-nowrap gap-2.5 overflow-x-auto overflow-y-hidden py-1 sm:gap-3">
                   {walletCards.map((wallet) => {
@@ -2070,7 +2075,7 @@ const Dashboard: React.FC = () => {
                     return (
                       <div
                         key={wallet._id}
-                        className="relative min-w-[236px] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] border border-white/12 bg-card shadow-sm sm:min-w-[286px]"
+                        className="relative min-w-[246px] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] border border-white/12 bg-card shadow-sm sm:min-w-[286px]"
                       >
                         <div
                           className="flex w-[200%] transition-transform duration-300 ease-out"
@@ -2081,7 +2086,7 @@ const Dashboard: React.FC = () => {
                           }}
                         >
                           <div
-                            className="relative min-h-[216px] w-1/2 shrink-0 overflow-hidden p-4 text-white sm:min-h-[238px] sm:p-5"
+                            className="relative min-h-[154px] w-1/2 shrink-0 overflow-hidden p-3.5 text-white sm:min-h-[238px] sm:p-5"
                             style={{
                               backgroundImage: wallet.background,
                               backgroundPosition: "center",
@@ -2089,62 +2094,61 @@ const Dashboard: React.FC = () => {
                             }}
                           >
                             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.18)_0%,rgba(2,6,23,0.36)_42%,rgba(2,6,23,0.88)_100%)]" />
-                            <div className="relative z-10 flex h-full flex-col justify-between gap-4">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="min-w-0 space-y-1.5">
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/72">
-                                    {walletTypeLabel}
-                                  </p>
-                                  <h3 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
-                                    {wallet.name}
-                                  </h3>
-                                  {wallet.accountNumber ? (
-                                    <p className="truncate text-xs text-white/68">
-                                      {wallet.accountNumber}
+                            <div className="relative z-10 flex h-full flex-col justify-between gap-3 sm:gap-4">
+                              <div className="flex items-start gap-2.5 sm:justify-between sm:gap-3">
+                                <div className="flex min-w-0 items-start gap-2.5">
+                                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-4px)] bg-white/14 backdrop-blur-sm sm:h-10 sm:w-10">
+                                    {normalizedType.includes("bank") ? (
+                                      <Landmark className="h-4 w-4 sm:h-5 sm:w-5" />
+                                    ) : normalizedType.includes("ewallet") ? (
+                                      <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
+                                    ) : (
+                                      <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/72 sm:text-[10px] sm:tracking-[0.16em]">
+                                      {walletTypeLabel}
                                     </p>
-                                  ) : null}
+                                    <h3 className="mt-0.5 truncate text-sm font-semibold tracking-tight sm:mt-1 sm:text-xl">
+                                      {wallet.name}
+                                    </h3>
+                                    {wallet.accountNumber ? (
+                                      <p className="mt-0.5 truncate text-[10px] text-white/68 sm:text-xs">
+                                        {wallet.accountNumber}
+                                      </p>
+                                    ) : null}
+                                  </div>
                                 </div>
 
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-2px)] bg-white/14 backdrop-blur-sm sm:h-10 sm:w-10">
-                                  {normalizedType.includes("bank") ? (
-                                    <Landmark className="h-4 w-4 sm:h-5 sm:w-5" />
-                                  ) : normalizedType.includes("ewallet") ? (
-                                    <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
-                                  ) : (
-                                    <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/68">
+                                <div className="shrink-0 text-left sm:text-right">
+                                  <p className="text-[9px] uppercase tracking-[0.14em] text-white/68 sm:text-[10px] sm:tracking-[0.18em]">
                                     {copy.availableBalance}
                                   </p>
-                                  <p className="mt-1 text-[1.45rem] font-semibold tracking-tight sm:text-[1.8rem]">
+                                  <p className="mt-0.5 text-xl font-semibold tracking-tight sm:mt-1 sm:text-[1.8rem]">
                                     {formatCurrency(parseAmount(wallet.balance))}
                                   </p>
                                 </div>
+                              </div>
 
-                                <div className="flex items-center justify-between gap-3 border-t border-white/18 pt-3 text-xs text-white/78">
-                                  <span>
-                                    {copy.share}: {wallet.share.toFixed(0)}%
-                                  </span>
-                                  <button
-                                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/16 bg-white/14 px-2.5 text-[11px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
-                                    onClick={() => setExpandedWalletId(wallet._id)}
-                                    type="button"
-                                  >
-                                    <ChartPie className="h-3.5 w-3.5" />
-                                    {copy.allocation}
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
+                              <div className="flex items-center justify-between gap-3 border-t border-white/18 pt-2.5 text-xs text-white/78 sm:pt-3">
+                                <span>
+                                  {copy.share}: {wallet.share.toFixed(0)}%
+                                </span>
+                                <button
+                                  className="inline-flex h-7 items-center gap-1 rounded-full border border-white/16 bg-white/14 px-2 text-[10px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[11px]"
+                                  onClick={() => setExpandedWalletId(wallet._id)}
+                                  type="button"
+                                >
+                                  <ChartPie className="h-3.5 w-3.5" />
+                                  {copy.allocation}
+                                  <ChevronRight className="h-3.5 w-3.5" />
+                                </button>
                               </div>
                             </div>
                           </div>
 
-                          <div className="min-h-[216px] w-1/2 shrink-0 bg-card p-4 text-foreground sm:min-h-[238px] sm:p-5">
+                          <div className="min-h-[154px] w-1/2 shrink-0 bg-card p-3.5 text-foreground sm:min-h-[238px] sm:p-5">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -2163,7 +2167,7 @@ const Dashboard: React.FC = () => {
                               </button>
                             </div>
 
-                            <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-muted">
+                            <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted sm:mt-4">
                               {allocationSegments.length > 0 ? (
                                 allocationSegments.map((segment) => (
                                   <div
@@ -2179,8 +2183,8 @@ const Dashboard: React.FC = () => {
                               )}
                             </div>
 
-                            <div className="mt-4 space-y-2.5">
-                              <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-muted/35 px-3 py-2">
+                            <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
+                              <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-muted/35 px-3 py-1.5 sm:py-2">
                                 <span className="text-xs text-muted-foreground">
                                   {copy.freeToSpend}
                                 </span>
@@ -2188,7 +2192,7 @@ const Dashboard: React.FC = () => {
                                   {formatCurrency(freeAmount)}
                                 </span>
                               </div>
-                              <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-muted/35 px-3 py-2">
+                              <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-muted/35 px-3 py-1.5 sm:py-2">
                                 <span className="text-xs text-muted-foreground">
                                   {copy.budgetReserved}
                                 </span>
@@ -2198,7 +2202,7 @@ const Dashboard: React.FC = () => {
                               </div>
                             </div>
 
-                            <div className="mt-3 flex flex-wrap gap-1.5">
+                            <div className="mt-2.5 hidden flex-wrap gap-1.5 sm:flex">
                               {reserveItems.length > 0 ? (
                                 reserveItems
                                   .filter((item) => Number(item.remaining || 0) > 0)

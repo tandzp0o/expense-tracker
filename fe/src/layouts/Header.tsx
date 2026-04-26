@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, LogOut, Menu, Settings, UserRound } from "lucide-react";
+import { ChevronDown, Download, LogOut, Menu, Settings, UserRound } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
+import { useToast } from "../contexts/ToastContext";
 import { Avatar } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
 import ThemeSwitcher from "../components/ThemeSwitcher";
 import { buildNavigationItems } from "./navigation";
 import { cn } from "../lib/utils";
+import { usePWAInstall } from "../hooks/usePWAInstall";
 
 interface HeaderProps {
     onMenuClick?: () => void;
@@ -18,6 +20,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     const navigate = useNavigate();
     const { logout, currentUser } = useAuth();
     const { language, isVietnamese } = useLocale();
+    const { toast } = useToast();
+    const { installApp, isInstalled } = usePWAInstall();
     const [menuOpen, setMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -31,6 +35,66 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         : "Create your first wallet to unlock Profile and Settings.";
     const menuItemClassName =
         "flex items-center gap-3 rounded-[var(--app-radius-md)] px-3 py-2 text-sm transition-colors";
+    const installCopy = isVietnamese
+        ? {
+              label: "Tải xuống",
+              installedTitle: "Ứng dụng đã sẵn sàng",
+              installedDesc:
+                  "FinTrack đã được cài hoặc đang chạy ở chế độ ứng dụng.",
+              unavailableTitle: "Chưa thể tải trực tiếp",
+              unavailableDesc:
+                  "Trình duyệt chưa cấp luồng cài đặt trực tiếp. Hãy mở bằng Chrome/Edge hoặc dùng Chia sẻ > Thêm vào màn hình chính trên Safari.",
+              dismissedTitle: "Đã huỷ tải xuống",
+              dismissedDesc: "Bạn có thể bấm lại nút tải xuống bất cứ lúc nào.",
+              acceptedTitle: "Đang tải FinTrack",
+              acceptedDesc: "Trình duyệt đang hoàn tất cài đặt ứng dụng.",
+          }
+        : {
+              label: "Download",
+              installedTitle: "App is ready",
+              installedDesc: "FinTrack is already installed or running as an app.",
+              unavailableTitle: "Direct download is not ready",
+              unavailableDesc:
+                  "The browser has not exposed the direct install flow yet. Open in Chrome/Edge, or use Share > Add to Home Screen on Safari.",
+              dismissedTitle: "Download cancelled",
+              dismissedDesc: "You can tap the download button again anytime.",
+              acceptedTitle: "Installing FinTrack",
+              acceptedDesc: "The browser is finishing app installation.",
+          };
+
+    const handleInstallApp = async () => {
+        if (isInstalled) {
+            toast({
+                title: installCopy.installedTitle,
+                description: installCopy.installedDesc,
+                variant: "success",
+            });
+            return;
+        }
+
+        const outcome = await installApp();
+        if (outcome === "accepted") {
+            toast({
+                title: installCopy.acceptedTitle,
+                description: installCopy.acceptedDesc,
+                variant: "success",
+            });
+            return;
+        }
+
+        if (outcome === "dismissed") {
+            toast({
+                title: installCopy.dismissedTitle,
+                description: installCopy.dismissedDesc,
+            });
+            return;
+        }
+
+        toast({
+            title: installCopy.unavailableTitle,
+            description: installCopy.unavailableDesc,
+        });
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -121,12 +185,23 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 </div>
 
                 <div className="ml-2 flex shrink-0 items-center gap-1.5 sm:gap-2">
+                    <Button
+                        aria-label={installCopy.label}
+                        className="h-10 w-10 shrink-0 px-0 sm:w-auto sm:px-3"
+                        onClick={handleInstallApp}
+                        size="sm"
+                        variant="outline"
+                    >
+                        <Download className="h-4 w-4" />
+                        <span className="hidden lg:inline">{installCopy.label}</span>
+                    </Button>
+
                     <ThemeSwitcher />
 
                     <div className="relative" ref={menuRef}>
                         <button
                             className={cn(
-                                "app-header-user-trigger flex items-center gap-2 rounded-[var(--app-radius-lg)] px-2.5 py-2 text-left transition-colors sm:gap-3 sm:px-3",
+                                "app-header-user-trigger flex items-center gap-2 rounded-[var(--app-radius-md)] md:px-2.5 md:py-2 text-left transition-colors sm:gap-3 sm:px-3",
                                 isScrolled && "is-scrolled",
                             )}
                             onClick={() => setMenuOpen((current) => !current)}

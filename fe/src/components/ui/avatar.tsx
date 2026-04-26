@@ -39,7 +39,7 @@ export const Avatar: React.FC<{
     return (
         <div
             className={cn(
-                "flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-muted-foreground",
+                "flex h-10 w-10 items-center justify-center overflow-hidden rounded-[var(--app-radius-md)] bg-muted text-sm font-semibold text-muted-foreground",
                 className,
             )}
         >
