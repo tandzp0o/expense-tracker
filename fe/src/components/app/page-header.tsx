@@ -20,7 +20,7 @@ export const PageHeader: React.FC<{
 }) => (
     <div
         className={cn(
-            "flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between",
+            "hidden md:flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between",
             className,
         )}
     >

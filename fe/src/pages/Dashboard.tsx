@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
@@ -7,14 +13,12 @@ import {
   ArrowUpRight,
   Briefcase,
   Car,
-  ChartPie,
-  ChevronRight,
   CreditCard,
   Download,
   HeartPulse,
   Home,
   Landmark,
-    Plus,
+  Plus,
   ShoppingBag,
   Sparkles,
   Target,
@@ -28,7 +32,10 @@ import { formatCurrency, formatDate } from "../utils/formatters";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
-import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
+import {
+  getAppearanceGradientColors,
+  useTheme,
+} from "../contexts/ThemeContext";
 import { cn, hexToRgba } from "../lib/utils";
 import { PageHeader } from "../components/app/page-header";
 import {
@@ -205,7 +212,8 @@ const getTransactionStatus = (transaction: Pick<Transaction, "status">) =>
 
 const isTransferTransaction = (
   transaction: Pick<Transaction, "category" | "transferGroupId">,
-) => transaction.category === "Transfer" || Boolean(transaction.transferGroupId);
+) =>
+  transaction.category === "Transfer" || Boolean(transaction.transferGroupId);
 
 const isCashflowTransaction = (transaction: Transaction) =>
   (transaction.type === "INCOME" || transaction.type === "EXPENSE") &&
@@ -305,7 +313,11 @@ const getCategoryMeta = (category: string) => {
 const getCategoryChartColor = (category: string, index: number) => {
   const label = normalizeText(category || "");
 
-  if (label.includes("an") || label.includes("uong") || label.includes("food")) {
+  if (
+    label.includes("an") ||
+    label.includes("uong") ||
+    label.includes("food")
+  ) {
     return "#10b981";
   }
 
@@ -395,7 +407,6 @@ const Dashboard: React.FC = () => {
     useState<TransactionFilter>("ALL");
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [expandedWalletId, setExpandedWalletId] = useState<string | null>(null);
   const fetchRequestRef = useRef(0);
   const rightColumnRef = useRef<HTMLDivElement | null>(null);
   const [transactionPanelHeight, setTransactionPanelHeight] = useState<
@@ -403,103 +414,102 @@ const Dashboard: React.FC = () => {
   >(null);
 
   const baseCopy = isVietnamese
-      ? {
-          headerTitle: "Bảng điều khiển tài chính",
-          headerDescription:
-            "Theo dõi dòng tiền, giao dịch gần đây, mục tiêu và số dư ví trong một nơi.",
-          reportButton: "Báo cáo",
-          addTransaction: "Thêm giao dịch",
-          allWallets: "Tất cả ví",
-          periods: {
-            "3m": "3 tháng",
-            "6m": "6 tháng",
-            "12m": "12 tháng",
-          } as Record<PeriodFilter, string>,
-          myBalance: "Tổng số dư",
-          income: "Thu nhập",
-          expense: "Chi tiêu",
-          monthExpense: "Chi tiêu tháng",
-          netProfit: "Dòng tiền ròng",
-          summary: "Tóm tắt",
-          vsPreviousPeriod: "so với kỳ trước",
-          noChange: "Không đổi so với kỳ trước",
-          newChange: "Phát sinh mới so với kỳ trước",
-          allWalletsActive: (count: number) =>
-            `${count} ví đang hoạt động trong hệ thống`,
-          activeWalletFocus: (name: string) =>
-            `${name} đang được chọn trên dashboard`,
-          savingsRate: (value: number) =>
-            `${value.toFixed(0)}% được giữ lại từ tổng thu`,
-          incomeChartDesc: (periodLabel: string) =>
-            `Biểu đồ thu nhập theo ${periodLabel.toLowerCase()} gần nhất`,
-          expenseChartDesc: "Tổng chi tiêu từng tháng trong kỳ đang chọn",
-          summaryChartDesc: "Tóm tắt các danh mục bạn đã chi tiêu trong kỳ này",
-          totalIncome: "Tổng thu nhập",
-          totalExpense: "Tổng chi tiêu",
-          transactionsTitle: "Giao dịch",
-          transactionsDesc:
-            "Danh sách giao dịch thay đổi theo bộ lọc kỳ xem, ví và loại giao dịch",
-          openTransactions: "Mở giao dịch",
-          noTransactions: "Chưa có giao dịch phù hợp với bộ lọc hiện tại.",
-          all: "Tất cả",
-          savingGoalTitle: "Mục tiêu tiết kiệm",
-          savingGoalDesc:
-            "Tiến độ mục tiêu đang ưu tiên trên dashboard",
-          openGoals: "Xem mục tiêu",
-          goalFocus: "Mục tiêu ưu tiên",
-          savedAmount: "Đã tiết kiệm",
-          activeGoals: "Mục tiêu đang chạy",
-          completedGoals: "Đã hoàn thành",
-          totalProgress: "Tổng tiến độ",
-          target: "Mục tiêu",
-          progress: "Tiến độ",
-          deadline: "Hạn",
-          noDeadline: "Chưa đặt hạn",
-          noGoalsTitle: "Chưa có mục tiêu tiết kiệm",
-          noGoalsDesc: "Tạo goal để hiển thị tiến độ tiết kiệm trên dashboard.",
-          myWalletTitle: "Ví của tôi",
-          myWalletDesc:
-            "Danh sách ví hiện tại theo dạng card để xem nhanh số dư và tỷ trọng",
-          manageWallets: "Quản lý ví",
-          availableBalance: "Số dư hiện tại",
-          allocation: "Phân bổ",
-          allocationDetails: "Chi tiết phân bổ",
-          backToCard: "Quay lại",
-          freeToSpend: "Có thể chi",
-          budgetReserved: "Giữ cho ngân sách",
-          noBudgetReserve: "Chưa gắn ngân sách tháng này",
-          share: "Tỷ trọng",
-          active: "Đang chọn",
-          noWallets: "Chưa có ví nào để hiển thị.",
-          unknownWallet: "Không rõ ví",
-          genericCategory: "Tổng quát",
-          noExpenseData: "Chưa có chi tiêu để tổng hợp.",
-          deleteTransaction: "Xóa giao dịch",
-          deleteTransactionDesc: (label: string) =>
-            `Xóa "${label}" khỏi danh sách giao dịch?`,
-          keep: "Giữ lại",
-          delete: "Xóa",
-          deleted: "Đã xóa giao dịch",
-          deleteFailed: "Xóa thất bại",
-          loadFailed: "Không thể tải dashboard",
-          loadFailedDesc: "Vui lòng thử lại sau ít phút.",
-          goalStatuses: {
-            active: "Đang thực hiện",
-            completed: "Hoàn thành",
-            expired: "Hết hạn",
-          } as Record<GoalItem["status"], string>,
-          walletTypes: {
-            cash: "Tiền mặt",
-            bank: "Ngân hàng",
-            ewallet: "Ví điện tử",
-            other: "Tài khoản",
-          },
-          transactionLabels: {
-            INCOME: "Thu nhập",
-            EXPENSE: "Chi tiêu",
-            OTHER: "Tiết kiệm",
-          },
-        }
+    ? {
+        headerTitle: "Bảng điều khiển tài chính",
+        headerDescription:
+          "Theo dõi dòng tiền, giao dịch gần đây, mục tiêu và số dư ví trong một nơi.",
+        reportButton: "Báo cáo",
+        addTransaction: "Thêm giao dịch",
+        allWallets: "Tất cả ví",
+        periods: {
+          "3m": "3 tháng",
+          "6m": "6 tháng",
+          "12m": "12 tháng",
+        } as Record<PeriodFilter, string>,
+        myBalance: "Tổng số dư",
+        income: "Thu nhập",
+        expense: "Chi tiêu",
+        monthExpense: "Chi tiêu tháng",
+        netProfit: "Dòng tiền ròng",
+        summary: "Tóm tắt",
+        vsPreviousPeriod: "so với kỳ trước",
+        noChange: "Không đổi so với kỳ trước",
+        newChange: "Phát sinh mới so với kỳ trước",
+        allWalletsActive: (count: number) =>
+          `${count} ví đang hoạt động trong hệ thống`,
+        activeWalletFocus: (name: string) =>
+          `${name} đang được chọn trên dashboard`,
+        savingsRate: (value: number) =>
+          `${value.toFixed(0)}% được giữ lại từ tổng thu`,
+        incomeChartDesc: (periodLabel: string) =>
+          `Biểu đồ thu nhập theo ${periodLabel.toLowerCase()} gần nhất`,
+        expenseChartDesc: "Tổng chi tiêu từng tháng trong kỳ đang chọn",
+        summaryChartDesc: "Tóm tắt các danh mục bạn đã chi tiêu trong kỳ này",
+        totalIncome: "Tổng thu nhập",
+        totalExpense: "Tổng chi tiêu",
+        transactionsTitle: "Giao dịch",
+        transactionsDesc:
+          "Danh sách giao dịch thay đổi theo bộ lọc kỳ xem, ví và loại giao dịch",
+        openTransactions: "Mở giao dịch",
+        noTransactions: "Chưa có giao dịch phù hợp với bộ lọc hiện tại.",
+        all: "Tất cả",
+        savingGoalTitle: "Mục tiêu tiết kiệm",
+        savingGoalDesc: "Tiến độ mục tiêu đang ưu tiên trên dashboard",
+        openGoals: "Xem mục tiêu",
+        goalFocus: "Mục tiêu ưu tiên",
+        savedAmount: "Đã tiết kiệm",
+        activeGoals: "Mục tiêu đang chạy",
+        completedGoals: "Đã hoàn thành",
+        totalProgress: "Tổng tiến độ",
+        target: "Mục tiêu",
+        progress: "Tiến độ",
+        deadline: "Hạn",
+        noDeadline: "Chưa đặt hạn",
+        noGoalsTitle: "Chưa có mục tiêu tiết kiệm",
+        noGoalsDesc: "Tạo goal để hiển thị tiến độ tiết kiệm trên dashboard.",
+        myWalletTitle: "Ví của tôi",
+        myWalletDesc:
+          "Danh sách ví hiện tại theo dạng card để xem nhanh số dư và tỷ trọng",
+        manageWallets: "Quản lý ví",
+        availableBalance: "Số dư hiện tại",
+        allocation: "Phân bổ",
+        allocationDetails: "Chi tiết phân bổ",
+        backToCard: "Quay lại",
+        freeToSpend: "Có thể chi",
+        budgetReserved: "Giữ cho ngân sách",
+        noBudgetReserve: "Chưa gắn ngân sách tháng này",
+        share: "Tỷ trọng",
+        active: "Đang chọn",
+        noWallets: "Chưa có ví nào để hiển thị.",
+        unknownWallet: "Không rõ ví",
+        genericCategory: "Tổng quát",
+        noExpenseData: "Chưa có chi tiêu để tổng hợp.",
+        deleteTransaction: "Xóa giao dịch",
+        deleteTransactionDesc: (label: string) =>
+          `Xóa "${label}" khỏi danh sách giao dịch?`,
+        keep: "Giữ lại",
+        delete: "Xóa",
+        deleted: "Đã xóa giao dịch",
+        deleteFailed: "Xóa thất bại",
+        loadFailed: "Không thể tải dashboard",
+        loadFailedDesc: "Vui lòng thử lại sau ít phút.",
+        goalStatuses: {
+          active: "Đang thực hiện",
+          completed: "Hoàn thành",
+          expired: "Hết hạn",
+        } as Record<GoalItem["status"], string>,
+        walletTypes: {
+          cash: "Tiền mặt",
+          bank: "Ngân hàng",
+          ewallet: "Ví điện tử",
+          other: "Tài khoản",
+        },
+        transactionLabels: {
+          INCOME: "Thu nhập",
+          EXPENSE: "Chi tiêu",
+          OTHER: "Tiết kiệm",
+        },
+      }
     : {
         headerTitle: "Finance Dashboard",
         headerDescription:
@@ -602,7 +612,9 @@ const Dashboard: React.FC = () => {
 
   const copy = {
     ...baseCopy,
-    headerTitle: isVietnamese ? "Bảng điều khiển tài chính" : "Finance Dashboard",
+    headerTitle: isVietnamese
+      ? "Bảng điều khiển tài chính"
+      : "Finance Dashboard",
     headerDescription: isVietnamese
       ? "Theo dõi dòng tiền, giao dịch gần đây, mục tiêu và số dư ví trong một nơi."
       : "Track cash flow, recent activity, goals, and wallet balances in one place.",
@@ -669,24 +681,24 @@ const Dashboard: React.FC = () => {
 
       const [walletsRes, transactionRes, goalsRes, budgetSummaryRes] =
         await Promise.all([
-        walletApi.getWallets(token),
-        transactionApi.getTransactions(
-          {
-            startDate,
-            endDate,
-            limit: 2500,
-            page: 1,
-          },
-          token,
-        ),
-        goalApi.getGoals(token),
-        budgetApi.getBudgetSummary(
-          {
-            month: dayjs().month() + 1,
-            year: dayjs().year(),
-          },
-          token,
-        ),
+          walletApi.getWallets(token),
+          transactionApi.getTransactions(
+            {
+              startDate,
+              endDate,
+              limit: 2500,
+              page: 1,
+            },
+            token,
+          ),
+          goalApi.getGoals(token),
+          budgetApi.getBudgetSummary(
+            {
+              month: dayjs().month() + 1,
+              year: dayjs().year(),
+            },
+            token,
+          ),
         ]);
 
       if (fetchRequestRef.current !== requestId) {
@@ -725,7 +737,6 @@ const Dashboard: React.FC = () => {
     setTransactions([]);
     setGoals([]);
     setBudgetSummary(null);
-    setExpandedWalletId(null);
   }, [currentUser?.uid]);
 
   useEffect(() => {
@@ -770,7 +781,10 @@ const Dashboard: React.FC = () => {
       resizeObserver.disconnect();
 
       if (typeof desktopQuery.removeEventListener === "function") {
-        desktopQuery.removeEventListener("change", updateTransactionPanelHeight);
+        desktopQuery.removeEventListener(
+          "change",
+          updateTransactionPanelHeight,
+        );
       } else {
         desktopQuery.removeListener(updateTransactionPanelHeight);
       }
@@ -989,7 +1003,10 @@ const Dashboard: React.FC = () => {
           value <= previousEnd.valueOf()
         );
       })
-      .reduce((total, transaction) => total + parseAmount(transaction.amount), 0);
+      .reduce(
+        (total, transaction) => total + parseAmount(transaction.amount),
+        0,
+      );
   }, [currentWeekStart, walletScopedCashflowTransactions]);
 
   const monthExpenseSparkline = useMemo(() => {
@@ -1152,11 +1169,7 @@ const Dashboard: React.FC = () => {
         percent: totalExpense > 0 ? (value / totalExpense) * 100 : 0,
         color: getCategoryChartColor(name, index),
       }));
-  }, [
-    copy.genericCategory,
-    currentCashflowTransactions,
-    totalExpense,
-  ]);
+  }, [copy.genericCategory, currentCashflowTransactions, totalExpense]);
 
   const summaryChartData = useMemo(
     () => ({
@@ -1260,14 +1273,13 @@ const Dashboard: React.FC = () => {
           allWalletBalance > 0
             ? (parseAmount(wallet.balance) / allWalletBalance) * 100
             : 0,
-        background:
-          wallet.imageUrl
-            ? `linear-gradient(180deg, rgba(2, 6, 23, 0.14) 0%, rgba(2, 6, 23, 0.62) 72%, rgba(2, 6, 23, 0.88) 100%), url("${wallet.imageUrl}")`
-            : wallet.color && wallet.color.startsWith("#")
-              ? `linear-gradient(180deg, ${hexToRgba(
-                  wallet.color,
-                  0.72,
-                )} 0%, ${hexToRgba(wallet.color, 0.92)} 54%, rgba(2, 6, 23, 0.94) 100%)`
+        background: wallet.imageUrl
+          ? `linear-gradient(180deg, rgba(2, 6, 23, 0.14) 0%, rgba(2, 6, 23, 0.62) 72%, rgba(2, 6, 23, 0.88) 100%), url("${wallet.imageUrl}")`
+          : wallet.color && wallet.color.startsWith("#")
+            ? `linear-gradient(180deg, ${hexToRgba(
+                wallet.color,
+                0.72,
+              )} 0%, ${hexToRgba(wallet.color, 0.92)} 54%, rgba(2, 6, 23, 0.94) 100%)`
             : `linear-gradient(180deg, ${hexToRgba(
                 themeColors.primary,
                 0.72,
@@ -1292,7 +1304,8 @@ const Dashboard: React.FC = () => {
 
   const getBudgetColor = useCallback(
     (budget: WalletBudgetItem, index: number) =>
-      budget.color || BUDGET_SEGMENT_COLORS[index % BUDGET_SEGMENT_COLORS.length],
+      budget.color ||
+      BUDGET_SEGMENT_COLORS[index % BUDGET_SEGMENT_COLORS.length],
     [],
   );
 
@@ -1324,14 +1337,16 @@ const Dashboard: React.FC = () => {
                   dashboardBalance,
                   selectedWalletItem?.currency || "VND",
                   {
-                  displayMode: "full",
+                    displayMode: "full",
                   },
                 )}
               </p>
             </div>
             <span className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-primary dark:border-white/10 dark:bg-white/10">
               <Sparkles className="h-3.5 w-3.5" />
-              {isVietnamese ? "AI đang học thói quen" : "AI learning your habits"}
+              {isVietnamese
+                ? "AI đang học thói quen"
+                : "AI learning your habits"}
             </span>
           </div>
 
@@ -1418,8 +1433,8 @@ const Dashboard: React.FC = () => {
 
       <PageHeader
         actions={
-          <div className="flex w-full flex-col gap-3 lg:items-end">
-            <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+          <div className="flex w-full flex-col gap-3 md:items-center md:flex-row-reverse justify-center">
+            <div className="gap-2 flex justify-end items-center">
               <Button
                 className="hidden h-9 whitespace-nowrap px-3 text-xs lg:inline-flex sm:text-sm"
                 onClick={() => navigate("/analytics")}
@@ -1582,11 +1597,19 @@ const Dashboard: React.FC = () => {
 
         <div className="mt-5 grid h-24 grid-cols-7 items-end gap-2">
           {weeklyExpenseBuckets.map((item, index) => {
-            const height = Math.max((item.value / mobileWeekMaxExpense) * 100, 16);
-            const isToday = currentWeekStart.add(index, "day").isSame(dayjs(), "day");
+            const height = Math.max(
+              (item.value / mobileWeekMaxExpense) * 100,
+              16,
+            );
+            const isToday = currentWeekStart
+              .add(index, "day")
+              .isSame(dayjs(), "day");
 
             return (
-              <div key={item.label} className="flex h-full flex-col justify-end gap-2">
+              <div
+                key={item.label}
+                className="flex h-full flex-col justify-end gap-2"
+              >
                 <div
                   className="rounded-t-[var(--app-radius-md)] rounded-b-sm"
                   style={{
@@ -1611,85 +1634,85 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="hidden gap-4 sm:gap-6 lg:grid xl:grid-cols-3">
-        <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div className="space-y-1">
-              <CardTitle>{copy.income}</CardTitle>
-              <CardDescription>
-                {copy.incomeChartDesc(periodLabel)}
-              </CardDescription>
-            </div>
-            <Badge variant="outline">{periodLabel}</Badge>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="h-36 lg:h-[18rem]">
-              <LineChart
-                data={incomeChartData}
-                options={{
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      display: false,
-                    },
-                  },
-                  scales: {
-                    x: {
-                      grid: { display: false },
-                      ticks: { color: tickColor },
-                    },
-                    y: {
-                      grid: { color: gridColor },
-                      ticks: {
-                        color: tickColor,
-                        callback: axisTick,
+        <div className="flex flex-col col-span-2 gap-6">
+          <Card className="overflow-hidden">
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle>{copy.income}</CardTitle>
+                <CardDescription>
+                  {copy.incomeChartDesc(periodLabel)}
+                </CardDescription>
+              </div>
+              <Badge variant="outline">{periodLabel}</Badge>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="h-20 lg:h-[12rem]">
+                <LineChart
+                  data={incomeChartData}
+                  options={{
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false,
                       },
                     },
-                  },
-                }}
-              />
-            </div>
-
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div className="space-y-1">
-              <CardTitle>{copy.monthExpense}</CardTitle>
-              <CardDescription>{copy.expenseChartDesc}</CardDescription>
-            </div>
-            <Badge variant="outline">{copy.monthExpense}</Badge>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="h-36 lg:h-[18rem]">
-              <BarChart
-                data={expenseChartData}
-                options={{
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      display: false,
-                    },
-                  },
-                  scales: {
-                    x: {
-                      grid: { display: false },
-                      ticks: { color: tickColor },
-                    },
-                    y: {
-                      grid: { color: gridColor },
-                      ticks: {
-                        color: tickColor,
-                        callback: axisTick,
+                    scales: {
+                      x: {
+                        grid: { display: false },
+                        ticks: { color: tickColor },
+                      },
+                      y: {
+                        grid: { color: gridColor },
+                        ticks: {
+                          color: tickColor,
+                          callback: axisTick,
+                        },
                       },
                     },
-                  },
-                }}
-              />
-            </div>
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-          </CardContent>
-        </Card>
+          <Card className="overflow-hidden">
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle>{copy.monthExpense}</CardTitle>
+                <CardDescription>{copy.expenseChartDesc}</CardDescription>
+              </div>
+              <Badge variant="outline">{copy.monthExpense}</Badge>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="h-20 lg:h-[10rem]">
+                <BarChart
+                  data={expenseChartData}
+                  options={{
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false,
+                      },
+                    },
+                    scales: {
+                      x: {
+                        grid: { display: false },
+                        ticks: { color: tickColor },
+                      },
+                      y: {
+                        grid: { color: gridColor },
+                        ticks: {
+                          color: tickColor,
+                          callback: axisTick,
+                        },
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card className="overflow-hidden">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -1751,7 +1774,6 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-
 
       <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
         <div
@@ -1852,17 +1874,21 @@ const Dashboard: React.FC = () => {
                             </Badge>
                             {transactionStatus !== "COMPLETED" ? (
                               <Badge variant="outline">
-                                {transactionStatusText[transactionStatus][
-                                  isVietnamese ? "vi" : "en"
-                                ]}
+                                {
+                                  transactionStatusText[transactionStatus][
+                                    isVietnamese ? "vi" : "en"
+                                  ]
+                                }
                               </Badge>
                             ) : null}
                           </div>
                           <p className="hidden">
-                            {walletName} • {transaction.category || copy.genericCategory}
+                            {walletName} •{" "}
+                            {transaction.category || copy.genericCategory}
                           </p>
                           <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                            {walletName} • {transaction.category || copy.genericCategory} •{" "}
+                            {walletName} •{" "}
+                            {transaction.category || copy.genericCategory} •{" "}
                             {formatDate(transaction.date)}
                           </p>
                         </div>
@@ -1895,7 +1921,7 @@ const Dashboard: React.FC = () => {
                   );
                 })
               ) : (
-              <div className="flex min-h-[200px] items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-4 text-center text-sm text-muted-foreground sm:min-h-[240px] sm:px-6">
+                <div className="flex min-h-[200px] items-center justify-center rounded-[var(--app-radius-lg)] border border-dashed border-border bg-muted/15 px-4 text-center text-sm text-muted-foreground sm:min-h-[240px] sm:px-6">
                   {copy.noTransactions}
                 </div>
               )}
@@ -1903,7 +1929,10 @@ const Dashboard: React.FC = () => {
           </Card>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4 sm:gap-6" ref={rightColumnRef}>
+        <div
+          className="flex min-w-0 flex-col gap-4 sm:gap-6"
+          ref={rightColumnRef}
+        >
           {/* section saving */}
           <Card className="overflow-hidden">
             <CardHeader className="flex flex-col gap-4 border-b border-border/70 md:flex-row md:items-start md:justify-between">
@@ -1936,7 +1965,8 @@ const Dashboard: React.FC = () => {
                       </div>
 
                       <p className="text-sm text-muted-foreground">
-                        {goalSummary.featuredGoal.category || copy.genericCategory}
+                        {goalSummary.featuredGoal.category ||
+                          copy.genericCategory}
                         {" - "}
                         {goalSummary.featuredGoal.deadline
                           ? `${copy.deadline}: ${formatDate(
@@ -2028,8 +2058,9 @@ const Dashboard: React.FC = () => {
                         : normalizedType.includes("cash")
                           ? copy.walletTypes.cash
                           : copy.walletTypes.other;
-                    const walletBudgetSummary =
-                      walletBudgetSummaryMap.get(wallet._id);
+                    const walletBudgetSummary = walletBudgetSummaryMap.get(
+                      wallet._id,
+                    );
                     const reserveItems = (
                       walletBudgetSummary?.items || []
                     ).filter(
@@ -2070,163 +2101,127 @@ const Dashboard: React.FC = () => {
                           color: getBudgetColor(item, index),
                         })),
                     ];
-                    const isExpanded = expandedWalletId === wallet._id;
-
                     return (
                       <div
                         key={wallet._id}
-                        className="relative min-w-[246px] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] border border-white/12 bg-card shadow-sm sm:min-w-[286px]"
+                        className="w-[min(286px,calc(100vw-3rem))] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] border border-white/12 bg-card shadow-sm"
                       >
                         <div
-                          className="flex w-[200%] transition-transform duration-300 ease-out"
+                          className="relative min-h-[154px] overflow-hidden p-3.5 text-white sm:min-h-[238px] sm:p-5"
                           style={{
-                            transform: isExpanded
-                              ? "translateX(-50%)"
-                              : "translateX(0)",
+                            backgroundImage: wallet.background,
+                            backgroundPosition: "center",
+                            backgroundSize: "cover",
                           }}
                         >
-                          <div
-                            className="relative min-h-[154px] w-1/2 shrink-0 overflow-hidden p-3.5 text-white sm:min-h-[238px] sm:p-5"
-                            style={{
-                              backgroundImage: wallet.background,
-                              backgroundPosition: "center",
-                              backgroundSize: "cover",
-                            }}
-                          >
-                            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.18)_0%,rgba(2,6,23,0.36)_42%,rgba(2,6,23,0.88)_100%)]" />
-                            <div className="relative z-10 flex h-full flex-col justify-between gap-3 sm:gap-4">
-                              <div className="flex items-start gap-2.5 sm:justify-between sm:gap-3">
-                                <div className="flex min-w-0 items-start gap-2.5">
-                                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-4px)] bg-white/14 backdrop-blur-sm sm:h-10 sm:w-10">
-                                    {normalizedType.includes("bank") ? (
-                                      <Landmark className="h-4 w-4 sm:h-5 sm:w-5" />
-                                    ) : normalizedType.includes("ewallet") ? (
-                                      <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
-                                    ) : (
-                                      <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
-                                    )}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/72 sm:text-[10px] sm:tracking-[0.16em]">
-                                      {walletTypeLabel}
-                                    </p>
-                                    <h3 className="mt-0.5 truncate text-sm font-semibold tracking-tight sm:mt-1 sm:text-xl">
-                                      {wallet.name}
-                                    </h3>
-                                    {wallet.accountNumber ? (
-                                      <p className="mt-0.5 truncate text-[10px] text-white/68 sm:text-xs">
-                                        {wallet.accountNumber}
-                                      </p>
-                                    ) : null}
-                                  </div>
+                          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.18)_0%,rgba(2,6,23,0.36)_42%,rgba(2,6,23,0.88)_100%)]" />
+                          <div className="relative z-10 flex h-full flex-col gap-3 sm:gap-4">
+                            <div className="flex items-start gap-2.5 sm:justify-between sm:gap-3">
+                              <div className="flex min-w-0 items-start gap-2.5">
+                                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-4px)] bg-white/14 backdrop-blur-sm sm:h-10 sm:w-10">
+                                  {normalizedType.includes("bank") ? (
+                                    <Landmark className="h-4 w-4 sm:h-5 sm:w-5" />
+                                  ) : normalizedType.includes("ewallet") ? (
+                                    <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
+                                  ) : (
+                                    <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
+                                  )}
                                 </div>
-
-                                <div className="shrink-0 text-left sm:text-right">
-                                  <p className="text-[9px] uppercase tracking-[0.14em] text-white/68 sm:text-[10px] sm:tracking-[0.18em]">
-                                    {copy.availableBalance}
+                                <div className="min-w-0">
+                                  <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/72 sm:text-[10px] sm:tracking-[0.16em]">
+                                    {walletTypeLabel}
                                   </p>
-                                  <p className="mt-0.5 text-xl font-semibold tracking-tight sm:mt-1 sm:text-[1.8rem]">
-                                    {formatCurrency(parseAmount(wallet.balance))}
-                                  </p>
+                                  <h3 className="mt-0.5 truncate text-sm font-semibold tracking-tight sm:mt-1 sm:text-xl">
+                                    {wallet.name}
+                                  </h3>
+                                  {wallet.accountNumber ? (
+                                    <p className="mt-0.5 truncate text-[10px] text-white/68 sm:text-xs">
+                                      {wallet.accountNumber}
+                                    </p>
+                                  ) : null}
                                 </div>
                               </div>
 
-                              <div className="flex items-center justify-between gap-3 border-t border-white/18 pt-2.5 text-xs text-white/78 sm:pt-3">
+                              <div className="shrink-0 text-left sm:text-right">
+                                <p className="text-[9px] uppercase tracking-[0.14em] text-white/68 sm:text-[10px] sm:tracking-[0.18em]">
+                                  {copy.availableBalance}
+                                </p>
+                                <p className="mt-0.5 text-xl font-semibold tracking-tight sm:mt-1 sm:text-[1.8rem]">
+                                  {formatCurrency(parseAmount(wallet.balance))}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2 border-t border-white/18 pt-2.5 text-xs text-white/78 sm:space-y-2.5 sm:pt-3">
+                              <div className="flex items-center justify-between gap-3">
                                 <span>
                                   {copy.share}: {wallet.share.toFixed(0)}%
                                 </span>
-                                <button
-                                  className="inline-flex h-7 items-center gap-1 rounded-full border border-white/16 bg-white/14 px-2 text-[10px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[11px]"
-                                  onClick={() => setExpandedWalletId(wallet._id)}
-                                  type="button"
-                                >
-                                  <ChartPie className="h-3.5 w-3.5" />
-                                  {copy.allocation}
-                                  <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
                               </div>
-                            </div>
-                          </div>
 
-                          <div className="min-h-[154px] w-1/2 shrink-0 bg-card p-3.5 text-foreground sm:min-h-[238px] sm:p-5">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                                  {copy.allocationDetails}
-                                </p>
-                                <h3 className="mt-1 truncate text-base font-semibold">
-                                  {wallet.name}
-                                </h3>
-                              </div>
-                              <button
-                                className="h-8 rounded-full border border-border bg-background px-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                onClick={() => setExpandedWalletId(null)}
-                                type="button"
-                              >
-                                {copy.backToCard}
-                              </button>
-                            </div>
-
-                            <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted sm:mt-4">
-                              {allocationSegments.length > 0 ? (
-                                allocationSegments.map((segment) => (
-                                  <div
-                                    key={segment.key}
-                                    style={{
-                                      backgroundColor: segment.color,
-                                      width: `${(segment.amount / allocationTotal) * 100}%`,
-                                    }}
-                                  />
-                                ))
-                              ) : (
-                                <div className="h-full w-full bg-muted-foreground/20" />
-                              )}
-                            </div>
-
-                            <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
-                              <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-muted/35 px-3 py-1.5 sm:py-2">
-                                <span className="text-xs text-muted-foreground">
-                                  {copy.freeToSpend}
-                                </span>
-                                <span className="text-sm font-semibold">
-                                  {formatCurrency(freeAmount)}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-muted/35 px-3 py-1.5 sm:py-2">
-                                <span className="text-xs text-muted-foreground">
-                                  {copy.budgetReserved}
-                                </span>
-                                <span className="text-sm font-semibold">
-                                  {formatCurrency(reservedAmount)}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="mt-2.5 hidden flex-wrap gap-1.5 sm:flex">
-                              {reserveItems.length > 0 ? (
-                                reserveItems
-                                  .filter((item) => Number(item.remaining || 0) > 0)
-                                  .slice(0, 3)
-                                  .map((item, index) => (
-                                    <span
-                                      key={item._id}
-                                      className="inline-flex max-w-full items-center truncate rounded-full px-2 py-1 text-[10px] font-medium"
+                              <div className="flex h-2 overflow-hidden rounded-full bg-white/14">
+                                {allocationSegments.length > 0 ? (
+                                  allocationSegments.map((segment) => (
+                                    <div
+                                      key={segment.key}
                                       style={{
-                                        backgroundColor: hexToRgba(
-                                          getBudgetColor(item, index),
-                                          0.14,
-                                        ),
-                                        color: getBudgetColor(item, index),
+                                        backgroundColor: segment.color,
+                                        width: `${(segment.amount / allocationTotal) * 100}%`,
                                       }}
-                                    >
-                                      {item.category}
-                                    </span>
+                                    />
                                   ))
-                              ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  {copy.noBudgetReserve}
-                                </span>
-                              )}
+                                ) : (
+                                  <div className="h-full w-full bg-white/24" />
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5">
+                                <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-white/10 px-3 py-2 backdrop-blur-sm">
+                                  <span className="text-[11px] text-white/72">
+                                    {copy.freeToSpend}
+                                  </span>
+                                  <span className="text-sm font-semibold text-white">
+                                    {formatCurrency(freeAmount)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 rounded-[var(--app-radius-md)] bg-white/10 px-3 py-2 backdrop-blur-sm">
+                                  <span className="text-[11px] text-white/72">
+                                    {copy.budgetReserved}
+                                  </span>
+                                  <span className="text-sm font-semibold text-white">
+                                    {formatCurrency(reservedAmount)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap gap-1.5">
+                                {reserveItems.length > 0 ? (
+                                  reserveItems
+                                    .filter(
+                                      (item) => Number(item.remaining || 0) > 0,
+                                    )
+                                    .slice(0, 3)
+                                    .map((item, index) => (
+                                      <span
+                                        key={item._id}
+                                        className="inline-flex max-w-full items-center truncate rounded-full px-2 py-1 text-[10px] font-medium"
+                                        style={{
+                                          backgroundColor: hexToRgba(
+                                            getBudgetColor(item, index),
+                                            0.14,
+                                          ),
+                                          color: getBudgetColor(item, index),
+                                        }}
+                                      >
+                                        {item.category}
+                                      </span>
+                                    ))
+                                ) : (
+                                  <span className="text-xs text-white/68">
+                                    {copy.noBudgetReserve}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>

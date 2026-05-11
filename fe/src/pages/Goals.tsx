@@ -559,7 +559,7 @@ const Goals: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col gap-3 border-t border-border pt-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:pt-4">
+                                    <div className="flex flex-row gap-3 border-t border-border pt-3 text-sm items-center justify-between sm:pt-4">
                                         <span className="text-muted-foreground">
                                             {goal.deadline
                                                 ? `${copy.deadline} ${formatDate(goal.deadline)}`
@@ -574,11 +574,12 @@ const Goals: React.FC = () => {
                                                 {copy.edit}
                                             </Button>
                                             <Button
+                                                className="hover:bg-red-200"
                                                 onClick={() => setPendingDelete(goal)}
                                                 size="sm"
                                                 variant="ghost"
                                             >
-                                                <Trash2 className="h-4 w-4" />
+                                                <Trash2 className="h-4 w-4 text-red-600" />
                                             </Button>
                                         </div>
                                     </div>

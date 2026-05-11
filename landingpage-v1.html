@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mầm Chi Tiêu AI v1</title>
+    <meta
+        name="description"
+        content="Phiên bản v1 cho landing page Mầm Chi Tiêu AI với hero video cinematic, typography serif, và nội dung gốc giữ nguyên."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Serif+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap"
+        rel="stylesheet"
+    />
+    <style>
+        :root {
+            --bg: #ffffff;
+            --bg-soft: #f7f7f4;
+            --surface: rgba(255, 255, 255, 0.88);
+            --surface-strong: rgba(255, 255, 255, 0.97);
+            --text: #000000;
+            --muted: #6f6f6f;
+            --line: rgba(0, 0, 0, 0.09);
+            --shadow: 0 28px 80px rgba(18, 36, 42, 0.12);
+            --shadow-soft: 0 18px 46px rgba(18, 36, 42, 0.09);
+            --photo-shadow: 0 34px 92px rgba(18, 36, 42, 0.18);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            background: var(--bg);
+            overflow-x: hidden;
+        }
+
+        h1,
+        h2,
+        h3,
+        .brand,
+        .brand-name {
+            font-family: "Noto Serif Display", Georgia, serif;
+            font-weight: 400;
+            letter-spacing: -0.02em;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        .page {
+            position: relative;
+        }
+
+        .container {
+            width: min(1200px, calc(100% - 32px));
+            margin: 0 auto;
+        }
+
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .hero-video-shell {
+            position: absolute;
+            inset: auto 0 0 0;
+            top: 300px;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .hero-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 120ms linear;
+            transform: scale(1.02);
+            filter: saturate(0.98) contrast(0.98) brightness(1.03);
+        }
+
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.25) 24%, rgba(255, 255, 255, 0.0) 50%, rgba(255, 255, 255, 0.14) 82%, rgba(255, 255, 255, 0.95) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .hero-top {
+            position: relative;
+            z-index: 2;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 24px 0 20px;
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            color: #000;
+        }
+
+        .brand-badge {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            background: rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.04);
+        }
+
+        .brand-badge::before {
+            content: "";
+            width: 16px;
+            height: 16px;
+            border-radius: 5px;
+            background: #2f7a54;
+            transform: rotate(-8deg);
+        }
+
+        .brand-name {
+            font-size: 2rem;
+            line-height: 1;
+        }
+
+        .brand-meta {
+            display: block;
+            margin-top: 4px;
+            font-family: "Inter", sans-serif;
+            font-size: 0.84rem;
+            color: var(--muted);
+        }
+
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+        .nav a {
+            font-size: 0.95rem;
+            color: var(--muted);
+            transition: color 180ms ease, transform 180ms ease;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            color: #000;
+            transform: translateY(-1px);
+        }
+
+        .nav-cta {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 18px;
+            border-radius: 999px;
+            background: #000;
+            color: #fff;
+            font-size: 0.94rem;
+            font-weight: 600;
+            border: 1px solid #000;
+            transition: transform 180ms ease, box-shadow 180ms ease;
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.12);
+        }
+
+        .nav-cta:hover {
+            transform: scale(1.03);
+        }
+
+        .hero-copy {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: calc(7rem - 60px) 24px 108px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-inner {
+            width: min(1100px, 100%);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #2f7a54;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: #2f7a54;
+            box-shadow: 0 0 0 6px rgba(47, 122, 84, 0.12);
+        }
+
+        .hero-title {
+            margin: 18px auto 0;
+            max-width: 16ch;
+            font-size: 3.7rem;
+            line-height: 0.95;
+            letter-spacing: -0.04em;
+            color: #000;
+        }
+
+        .hero-title .soft {
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        .hero-desc {
+            margin: 28px auto 0;
+            max-width: 48rem;
+            font-size: 1.08rem;
+            line-height: 1.8;
+            color: var(--muted);
+        }
+
+        .hero-actions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 28px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border-radius: 999px;
+            transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .btn:hover {
+            transform: scale(1.03);
+        }
+
+        .btn-primary {
+            padding: 18px 34px;
+            background: #000;
+            color: #fff;
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.18);
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .btn-secondary {
+            padding: 14px 22px;
+            background: rgba(255, 255, 255, 0.78);
+            border-color: rgba(0, 0, 0, 0.08);
+            color: #000;
+            font-size: 0.95rem;
+            font-weight: 600;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .hero-note {
+            margin: 18px auto 0;
+            width: fit-content;
+            padding: 12px 16px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #8a5f26;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .hero-points {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .point {
+            padding: 18px;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            text-align: left;
+            box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(8px);
+        }
+
+        .point strong {
+            display: block;
+            font-size: 1rem;
+            margin-bottom: 6px;
+        }
+
+        .point span {
+            display: block;
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .scroll-chevron {
+            position: absolute;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            z-index: 3;
+            color: #000;
+            font-family: "Inter", sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            opacity: 0.55;
+        }
+
+        .section {
+            padding: clamp(88px, 8vw, 132px) 0;
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(90deg, rgba(29, 93, 63, 0.16) 0%, rgba(250, 249, 244, 0.96) 23%, rgba(255, 255, 255, 0.98) 50%, rgba(250, 248, 240, 0.96) 77%, rgba(69, 179, 202, 0.16) 100%),
+                linear-gradient(180deg, #f9f7f1 0%, #ffffff 55%, #f4fbfb 100%);
+            isolation: isolate;
+        }
+
+        .section::before,
+        .section::after {
+            display: none;
+        }
+
+        .section:nth-of-type(odd) {
+            background:
+                linear-gradient(90deg, rgba(29, 93, 63, 0.18) 0%, rgba(250, 249, 244, 0.97) 24%, rgba(255, 255, 255, 0.98) 52%, rgba(250, 246, 238, 0.96) 78%, rgba(231, 184, 101, 0.16) 100%),
+                linear-gradient(180deg, #ffffff 0%, #faf8f1 58%, #ffffff 100%);
+        }
+
+        .section .container {
+            width: min(1120px, calc(100% - 64px));
+            position: relative;
+            z-index: 2;
+        }
+
+        .section-head {
+            display: grid;
+            grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.72fr);
+            align-items: end;
+            gap: clamp(24px, 5vw, 74px);
+            margin-bottom: clamp(30px, 4vw, 52px);
+        }
+
+        .section-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            color: #2f7a54;
+            font-family: "Inter", sans-serif;
+            font-size: 0.84rem;
+            font-weight: 700;
+            box-shadow: 0 10px 24px rgba(25, 72, 53, 0.08);
+        }
+
+        .section-kicker::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #2f7a54;
+        }
+
+        .section-title {
+            margin: 10px 0 0;
+            max-width: 16.5ch;
+            font-size: clamp(2.15rem, 3.25vw, 4.15rem);
+            line-height: 0.96;
+            letter-spacing: -0.035em;
+            text-wrap: balance;
+        }
+
+        .section-desc {
+            margin: 0;
+            max-width: 36rem;
+            color: var(--muted);
+            line-height: 1.85;
+            font-size: clamp(0.98rem, 1vw, 1.08rem);
+        }
+
+        .feature-grid,
+        .roadmap-grid,
+        .trust-grid {
+            display: grid;
+            gap: 18px;
+        }
+
+        .feature-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .feature-card,
+        .panel,
+        .roadmap-card,
+        .trust-card {
+            background: var(--surface);
+            border: 1px solid rgba(20, 45, 52, 0.1);
+            border-radius: 28px;
+            box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(9px);
+            position: relative;
+            overflow: hidden;
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+            will-change: transform;
+        }
+
+        .feature-card:hover,
+        .panel:hover,
+        .roadmap-card:hover,
+        .trust-card:hover,
+        .cohort-card:hover,
+        .insight:hover,
+        .flow-track:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow);
+            border-color: rgba(47, 122, 84, 0.18);
+        }
+
+        .feature-card::before,
+        .panel::before,
+        .roadmap-card::before,
+        .trust-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(135deg, rgba(47, 122, 84, 0.08), transparent 42%, rgba(82, 178, 203, 0.08));
+            opacity: 0.78;
+            pointer-events: none;
+        }
+
+        .feature-card > *,
+        .panel > *,
+        .roadmap-card > *,
+        .trust-card > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .feature-card,
+        .roadmap-card,
+        .trust-card {
+            padding: 24px;
+        }
+
+        .feature-card {
+            min-height: 248px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .icon-badge {
+            width: 54px;
+            height: 54px;
+            display: grid;
+            place-items: center;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            font-weight: 700;
+            box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.92), 0 10px 22px rgba(18, 36, 42, 0.06);
+        }
+
+        .feature-card h3,
+        .roadmap-card h3,
+        .trust-card h3,
+        .panel h3 {
+            margin: 0;
+            font-size: 1.48rem;
+            line-height: 1.1;
+        }
+
+        .feature-card p,
+        .roadmap-card p,
+        .trust-card p,
+        .panel p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #4f4f4f;
+            font-size: 0.84rem;
+        }
+
+        .flow-panel,
+        .split-grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: 1.05fr 0.95fr;
+        }
+
+        .panel {
+            padding: 24px;
+        }
+
+        .section-divider {
+            height: 1px;
+            margin: 20px 0;
+            background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.12), transparent);
+        }
+
+        .flow-track {
+            position: relative;
+            overflow: hidden;
+            padding: 24px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: var(--shadow-soft);
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+        }
+
+        .flow-track::before {
+            content: "";
+            position: absolute;
+            left: 28px;
+            right: 28px;
+            top: 50%;
+            height: 2px;
+            transform: translateY(-50%);
+            background: linear-gradient(90deg, rgba(0, 0, 0, 0.08), rgba(47, 122, 84, 0.5), rgba(0, 0, 0, 0.08));
+            border-radius: 999px;
+        }
+
+        .flow {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 10px;
+            align-items: center;
+        }
+
+        .flow-node {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            min-height: 112px;
+            padding: 16px 10px;
+            text-align: center;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .flow-node strong {
+            font-size: 0.98rem;
+        }
+
+        .flow-node span {
+            font-size: 0.84rem;
+            line-height: 1.45;
+            color: var(--muted);
+        }
+
+        .flow-arrow {
+            display: grid;
+            place-items: center;
+            color: #666;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .cohort-band {
+            display: grid;
+            gap: 14px;
+        }
+
+        .cohort-card {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 14px;
+            align-items: start;
+            padding: 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+        }
+
+        .cohort-mark {
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 16px;
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            font-weight: 700;
+        }
+
+        .cohort-card h4 {
+            margin: 0 0 6px;
+            font-size: 1rem;
+            font-family: "Inter", sans-serif;
+        }
+
+        .cohort-card p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.65;
+        }
+
+        .insight-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .insight {
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+        }
+
+        .tag {
+            display: inline-flex;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .tag.good {
+            background: rgba(47, 122, 84, 0.12);
+            color: #24724f;
+        }
+
+        .tag.warn {
+            background: rgba(255, 193, 92, 0.18);
+            color: #9a6522;
+        }
+
+        .tag.soft {
+            background: rgba(109, 190, 230, 0.16);
+            color: #2b6e87;
+        }
+
+        .roadmap-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .roadmap-card {
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .roadmap-step {
+            display: inline-flex;
+            width: fit-content;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #2f7a54;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .roadmap-list {
+            display: grid;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .roadmap-list span {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            color: var(--muted);
+            line-height: 1.55;
+            font-size: 0.93rem;
+        }
+
+        .roadmap-list span::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #2f7a54;
+            flex: 0 0 auto;
+            margin-top: 7px;
+        }
+
+        .trust-band {
+            padding: 24px;
+            border-radius: 28px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .trust-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin-top: 16px;
+        }
+
+        .trust-card {
+            min-height: 170px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chip {
+            display: inline-flex;
+            width: fit-content;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #2f7a54;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .footer {
+            padding: 32px 0 56px;
+            color: rgba(0, 0, 0, 0.55);
+            font-size: 0.92rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(90deg, rgba(45, 122, 84, 0.08), rgba(255, 255, 255, 0.9) 34%, rgba(255, 255, 255, 0.9) 66%, rgba(80, 180, 209, 0.1)),
+                #ffffff;
+        }
+
+        .nature-rail {
+            position: absolute;
+            top: clamp(34px, 4.8vw, 78px);
+            bottom: clamp(34px, 4.8vw, 78px);
+            width: min(24vw, 360px);
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+            opacity: 0.98;
+            transform: translateZ(0);
+            border: 1px solid rgba(255, 255, 255, 0.68);
+            box-shadow: var(--photo-shadow);
+        }
+
+        .nature-left {
+            left: 0;
+            border-radius: 0 42px 42px 0;
+        }
+
+        .nature-right {
+            right: 0;
+            border-radius: 42px 0 0 42px;
+        }
+
+        .nature-rail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+            filter: saturate(1.14) contrast(1.05) brightness(1.02);
+            transform: scale(1.015);
+        }
+
+        .nature-left img {
+            object-position: center 42%;
+        }
+
+        .nature-right img {
+            object-position: center 58%;
+        }
+
+        .nature-rail::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .nature-left::after {
+            background:
+                linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.1) 88%, rgba(255, 255, 255, 0.4) 100%);
+        }
+
+        .nature-right::after {
+            background:
+                linear-gradient(270deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.1) 88%, rgba(255, 255, 255, 0.4) 100%);
+        }
+
+        .nature-rail.top-fade::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, transparent 12%, transparent 88%, rgba(255, 255, 255, 0.08) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .nature-rail.top-fade::after {
+            z-index: 2;
+        }
+
+        .animate-fade-rise {
+            animation: fadeRise 0.8s ease-out both;
+        }
+
+        .animate-fade-rise-delay {
+            animation: fadeRise 0.8s ease-out 0.2s both;
+        }
+
+        .animate-fade-rise-delay-2 {
+            animation: fadeRise 0.8s ease-out 0.4s both;
+        }
+
+        .delay-1 {
+            animation-delay: 0.12s;
+        }
+
+        .delay-2 {
+            animation-delay: 0.24s;
+        }
+
+        .delay-3 {
+            animation-delay: 0.36s;
+        }
+
+        .delay-4 {
+            animation-delay: 0.48s;
+        }
+
+        .delay-5 {
+            animation-delay: 0.6s;
+        }
+
+        .delay-6 {
+            animation-delay: 0.72s;
+        }
+
+        .fade-rise {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeRise 0.8s ease-out both;
+        }
+
+        @keyframes fadeRise {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (min-width: 640px) {
+            .hero-title {
+                font-size: 4.4rem;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .hero-title {
+                font-size: 5.2rem;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .hero-title {
+                font-size: 6.1rem;
+            }
+        }
+
+        @media (max-width: 1080px) {
+            .feature-grid,
+            .roadmap-grid,
+            .trust-grid,
+            .flow-panel,
+            .split-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .flow {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 860px) {
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .nav {
+                gap: 12px;
+            }
+
+            .hero-copy {
+                padding: calc(7rem - 60px) 18px 96px;
+            }
+
+            .hero-points {
+                grid-template-columns: 1fr;
+            }
+
+            .section {
+                padding: 244px 0 72px;
+            }
+
+            .section .container {
+                width: min(100% - 36px, 760px);
+            }
+
+            .section-head {
+                grid-template-columns: 1fr;
+                align-items: start;
+                gap: 14px;
+                margin-bottom: 26px;
+            }
+
+            .section-title {
+                max-width: none;
+            }
+
+            .section-desc {
+                max-width: none;
+            }
+
+            .nature-rail {
+                top: 16px;
+                bottom: auto;
+                width: 50%;
+                height: 190px;
+                border-radius: 0;
+            }
+
+            .nature-left {
+                border-radius: 0 0 28px 0;
+            }
+
+            .nature-right {
+                border-radius: 0 0 0 28px;
+            }
+
+            .nature-left::after,
+            .nature-right::after {
+                background:
+                    linear-gradient(180deg, transparent 0%, transparent 66%, rgba(255, 255, 255, 0.58) 100%);
+            }
+        }
+
+        @media (max-width: 620px) {
+            .container {
+                width: min(100% - 20px, 1200px);
+            }
+
+            .section {
+                padding-top: 214px;
+            }
+
+            .section .container {
+                width: min(100% - 22px, 760px);
+            }
+
+            .nature-rail {
+                height: 164px;
+            }
+
+            .brand-name {
+                font-size: 1.8rem;
+            }
+
+            .hero-title {
+                max-width: 100%;
+                font-size: 3.2rem;
+            }
+
+            .hero-desc {
+                font-size: 0.98rem;
+            }
+
+            .hero-actions {
+                flex-direction: column;
+            }
+
+            .btn,
+            .nav-cta {
+                width: 100%;
+            }
+
+            .hero-note {
+                width: 100%;
+            }
+
+            .feature-card,
+            .roadmap-card,
+            .trust-card,
+            .panel,
+            .trust-band {
+                padding: 18px;
+            }
+
+            .flow {
+                grid-template-columns: 1fr;
+            }
+
+            .flow-arrow {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="hero" id="top">
+            <div class="hero-video-shell" aria-hidden="true">
+                <video
+                    class="hero-video"
+                    data-hero-video
+                    autoplay
+                    muted
+                    playsinline
+                    preload="auto"
+                >
+                    <source
+                        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_083109_283f3553-e28f-428b-a723-d639c617eb2b.mp4"
+                        type="video/mp4"
+                    />
+                </video>
+                <div class="hero-overlay"></div>
+            </div>
+
+            <div class="hero-top">
+                <div class="container">
+                    <header class="topbar animate-fade-rise">
+                        <a class="brand" href="#top" aria-label="Mầm Chi Tiêu AI">
+                            <span class="brand-badge" aria-hidden="true"></span>
+                            <span>
+                                <span class="brand-name">Mầm Chi Tiêu AI</span>
+                                <span class="brand-meta">Gold MVP · học từ data đã xác nhận</span>
+                            </span>
+                        </a>
+
+                        <nav class="nav" aria-label="Điều hướng">
+                            <a class="active" href="#ocr">OCR</a>
+                            <a href="#flow">Pipeline</a>
+                            <a href="#cohort">Phân lớp</a>
+                            <a href="#roadmap">Roadmap</a>
+                            <a class="nav-cta" href="#roadmap">Bắt đầu hành trình</a>
+                        </nav>
+                    </header>
+                </div>
+
+                <div class="hero-copy">
+                    <div class="hero-inner">
+                        <div class="eyebrow animate-fade-rise-delay">Gold MVP · OCR trước, gợi ý sau, train từ data thật</div>
+                        <h1 class="hero-title animate-fade-rise-delay">
+                            Trợ lý chi tiêu AI mọc lên từ <span class="soft">từng hóa đơn</span> của bạn
+                        </h1>
+                        <p class="hero-desc animate-fade-rise-delay">
+                            Điểm vàng của app là: chụp ảnh hóa đơn, đọc thông báo thanh toán, tự canh chỉnh ảnh,
+                            tách thông tin giao dịch, rồi học từ dữ liệu đã được người dùng xác nhận để gợi ý ngày
+                            càng đúng hơn theo từng tầng chi tiêu.
+                        </p>
+
+                        <div class="hero-actions animate-fade-rise-delay-2">
+                            <a class="btn btn-primary" href="#flow">Xem pipeline</a>
+                            <a class="btn btn-secondary" href="#roadmap">Xem roadmap</a>
+                        </div>
+
+                        <div class="hero-note animate-fade-rise-delay-2">
+                            Không lưu giao dịch AI nếu chưa xác nhận.
+                        </div>
+
+                        <div class="hero-points">
+                            <div class="point animate-fade-rise-delay">
+                                <strong>OCR và CV</strong>
+                                <span>Tự xoay ảnh, canh khung, đọc hóa đơn, phiếu thanh toán, popup điện thoại.</span>
+                            </div>
+                            <div class="point animate-fade-rise-delay">
+                                <strong>Phân lớp chi tiêu</strong>
+                                <span>Nhìn theo tầng tài chính, nhóm hành vi, và nhịp sống thật của từng người.</span>
+                            </div>
+                            <div class="point animate-fade-rise-delay">
+                                <strong>Gợi ý tốt hơn</strong>
+                                <span>Không chỉ tiết kiệm. Còn nhắc cân bằng ăn uống, mua sắm, sức khỏe và cuộc sống.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="scroll-chevron animate-fade-rise-delay-2">Scroll</div>
+            </div>
+        </section>
+
+        <section class="section" id="ocr">
+            <div class="nature-rail nature-left top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="nature-rail nature-right top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="container">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker fade-rise">Lõi đầu tiên</div>
+                        <h2 class="section-title fade-rise delay-1">
+                            OCR phải ngon trước. Model giỏi lên theo từng hóa đơn đã xác nhận.
+                        </h2>
+                    </div>
+                    <p class="section-desc fade-rise delay-2">
+                        Bước đầu không cần làm phức tạp. Cứ lấy đúng thứ người dùng đang có: ảnh hóa đơn, ảnh thanh toán,
+                        ảnh popup. Càng nhiều mẫu thật, extractor càng chắc tay.
+                    </p>
+                </div>
+
+                <div class="feature-grid">
+                    <article class="feature-card fade-rise delay-1">
+                        <div class="icon-badge">01</div>
+                        <h3>Ảnh vào, giao dịch ra</h3>
+                        <p>
+                            Chụp hóa đơn, ảnh màn hình, biên nhận. AI trả về merchant, số tiền, ngày giờ, note nháp
+                            và cảnh báo nếu thiếu chắc chắn.
+                        </p>
+                        <div class="pill-row">
+                            <span class="pill">Tự xoay</span>
+                            <span class="pill">Canh khung</span>
+                            <span class="pill">Trích dòng</span>
+                        </div>
+                    </article>
+
+                    <article class="feature-card fade-rise delay-2">
+                        <div class="icon-badge">02</div>
+                        <h3>Học từ ảnh thật</h3>
+                        <p>
+                            Chỉ cần người dùng duyệt lại một lần. Dữ liệu sạch hơn, model hiểu nhiều loại hóa đơn hơn,
+                            và nhãn category bám app hơn.
+                        </p>
+                        <div class="pill-row">
+                            <span class="pill">Opt-in</span>
+                            <span class="pill">Human confirm</span>
+                            <span class="pill">Active learning</span>
+                        </div>
+                    </article>
+
+                    <article class="feature-card fade-rise delay-3">
+                        <div class="icon-badge">03</div>
+                        <h3>Không chỉ hóa đơn</h3>
+                        <p>
+                            Popup thanh toán, màn hình app ngân hàng, thông báo ví điện tử, ảnh chụp nhanh ngoài đời.
+                            Chỗ nào có tín hiệu giao dịch, chỗ đó có giá trị.
+                        </p>
+                        <div class="pill-row">
+                            <span class="pill">Popup</span>
+                            <span class="pill">Screenshot</span>
+                            <span class="pill">Receipt</span>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="flow">
+            <div class="nature-rail nature-left top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="nature-rail nature-right top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="container">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker fade-rise">Dòng dữ liệu</div>
+                        <h2 class="section-title fade-rise delay-1">
+                            Ảnh đi qua pipeline, người dùng chốt lại, model học dần.
+                        </h2>
+                    </div>
+                    <p class="section-desc fade-rise delay-2">
+                        Không có bước nào tự động chốt cuối cùng nếu người dùng chưa đồng ý. Cái này giữ app an toàn,
+                        giữ dữ liệu sạch, và giữ niềm tin dài hạn.
+                    </p>
+                </div>
+
+                <div class="flow-panel">
+                    <div class="panel fade-rise delay-1">
+                        <h3>Luồng đề xuất</h3>
+                        <p>
+                            Chuỗi này là xương sống cho giai đoạn đầu. Rõ ràng, ngắn, dễ gắn API, dễ train lại khi có
+                            thêm dữ liệu.
+                        </p>
+                        <div class="section-divider"></div>
+                        <p>
+                            Ảnh vào -> tiền xử lý -> OCR/CV -> tạo draft có cấu trúc -> người dùng xác nhận ->
+                            lưu transaction -> dùng lại data xác nhận để nâng chất lượng model.
+                        </p>
+                    </div>
+
+                    <div class="flow-track fade-rise delay-2">
+                        <div class="flow">
+                            <div class="flow-node">
+                                <strong>Chụp ảnh</strong>
+                                <span>Hóa đơn, popup, biên nhận</span>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="flow-node">
+                                <strong>Xử lý ảnh</strong>
+                                <span>Tự xoay, canh, làm nét</span>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="flow-node">
+                                <strong>OCR / CV</strong>
+                                <span>Merchant, amount, thời gian</span>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="flow-node">
+                                <strong>Xác nhận</strong>
+                                <span>Người dùng sửa, chốt, lưu</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="cohort">
+            <div class="nature-rail nature-left top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="nature-rail nature-right top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1505142468610-359e7d316be0?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="container">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker fade-rise">Trọng tâm lớn</div>
+                        <h2 class="section-title fade-rise delay-1">
+                            Gợi ý hay phải hiểu tầng chi tiêu, rồi mới nói chuyện đúng người.
+                        </h2>
+                    </div>
+                    <p class="section-desc fade-rise delay-2">
+                        Mục tiêu không phải chỉ bảo người ta “bớt tiêu”. Mục tiêu là giúp họ sống cân bằng hơn:
+                        ăn đủ hơn, bớt mua sắm vô thức hơn, giữ sức khỏe tốt hơn, và ra quyết định tài chính sáng hơn.
+                    </p>
+                </div>
+
+                <div class="split-grid">
+                    <div class="panel fade-rise delay-1">
+                        <h3>3 tầng gợi ý</h3>
+                        <p>Phân lớp theo dữ liệu thật để AI không nói chung chung. Mỗi tầng có ngôn ngữ và nhịp nhắc riêng.</p>
+                        <div class="section-divider"></div>
+
+                        <div class="cohort-band">
+                            <div class="cohort-card">
+                                <div class="cohort-mark">A</div>
+                                <div>
+                                    <h4>Chi tiêu gọn</h4>
+                                    <p>Đã có kỷ luật, ưu tiên tối ưu dòng tiền. AI nhắc đúng lúc, không làm phiền nhiều.</p>
+                                </div>
+                            </div>
+                            <div class="cohort-card">
+                                <div class="cohort-mark">B</div>
+                                <div>
+                                    <h4>Chi tiêu cân bằng</h4>
+                                    <p>Cần gợi ý đều tay. AI giúp nhận ra chỗ rò rỉ, chỗ nên tăng đầu tư cho cuộc sống.</p>
+                                </div>
+                            </div>
+                            <div class="cohort-card">
+                                <div class="cohort-mark">C</div>
+                                <div>
+                                    <h4>Chi tiêu dễ trôi</h4>
+                                    <p>Chính là nhóm cần nhắc nhiều hơn. AI phải mềm, rõ, và đi kèm giải thích dễ hiểu.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel fade-rise delay-2">
+                        <h3>Ví dụ insight</h3>
+                        <p>Một gợi ý tốt không chỉ nhìn số tiền. Nó nhìn cả nhịp sống, thứ tự ưu tiên và chỗ nào đang lệch.</p>
+                        <div class="section-divider"></div>
+
+                        <div class="insight-list">
+                            <div class="insight">
+                                <span class="tag warn">Mất cân đối</span>
+                                <h4>Mua sắm cao, ăn uống thấp</h4>
+                                <p>Không cần chỉ bảo tiết kiệm. Cần nhắc người dùng cân bằng bữa ăn, sức khỏe, và nhu cầu sống thật.</p>
+                            </div>
+                            <div class="insight">
+                                <span class="tag soft">Xu hướng tuần</span>
+                                <h4>Chi cuối tuần tăng mạnh</h4>
+                                <p>AI nên nhắc theo thói quen, đưa cảnh báo nhẹ trước ngày dễ vượt hạn mức, thay vì đợi đến cuối tháng.</p>
+                            </div>
+                            <div class="insight">
+                                <span class="tag good">Cơ hội</span>
+                                <h4>Phần tiền rảnh đang nằm ở ví phụ</h4>
+                                <p>Gợi ý gom bớt số dư nhàn rỗi hoặc chuyển vào mục tiêu cụ thể, nhưng luôn để người dùng bấm duyệt.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="roadmap">
+            <div class="nature-rail nature-left top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="nature-rail nature-right top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="container">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker fade-rise">Lộ trình</div>
+                        <h2 class="section-title fade-rise delay-1">
+                            Đi từ cái thấy ngay sang cái giữ người dùng ở lại.
+                        </h2>
+                    </div>
+                    <p class="section-desc fade-rise delay-2">
+                        Bắt đầu bằng thứ hữu hình nhất: OCR. Sau đó mới đẩy sang recommendation, rồi mới tiến tới vòng
+                        lặp học sâu hơn từ dữ liệu đã xác nhận.
+                    </p>
+                </div>
+
+                <div class="roadmap-grid">
+                    <article class="roadmap-card fade-rise delay-1">
+                        <div class="roadmap-step">Phase 1</div>
+                        <h3>OCR + confirm</h3>
+                        <p>Đọc ảnh hóa đơn, popup thanh toán, screenshot giao dịch. Xong thì cho người dùng sửa trước khi lưu.</p>
+                        <div class="roadmap-list">
+                            <span>Tách text ra JSON có cấu trúc</span>
+                            <span>Có confidence và warning</span>
+                            <span>Không tự lưu nếu chưa duyệt</span>
+                        </div>
+                    </article>
+
+                    <article class="roadmap-card fade-rise delay-2">
+                        <div class="roadmap-step">Phase 2</div>
+                        <h3>Phân lớp chi tiêu</h3>
+                        <p>Nhìn hành vi theo tầng tài chính và nhóm nhỏ hơn. Dùng rule trước, model sau.</p>
+                        <div class="roadmap-list">
+                            <span>Nhóm theo budget, wallet, category</span>
+                            <span>Tách cohort rõ ràng</span>
+                            <span>Giảm gợi ý chung chung</span>
+                        </div>
+                    </article>
+
+                    <article class="roadmap-card fade-rise delay-3">
+                        <div class="roadmap-step">Phase 3</div>
+                        <h3>Gợi ý sống tốt hơn</h3>
+                        <p>Không chỉ tiết kiệm. Mà còn nhắc cân bằng ăn uống, giải trí, sức khỏe, và dòng tiền.</p>
+                        <div class="roadmap-list">
+                            <span>Insight theo tuần, tháng, mùa</span>
+                            <span>Phát hiện bất thường</span>
+                            <span>Nhắc đúng bối cảnh người dùng</span>
+                        </div>
+                    </article>
+
+                    <article class="roadmap-card fade-rise delay-4">
+                        <div class="roadmap-step">Phase 4</div>
+                        <h3>Data flywheel</h3>
+                        <p>Càng nhiều ảnh thật, càng nhiều sửa tay, model càng hiểu người dùng. Vòng lặp này mới là tài sản thật.</p>
+                        <div class="roadmap-list">
+                            <span>Opt-in training</span>
+                            <span>Đánh giá chất lượng gợi ý</span>
+                            <span>Học từ lần sửa category</span>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="nature-rail nature-left top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="nature-rail nature-right top-fade" aria-hidden="true">
+                <img
+                    src="https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&crop=entropy&w=2400&q=95"
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                />
+            </div>
+            <div class="container">
+                <div class="trust-band fade-rise">
+                    <div class="section-kicker">Niềm tin và kiếm tiền</div>
+                    <h2 class="section-title">
+                        Free vài tháng đầu. Sau đó thu phí nhẹ để duy trì AI, hạ tầng và chất lượng gợi ý.
+                    </h2>
+                    <p class="section-desc" style="margin-top: 10px;">
+                        Dữ liệu vẫn là của người dùng. AI chỉ là trợ lý. Muốn train thì phải có đồng ý rõ ràng,
+                        và người dùng luôn có quyền giữ riêng, xóa riêng, hoặc không tham gia train.
+                    </p>
+
+                    <div class="trust-grid">
+                        <article class="trust-card fade-rise delay-1">
+                            <div class="chip">Free trial</div>
+                            <h3>Đủ lâu để thấy giá trị</h3>
+                            <p>Cho người dùng chạm vào OCR và recommendation đủ lâu để thấy app khác gì với tracker thường.</p>
+                        </article>
+                        <article class="trust-card fade-rise delay-2">
+                            <div class="chip">Consent first</div>
+                            <h3>Train từ data đã duyệt</h3>
+                            <p>Chỉ dùng dữ liệu có xác nhận rõ ràng. Không lưu AI draft như kết luận cuối cùng.</p>
+                        </article>
+                        <article class="trust-card fade-rise delay-3">
+                            <div class="chip">Long term</div>
+                            <h3>Giữ người dùng bằng giá trị</h3>
+                            <p>Nếu gợi ý đủ hay, người dùng sẽ ở lại. Cái này mạnh hơn mọi chiêu ngắn hạn.</p>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <div class="container">Mầm Chi Tiêu AI · landing page v1 · mở trực tiếp từ file HTML</div>
+        </footer>
+    </main>
+
+    <script>
+        (() => {
+            const video = document.querySelector("[data-hero-video]");
+            if (!video) {
+                return;
+            }
+
+            const fadeDuration = 0.5;
+            let rafId = 0;
+            let loopActive = false;
+
+            const tick = () => {
+                const duration = Number(video.duration) || 0;
+                const currentTime = Number(video.currentTime) || 0;
+
+                if (!duration) {
+                    rafId = requestAnimationFrame(tick);
+                    return;
+                }
+
+                let opacity = 1;
+                if (currentTime < fadeDuration) {
+                    opacity = Math.min(opacity, currentTime / fadeDuration);
+                }
+
+                const remaining = duration - currentTime;
+                if (remaining < fadeDuration) {
+                    opacity = Math.min(opacity, Math.max(remaining / fadeDuration, 0));
+                }
+
+                video.style.opacity = String(opacity);
+                rafId = requestAnimationFrame(tick);
+            };
+
+            const startLoop = () => {
+                if (loopActive) {
+                    return;
+                }
+
+                loopActive = true;
+                cancelAnimationFrame(rafId);
+                rafId = requestAnimationFrame(tick);
+            };
+
+            const restartVideo = () => {
+                video.style.opacity = "0";
+                window.setTimeout(() => {
+                    video.currentTime = 0;
+                    video.play().catch(() => {});
+                }, 100);
+            };
+
+            video.addEventListener("loadedmetadata", startLoop);
+            video.addEventListener("play", startLoop);
+            video.addEventListener("ended", restartVideo);
+            video.addEventListener("error", () => {
+                video.style.opacity = "0.08";
+            });
+
+            video.play().catch(() => {});
+        })();
+    </script>
+</body>
+</html>

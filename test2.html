@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trắc nghiệm SKMT & BNN - Có Animation</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1e1b4b;
+            --card-bg: #312e81;
+            --text-main: #e0e7ff;
+            --btn-bg: #4f46e5;
+            --btn-hover: #4338ca;
+            --correct: #10b981;
+            --wrong: #ef4444;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        .quiz-container {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            max-width: 700px;
+            width: 100%;
+            position: relative;
+            z-index: 10;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 2px solid #4f46e5;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .question {
+            font-size: 1.4em;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+        .options {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        .option-btn {
+            background-color: var(--btn-bg);
+            color: white;
+            border: 2px solid transparent;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            display: flex;
+            align-items: center;
+        }
+        .option-btn:hover:not(:disabled) {
+            background-color: var(--btn-hover);
+            transform: translateY(-2px);
+        }
+        .option-btn:disabled {
+            cursor: not-allowed;
+        }
+        .option-label {
+            font-weight: bold;
+            margin-right: 15px;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 12px;
+            border-radius: 5px;
+        }
+        
+        /* Animations */
+        .correct-ans {
+            background-color: var(--correct) !important;
+            border-color: #fff !important;
+            box-shadow: 0 0 15px var(--correct);
+            transform: scale(1.02);
+        }
+        .wrong-ans {
+            background-color: var(--wrong) !important;
+            border-color: #fff !important;
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        
+        .feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4em;
+            font-weight: bold;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .feedback.show-correct {
+            color: var(--correct);
+            text-shadow: 0 0 20px #fff;
+            animation: popUp 1s ease forwards;
+        }
+        .feedback.show-wrong {
+            color: var(--wrong);
+            text-shadow: 0 0 20px #fff;
+            animation: popUp 1s ease forwards;
+        }
+        @keyframes popUp {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .hidden { display: none !important; }
+        .btn-start {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.3em;
+            background: var(--correct);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .btn-start:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+
+<div id="feedback-text" class="feedback"></div>
+
+<div class="quiz-container">
+    <div id="start-screen">
+        <h1 style="text-align: center; color: #34d399;">Trắc Nghiệm Tốc Độ</h1>
+        <h3 style="text-align: center;">60 Câu - SKMT & Bệnh Nghề Nghiệp</h3>
+        <p style="text-align: center; line-height: 1.6; color: #a5b4fc;">
+            Thể lệ: Chỉ có 1 đáp án đúng duy nhất (A, B, C hoặc D).<br>
+            Trả lời đúng sẽ có pháo hoa rực rỡ, trả lời sai sẽ bị rung chấn!<br>
+            Bạn đã sẵn sàng chưa?
+        </p>
+        <button class="btn-start" onclick="startQuiz()">Chiến luôn!</button>
+    </div>
+
+    <div id="quiz-screen" class="hidden">
+        <div class="header">
+            <span id="question-counter">Câu: 1/60</span>
+            <span id="score-counter">Điểm: 0</span>
+        </div>
+        <div id="question-text" class="question"></div>
+        <div id="options-container" class="options"></div>
+    </div>
+
+    <div id="result-screen" class="hidden">
+        <h1 style="text-align: center;">Hoàn thành xuất sắc!</h1>
+        <h2 id="final-score" style="text-align: center; color: #34d399; font-size: 3em; margin: 20px 0;">0/60</h2>
+        <p id="eval-msg" style="text-align: center; font-size: 1.2em;"></p>
+        <button class="btn-start" style="margin-top: 20px;" onclick="location.reload()">Chơi lại từ đầu</button>
+    </div>
+</div>
+
+<script>
+// Dữ liệu 60 câu hỏi dạng ABCD
+const questions = [
+    // Biến đổi khí hậu (1-10)
+    { q: "Nhiệt độ bề mặt Trái Đất tăng bao nhiêu độ C từ 1880-2024 theo NASA/GISS?", opts: ["1.1°C", "1.28°C", "1.47°C", "2.0°C"], ans: 2 },
+    { q: "Trong mô hình khí hậu - kinh tế, Vòng tuần hoàn cộng và trừ tương ứng với cơ chế nào?", opts: ["Cân bằng và Thúc đẩy", "Thúc đẩy và Cân bằng", "Tích lũy và Triệt tiêu", "Triệt tiêu và Tích lũy"], ans: 1 },
+    { q: "Quốc gia nào có tỷ lệ thanh niên lo âu về khí hậu cao nhất (Hickman, 2021)?", opts: ["Philippines", "Ấn Độ", "Bồ Đào Nha", "Pháp"], ans: 0 },
+    { q: "Định nghĩa 'Biến đổi khí hậu' theo IPCC 2007 ĐƯỢC duy trì trong khoảng thời gian bao lâu?", opts: ["Vài năm", "Hàng thập kỷ hoặc dài hơn", "Vài tháng", "Tức thời"], ans: 1 },
+    { q: "Bệnh Chikungunya lây truyền chủ yếu qua vector nào?", opts: ["Muỗi Culex", "Muỗi Anopheles", "Muỗi Aedes Aegypti", "Ruồi cát"], ans: 2 },
+    { q: "Tình trạng dễ bị tổn thương (Vulnerability) được hiểu là:", opts: ["Mức độ hệ thống nhạy cảm và không thể chống chịu", "Sự hiện diện của con người tại vùng nguy hiểm", "Biến đổi trạng thái khí quyển", "Mực nước biển dâng"], ans: 0 },
+    { q: "Các quốc gia SIDS chiếm bao nhiêu % dân số toàn cầu?", opts: ["1%", "5%", "10%", "15%"], ans: 0 },
+    { q: "Tác động gián tiếp của BĐKH lên sức khỏe bao gồm:", opts: ["Sốc nhiệt", "Chấn thương do bão", "Thay đổi hệ sinh thái vector truyền bệnh", "Đuối nước do lũ lụt"], ans: 2 },
+    { q: "Cơ chế nào giải thích BĐKH gây béo phì theo nghiên cứu của Behrens P (2025)?", opts: ["Tăng cường tổng hợp cơ bắp", "Thay thế bằng thực phẩm chế biến sẵn do thiếu thực phẩm tươi", "Giảm lượng đường trong máu", "Tăng cường chuyển hóa mỡ dưới da"], ans: 1 },
+    { q: "Tác động rõ rệt nhất của BĐKH tại Việt Nam là:", opts: ["Giảm nhiệt độ trung bình", "Mực nước biển dâng và thay đổi lượng mưa", "Tuyệt chủng toàn bộ sinh vật biển", "Động đất gia tăng"], ans: 1 },
+
+    // Ô nhiễm không khí (11-20)
+    { q: "Đạo luật Không khí sạch (Clean Air Act) của Anh Quốc được thông qua vào năm nào?", opts: ["1848", "1900", "1952", "1956"], ans: 3 },
+    { q: "Khí Ozone (O3) ở tầng thấp được hình thành chủ yếu do đâu?", opts: ["Phát thải trực tiếp từ ống xả xe", "Phản ứng quang hóa giữa NOx và chất hữu cơ bay hơi", "Cháy rừng", "Hoạt động núi lửa"], ans: 1 },
+    { q: "Hạt bụi mịn PM0.1 có khả năng đặc biệt nào khi xâm nhập cơ thể?", opts: ["Bị giữ lại ở mũi", "Đi qua hàng rào biểu mô đến tim, não", "Chỉ đọng ở khí quản", "Dễ dàng bị đại thực bào tiêu diệt"], ans: 1 },
+    { q: "Sự kiện London's Great Smog năm 1952 gây ra bao nhiêu ca tử vong?", opts: ["4.000", "8.000", "12.000", "20.000"], ans: 2 },
+    { q: "Ai là người đầu tiên được pháp luật công nhận chết trực tiếp do ô nhiễm không khí?", opts: ["Thomas Malthus", "John Snow", "Sanket Jain", "Ella Adoo-Kissi-Debrah"], ans: 3 },
+    { q: "Khí CO (Carbon Monoxide) gây độc theo cơ chế nào?", opts: ["Tạo mưa axit", "Kích ứng trực tiếp niêm mạc", "Thay thế oxy liên kết với Hemoglobin", "Phá hủy phế nang"], ans: 2 },
+    { q: "Ô nhiễm không khí gây tử vong cao nhất ở nhóm bệnh NCDs nào?", opts: ["Bệnh tim mạch", "Ung thư phổi", "Tiểu đường", "Đột quỵ"], ans: 0 },
+    { q: "Theo Scorecard WHO 2025, nồng độ PM2.5 trung bình năm của VN là bao nhiêu?", opts: ["15 µg/m3", "21 µg/m3", "25 µg/m3", "30 µg/m3"], ans: 1 },
+    { q: "Cơ chế gây viêm hệ thống do hạt bụi lắng đọng tại phế nang là do phóng thích:", opts: ["Chỉ Histamine", "Chỉ ROS", "Nhiều chất gồm Histamine, Leukotrienes, ROS", "Chỉ Interleukin"], ans: 2 },
+    { q: "Hành động nào thuộc về Sức khỏe môi trường (NEHA)?", opts: ["Chữa trị bệnh nan y", "Nhận diện, giới hạn phơi nhiễm tác nhân nguy hại", "Phẫu thuật chấn thương", "Khám bệnh định kỳ"], ans: 1 },
+
+    // Bệnh nghề nghiệp & Ergonomics (21-30)
+    { q: "Trong Ergonomics, đầu/thân gập/ngửa từ bao nhiêu độ trở lên bị coi là tư thế bất lợi?", opts: ["≥ 10 độ", "≥ 15 độ", "≥ 20 độ", "≥ 30 độ"], ans: 2 },
+    { q: "Khoảng cách vận chuyển thủ công (Manual handling) nào có rủi ro vừa phải?", opts: ["> 2m", "> 4m", "> 6m", "> 10m"], ans: 1 },
+    { q: "Điếc nghề nghiệp do tiếp xúc với yếu tố vật lý nào?", opts: ["Bức xạ", "Rung cục bộ", "Tiếng ồn", "Áp suất"], ans: 2 },
+    { q: "Nguyên tắc thiết kế chiều rộng ghế ngồi theo nhân trắc học lấy kích thước của ai?", opts: ["Người thấp", "Người cao", "Người béo", "Người gầy"], ans: 2 },
+    { q: "Hệ thống kiểm soát rủi ro (Hierarchy of controls) của NIOSH xếp yếu tố nào hiệu quả NHẤT?", opts: ["PPE", "Kiểm soát hành chính", "Thay thế", "Loại bỏ (Elimination)"], ans: 3 },
+    { q: "Thời gian tiếp xúc tiếng ồn tối đa cho phép ở mức 94 dBA là bao lâu?", opts: ["8 giờ", "4 giờ", "2 giờ", "1 giờ"], ans: 3 },
+    { q: "Bệnh phổi đen (Black lung) là do phơi nhiễm với loại bụi nào?", opts: ["Bụi than", "Bụi silica", "Bụi sắt", "Asbestos"], ans: 0 },
+    { q: "Sự cố kỹ thuật gây mất an toàn VSLĐ nghiêm trọng là sự cố:", opts: ["Gây thiệt hại > 1 tỷ đồng", "Vượt khả năng ứng phó của cơ sở", "Chỉ làm 1 người bị thương", "Chỉ hỏng máy móc"], ans: 1 },
+    { q: "Kích thước vùng thao tác tối ưu (Sâu x Rộng) cho vị trí ngồi là bao nhiêu?", opts: ["300x400mm", "400x600mm", "500x1300mm", "600x800mm"], ans: 0 },
+    { q: "Công thức tính sức chịu đựng lực cản trong lao động thủ công là gì?", opts: ["Tải trọng x 2", "Tải trọng bình thường x 4.5", "Khối lượng người / 2", "Tải trọng x 1.5"], ans: 1 },
+
+    // Ô nhiễm Đất (31-40)
+    { q: "Thứ tự các lớp của phẫu diện đất chuẩn từ bề mặt xuống đá mẹ là:", opts: ["A, B, C, O, R", "O, A, B, C, R", "O, A, E, B, C, R", "R, C, B, A, O"], ans: 1 },
+    { q: "Đất có Chỉ số vệ sinh (CSVS) = 0.80 thuộc tình trạng nào?", opts: ["Đất sạch", "Nhiễm bẩn yếu", "Nhiễm bẩn trung bình", "Nhiễm bẩn mạnh"], ans: 2 },
+    { q: "Thành phần rác sinh hoạt nào chiếm tỷ trọng LỚN NHẤT theo thể tích?", opts: ["Nhựa", "Giấy", "Hữu cơ", "Kim loại"], ans: 1 },
+    { q: "Ngưỡng giới hạn của thuốc trừ cỏ Atrazin trong đất là bao nhiêu mg/kg?", opts: ["0.2", "0.5", "1.0", "2.0"], ans: 0 },
+    { q: "Bệnh nào lây truyền qua đất do vi khuẩn?", opts: ["Uốn ván, Bệnh than", "Giun đũa", "Sán máng", "Viêm gan B"], ans: 0 },
+    { q: "Vi khuẩn chỉ thị nhiễm bẩn vi sinh vật của đất phổ biến là:", opts: ["Vibrio cholerae", "E. Coli, Clostridium Welchii", "Salmonella", "Shigella"], ans: 1 },
+    { q: "Ưu tiên CAO NHẤT trong tháp quản lý chất thải rắn của EPA là gì?", opts: ["Tái chế", "Đốt", "Chôn lấp", "Giảm phát sinh tại nguồn"], ans: 3 },
+    { q: "Ion nào dùng để chẩn đoán nhiễm độc đất qua phương pháp hóa học?", opts: ["NH3, NO2, NO3", "Ion SO4 2-", "Ion PO4 3-", "Ion K+"], ans: 0 },
+    { q: "Decomposers phân hủy chất hữu cơ tạo ra sản phẩm chứa Nitơ dạng nào trước tiên?", opts: ["Nitrat (NO3-)", "Amoni (NH4+)", "Nitrit (NO2-)", "Khí N2"], ans: 1 },
+    { q: "Nhiễm trùng lây truyền qua đất phổ biến nhất (STHs) là:", opts: ["Giun đũa, giun móc", "Sán lá gan", "Ký sinh trùng sốt rét", "Vi khuẩn tả"], ans: 0 },
+
+    // Ô nhiễm Nước (41-50)
+    { q: "Tỷ lệ nước trong Não của người trưởng thành là bao nhiêu?", opts: ["70%", "75%", "80%", "85%"], ans: 1 },
+    { q: "Bệnh 'Blue baby syndrome' xảy ra khi Methemoglobin vượt mức nào?", opts: ["> 15%", "> 30%", "> 40%", "> 55%"], ans: 3 },
+    { q: "Độ cứng của nước do sự hiện diện của ion nào?", opts: ["Na+ và K+", "Fe2+ và Mn2+", "Ca2+ và Mg2+", "Pb2+ và Cu2+"], ans: 2 },
+    { q: "Mối quan hệ đúng giữa các chỉ số oxy là:", opts: ["thOD > COD > BOD cuối > BOD5", "COD > thOD > BOD5", "BOD5 > COD > thOD", "BOD cuối > thOD > COD"], ans: 0 },
+    { q: "Ngộ độc Methylmercury qua cá gây ra bệnh gì?", opts: ["Minamata", "Itai-Itai", "Weil", "Cholera"], ans: 0 },
+    { q: "Giới hạn cho phép của Arsenic (As) trong nước sạch sinh hoạt là:", opts: ["0.05 mg/L", "0.01 mg/L", "0.02 mg/L", "0.1 mg/L"], ans: 1 },
+    { q: "Nước uống có nồng độ Fluoride bao nhiêu gây Fluorosis xương?", opts: ["> 0.5 mg/L", "> 1.5 mg/L", "> 3.0 mg/L", "> 5.0 mg/L"], ans: 3 },
+    { q: "Độc tố vi khuẩn lam khi bơi lội có thể gây triệu chứng gì?", opts: ["Viêm gan A", "Phồng rộp quanh miệng, mũi", "Viêm cơ tim", "Suy thận"], ans: 1 },
+    { q: "Triệu chứng đặc trưng của bệnh Sán máng qua đường nước là:", opts: ["Máu trong nước tiểu/phân", "Tiêu chảy cấp", "Đục thủy tinh thể", "Teo cơ"], ans: 0 },
+    { q: "So với nước mặt, nước ngầm có đặc điểm gì?", opts: ["Nhiều cặn hơn", "Nhiệt độ thay đổi mạnh", "Hàm lượng Sắt cao hơn", "Nhiều vi sinh vật hơn"], ans: 2 },
+
+    // Phân loại chất thải y tế & Hỗn hợp (51-60)
+    { q: "Chất thải y tế nguy hại gồm những loại nào?", opts: ["Chỉ chất thải lây nhiễm", "Lây nhiễm và nguy hại không lây nhiễm", "Chất thải sinh hoạt", "Chất thải tái chế"], ans: 1 },
+    { q: "Vi sinh vật Nhóm 3 có đặc điểm gì?", opts: ["Chưa gây bệnh", "Nguy cơ cá thể cao, cộng đồng trung bình", "Không có thuốc chữa", "Chỉ lây qua máu"], ans: 1 },
+    { q: "Màu sắc bao bì của Chất thải lây nhiễm là màu gì?", opts: ["Màu Xanh", "Màu Đen", "Màu Trắng", "Màu Vàng"], ans: 3 },
+    { q: "Cơ sở phát sinh DƯỚI 5kg/ngày lưu giữ chất thải lây nhiễm tối đa bao lâu?", opts: ["1 ngày", "2 ngày", "3 ngày", "7 ngày"], ans: 2 },
+    { q: "Vỏ lọ vắc xin KHÔNG phải loại giảm độc lực thuộc nhóm nào?", opts: ["Lây nhiễm", "Nguy hại", "Rắn thông thường", "Phóng xạ"], ans: 2 },
+    { q: "Chất thải dược phẩm 'gây độc tế bào' xếp vào loại nào?", opts: ["Lây nhiễm sắc nhọn", "Nguy hại không lây nhiễm", "Thông thường", "Tái chế"], ans: 1 },
+    { q: "Chất thải lây nhiễm lỏng phải được xử lý thế nào?", opts: ["Đổ ra cống chung", "Thu gom vào hệ thống nước thải y tế kín", "Cho vào túi vàng", "Đốt ngay lập tức"], ans: 1 },
+    { q: "Loại rác nào thuộc nhóm Vô Cơ không dễ tái chế?", opts: ["Bã trà", "Vỏ hộp giấy", "Đồ chơi, sành sứ", "Chai nhựa PET"], ans: 2 },
+    { q: "Độ pH chuẩn của nước sinh hoạt nên nằm trong khoảng nào?", opts: ["5.5 - 7.5", "6.0 - 8.5", "6.5 - 9.0", "7.0 - 8.5"], ans: 1 },
+    { q: "Thứ tự lượng nước phân bố trên Trái Đất (từ lớn đến nhỏ) là:", opts: ["Mặn > Ngầm > Sông băng > Mặt", "Mặn > Sông băng > Ngầm > Mặt", "Mặt > Mặn > Băng > Ngầm", "Băng > Mặn > Ngầm > Mặt"], ans: 1 }
+];
+
+let currentIndex = 0;
+let score = 0;
+let canAnswer = true;
+
+const startScreen = document.getElementById('start-screen');
+const quizScreen = document.getElementById('quiz-screen');
+const resultScreen = document.getElementById('result-screen');
+const qText = document.getElementById('question-text');
+const optionsContainer = document.getElementById('options-container');
+const qCounter = document.getElementById('question-counter');
+const scoreCounter = document.getElementById('score-counter');
+const feedbackText = document.getElementById('feedback-text');
+
+function startQuiz() {
+    startScreen.classList.add('hidden');
+    quizScreen.classList.remove('hidden');
+    loadQuestion();
+}
+
+function loadQuestion() {
+    if (currentIndex >= questions.length) {
+        showResults();
+        return;
+    }
+
+    canAnswer = true;
+    const q = questions[currentIndex];
+    qCounter.textContent = `Câu: ${currentIndex + 1}/${questions.length}`;
+    scoreCounter.textContent = `Điểm: ${score}`;
+    
+    qText.innerHTML = `<strong>Câu ${currentIndex + 1}:</strong> ${q.q}`;
+    optionsContainer.innerHTML = '';
+
+    const labels = ["A", "B", "C", "D"];
+    q.opts.forEach((opt, index) => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.innerHTML = `<span class="option-label">${labels[index]}</span> ${opt}`;
+        btn.onclick = () => handleAnswer(index, btn);
+        optionsContainer.appendChild(btn);
+    });
+}
+
+function handleAnswer(selectedIndex, btnNode) {
+    if (!canAnswer) return;
+    canAnswer = false; // Khóa không cho bấm nữa
+    
+    const q = questions[currentIndex];
+    const isCorrect = (selectedIndex === q.ans);
+    const allBtns = document.querySelectorAll('.option-btn');
+    
+    // Vô hiệu hóa tất cả các nút
+    allBtns.forEach(b => b.disabled = true);
+
+    if (isCorrect) {
+        // Đúng -> Confetti + Xanh lá
+        score++;
+        btnNode.classList.add('correct-ans');
+        triggerConfetti();
+        showFeedback("Tuyệt vời! ✓", true);
+    } else {
+        // Sai -> Rung lắc + Đỏ, bôi xanh đáp án đúng
+        btnNode.classList.add('wrong-ans');
+        allBtns[q.ans].classList.add('correct-ans'); // Hiển thị đáp án đúng
+        showFeedback("Sai rồi! ✗", false);
+    }
+
+    // Đợi 1.5 giây rồi chuyển câu
+    setTimeout(() => {
+        currentIndex++;
+        loadQuestion();
+    }, 1500);
+}
+
+function triggerConfetti() {
+    confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#10b981', '#34d399', '#ffffff', '#fbbf24']
+    });
+}
+
+function showFeedback(text, isCorrect) {
+    feedbackText.textContent = text;
+    feedbackText.className = 'feedback ' + (isCorrect ? 'show-correct' : 'show-wrong');
+    
+    // Reset class sau khi animate xong để dùng lại
+    setTimeout(() => {
+        feedbackText.className = 'feedback';
+    }, 1000);
+}
+
+function showResults() {
+    quizScreen.classList.add('hidden');
+    resultScreen.classList.remove('hidden');
+    document.getElementById('final-score').textContent = `${score}/${questions.length}`;
+    
+    const msg = document.getElementById('eval-msg');
+    if (score >= 50) msg.textContent = "Đỉnh của chóp! Đề thi này không làm khó được bạn.";
+    else if (score >= 40) msg.textContent = "Rất xuất sắc! Kiến thức vững vàng.";
+    else if (score >= 25) msg.textContent = "Khá khen cho sự nỗ lực! Hãy ôn tập thêm nhé.";
+    else msg.textContent = "Ui da... Cần phải cày lại slide bài giảng rồi bạn ơi!";
+    
+    // Bắn pháo hoa liên tục nếu điểm cao
+    if (score >= 40) {
+        let duration = 3 * 1000;
+        let end = Date.now() + duration;
+        (function frame() {
+            confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#10b981']});
+            confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#4f46e5']});
+            if (Date.now() < end) requestAnimationFrame(frame);
+        }());
+    }
+}
+</script>
+</body>
+</html>

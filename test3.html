@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trắc nghiệm Bệnh Nghề Nghiệp - 60 Câu Mới</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --btn-bg: #334155;
+            --btn-hover: #475569;
+            --correct: #22c55e;
+            --wrong: #ef4444;
+            --accent: #38bdf8;
+        }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .quiz-container {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--btn-bg);
+        }
+        .question {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        .options {
+            display: grid;
+            gap: 0.75rem;
+        }
+        .option-btn {
+            background-color: var(--btn-bg);
+            color: white;
+            border: 2px solid transparent;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+            font-size: 1rem;
+        }
+        .option-btn:hover:not(:disabled) {
+            background-color: var(--btn-hover);
+        }
+        .correct-ans { background-color: var(--correct) !important; border-color: white; }
+        .wrong-ans { background-color: var(--wrong) !important; animation: shake 0.4s; }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .feedback-pop {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 5rem;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+        }
+        .animate-pop { animation: pop 0.8s ease-out; }
+        @keyframes pop {
+            0% { opacity: 0; scale: 0.5; }
+            50% { opacity: 1; scale: 1.2; }
+            100% { opacity: 0; scale: 1; }
+        }
+        .hidden { display: none; }
+        .progress-bar {
+            height: 4px;
+            background: var(--accent);
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: width 0.3s;
+            border-radius: 1rem 1rem 0 0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="feedback" class="feedback-pop"></div>
+
+<div class="quiz-container">
+    <div id="progress" class="progress-bar" style="width: 0%"></div>
+    
+    <div id="start-screen">
+        <h1 style="color: var(--accent)">Bệnh Nghề Nghiệp (Bộ 2)</h1>
+        <p>Tài liệu bổ sung: 60 câu trắc nghiệm chuyên sâu về các nhóm bệnh nghề nghiệp thường gặp theo danh mục Bộ Y tế.</p>
+        <button class="option-btn" style="background: var(--accent); width: 100%; font-weight: bold;" onclick="startQuiz()">BẮT ĐẦU ÔN TẬP</button>
+    </div>
+
+    <div id="quiz-screen" class="hidden">
+        <div class="header">
+            <span id="q-count">Câu 1/60</span>
+            <span id="score">Điểm: 0</span>
+        </div>
+        <div id="q-text" class="question"></div>
+        <div id="options" class="options"></div>
+    </div>
+
+    <div id="result-screen" class="hidden">
+        <h2 style="text-align:center">KẾT QUẢ</h2>
+        <h1 id="final-score" style="text-align:center; font-size: 4rem; color: var(--accent)">0/60</h1>
+        <button class="option-btn" style="width: 100%" onclick="location.reload()">LÀM LẠI</button>
+    </div>
+</div>
+
+<script>
+const questions = [
+    // Bụi phổi & Hô hấp (1-15)
+    { q: "Bệnh bụi phổi Silic là do hít phải loại bụi nào?", opts: ["Bụi than", "Bụi Silic tự do (SiO2)", "Bụi bông", "Bụi Amiăng"], ans: 1 },
+    { q: "Triệu chứng lâm sàng sớm nhất của bệnh bụi phổi Silic thường là gì?", opts: ["Ho ra máu", "Đau ngực dữ dội", "Khó thở khi gắng sức", "Sốt cao"], ans: 2 },
+    { q: "Hình ảnh X-quang đặc trưng của bệnh bụi phổi Silic là:", opts: ["Phổi trắng xóa", "Các nốt mờ tròn, đều, rải rác 2 phế trường", "Tràn dịch màng phổi", "U phổi"], ans: 1 },
+    { q: "Bệnh bụi phổi Amiăng có nguy cơ cao dẫn đến loại ung thư nào?", opts: ["Ung thư gan", "Ung thư biểu mô trung biểu mô (Mesothelioma)", "Ung thư xương", "Ung thư vòm họng"], ans: 1 },
+    { q: "Bệnh bụi phổi than (Black Lung) chủ yếu gặp ở đối tượng nào?", opts: ["Công nhân dệt", "Công nhân khai thác mỏ than", "Thợ mộc", "Nhân viên y tế"], ans: 1 },
+    { q: "Bệnh Byssinosis (bụi phổi bông) thường có triệu chứng đặc biệt vào ngày nào trong tuần?", opts: ["Ngày cuối tuần", "Thứ Hai (Ngày đầu tuần đi làm)", "Thứ Năm", "Không có quy luật"], ans: 1 },
+    { q: "Hen phế quản nghề nghiệp chiếm khoảng bao nhiêu % các trường hợp hen ở người trưởng thành?", opts: ["1-5%", "10-15%", "30-40%", "50%"], ans: 1 },
+    { q: "Bệnh viêm phế quản mạn tính nghề nghiệp được chẩn đoán khi ho và khạc đờm ít nhất bao nhiêu tháng?", opts: ["1 tháng/năm", "2 tháng/năm trong 1 năm", "3 tháng/năm trong ít nhất 2 năm liên tiếp", "6 tháng liên tục"], ans: 2 },
+    { q: "Yếu tố nào làm tăng đáng kể nguy cơ ung thư phổi ở người tiếp xúc với Amiăng?", opts: ["Uống rượu", "Hút thuốc lá", "Lười vận động", "Ăn nhiều dầu mỡ"], ans: 1 },
+    { q: "Để dự phòng bệnh bụi phổi, biện pháp kỹ thuật quan trọng nhất là:", opts: ["Phát khẩu trang cho công nhân", "Thông gió và làm ẩm quy trình sản xuất", "Khám sức khỏe định kỳ", "Tắm rửa sau giờ làm"], ans: 1 },
+    { q: "Bụi phổi Silic là bệnh phổi:", opts: ["Cấp tính có thể chữa khỏi", "Mạn tính, không hồi phục", "Do vi khuẩn gây ra", "Chỉ gặp ở người già"], ans: 1 },
+    { q: "Nốt mờ trên X-quang bụi phổi Silic thường tập trung đầu tiên ở vùng nào?", opts: ["Đỉnh phổi", "Vùng giữa và dưới phổi", "Đáy phổi", "Rốn phổi"], ans: 1 },
+    { q: "Thời gian tiếp xúc tối thiểu để tính là mắc bệnh bụi phổi Silic nghề nghiệp thường là:", opts: ["1 tháng", "6 tháng", "vài năm (thường >5 năm)", "10 năm"], ans: 2 },
+    { q: "Bụi nào dưới đây thuộc nhóm bụi hữu cơ?", opts: ["Bụi sắt", "Bụi talc", "Bụi gỗ", "Bụi xi măng"], ans: 2 },
+    { q: "Biện pháp bảo hộ cá nhân (PPE) tốt nhất để chống bụi mịn là:", opts: ["Khẩu trang vải", "Khẩu trang y tế 3 lớp", "Mặt nạ lọc bụi tiêu chuẩn (N95, P100...)", "Khăn rằn"], ans: 2 },
+
+    // Nhiễm độc hóa chất (16-30)
+    { q: "Chì xâm nhập vào cơ thể chủ yếu qua đường nào trong môi trường lao động?", opts: ["Đường tiêu hóa", "Đường hô hấp", "Qua niêm mạc mắt", "Đường tiêm"], ans: 1 },
+    { q: "Dấu hiệu 'đường viền Burton' (viền đen ở lợi) là biểu hiện của nhiễm độc gì?", opts: ["Nhiễm độc Thủy ngân", "Nhiễm độc Chì", "Nhiễm độc Benzen", "Nhiễm độc Đồng"], ans: 1 },
+    { q: "Nhiễm độc Benzen nghề nghiệp chủ yếu gây tổn hại đến hệ thống nào?", opts: ["Hệ tiêu hóa", "Hệ tạo máu (Tủy xương)", "Hệ xương khớp", "Hệ tiết niệu"], ans: 1 },
+    { q: "Biến chứng nặng nhất của nhiễm độc Benzen mạn tính là:", opts: ["Viêm dạ dày", "Suy thận", "Ung thư máu (Leukemia)", "Viêm da cơ địa"], ans: 2 },
+    { q: "Nhiễm độc hóa chất bảo vệ thực vật (lân hữu cơ) gây ức chế men nào?", opts: ["Amylase", "Cholinesterase", "Pepsin", "Lipase"], ans: 1 },
+    { q: "Triệu chứng đặc trưng của nhiễm độc Thủy ngân mạn tính là:", opts: ["Run tay, rối loạn tâm thần (Erethism)", "Gãy xương tự nhiên", "Điếc tai", "Mù màu"], ans: 0 },
+    { q: "Nhiễm độc Mangan thường biểu hiện giống bệnh lý thần kinh nào?", opts: ["Alzheimer", "Parkinson (run, đi lại khó khăn)", "Động kinh", "Viêm não"], ans: 1 },
+    { q: "Chất nào được coi là 'sát thủ thầm lặng' trong không gian kín, gây ngạt do chiếm chỗ oxy?", opts: ["N2", "CO", "CO2", "Tất cả các khí trên"], ans: 3 },
+    { q: "Khí CO gây độc bằng cách tạo ra hợp chất bền vững nào trong máu?", opts: ["Oxyhemoglobin", "Carboxyhemoglobin (HbCO)", "Methemoglobin", "Carbaminohemoglobin"], ans: 1 },
+    { q: "Nhiễm độc Cadmium (Cd) mạn tính gây tổn thương nghiêm trọng ở đâu?", opts: ["Gan và tim", "Thận và xương", "Phổi và da", "Mắt và tai"], ans: 1 },
+    { q: "Bệnh Itai-Itai ở Nhật Bản do nhiễm độc chất nào qua nguồn nước/thực phẩm?", opts: ["Chì", "Thủy ngân", "Cadmium", "Arsen"], ans: 2 },
+    { q: "Công nhân sản xuất bình ắc quy có nguy cơ cao nhiễm độc chất nào?", opts: ["Benzen", "Chì", "Silic", "Tiếng ồn"], ans: 1 },
+    { q: "Arsen (Thạch tín) nghề nghiệp có thể gây ra bệnh lý da nào?", opts: ["Bệnh vảy nến", "Dày sừng lòng bàn tay, bàn chân và ung thư da", "Ghẻ lở", "Mề đay"], ans: 1 },
+    { q: "Chất giải độc đặc hiệu (antidote) cho nhiễm độc lân hữu cơ là:", opts: ["Vitamin C", "Atropin và Pralidoxime", "Nước muối sinh lý", "Xanh methylen"], ans: 1 },
+    { q: "Khi bị hóa chất bắn vào mắt, việc cần làm đầu tiên là:", opts: ["Chờ xe cấp cứu", "Rửa mắt liên tục bằng nước sạch trong ít nhất 15 phút", "Nhỏ thuốc mắt thông thường", "Đắp lá thuốc"], ans: 1 },
+
+    // Vật lý & Điếc nghề nghiệp (31-45)
+    { q: "Đặc điểm của điếc nghề nghiệp do tiếng ồn là:", opts: ["Điếc một bên tai", "Điếc dẫn truyền", "Điếc tiếp nhận, đối xứng 2 bên, không hồi phục", "Có thể chữa khỏi bằng thuốc"], ans: 2 },
+    { q: "Trên thính lực đồ, dấu hiệu sớm của điếc nghề nghiệp là khuyết (dip) ở tần số nào?", opts: ["1000 Hz", "2000 Hz", "4000 Hz", "8000 Hz"], ans: 2 },
+    { q: "Bệnh rung chuyển nghề nghiệp (Hội chứng Raynaud) do dùng máy cầm tay gây tổn thương mạch máu ở đâu?", opts: ["Gót chân", "Đầu ngón tay (trắng bệch khi lạnh)", "Thắt lưng", "Bả vai"], ans: 1 },
+    { q: "Bệnh do thay đổi áp suất đột ngột (Bệnh giảm áp) thường gặp ở đối tượng nào?", opts: ["Phi công", "Thợ lặn, công nhân hầm tàu", "Công nhân xây dựng", "Nông dân"], ans: 1 },
+    { q: "Để phòng ngừa bệnh giảm áp, quy tắc quan trọng nhất là:", opts: ["Ngoi lên thật nhanh", "Giảm áp từ từ theo quy trình", "Nhịn thở", "Uống nhiều nước"], ans: 1 },
+    { q: "Bức xạ ion hóa (Tia X, tia Gamma) có thể gây ra hậu quả gì?", opts: ["Bỏng da, suy tủy, ung thư, đột biến gen", "Chỉ gây sạm da", "Làm tăng thị lực", "Không gây hại nếu tiếp xúc ít"], ans: 0 },
+    { q: "Cataract (Đục thủy tinh thể) nghề nghiệp thường gặp ở thợ làm nghề nào?", opts: ["Thợ mộc", "Thợ thủy tinh, thợ luyện kim (do tia hồng ngoại)", "Văn phòng", "Lái xe"], ans: 1 },
+    { q: "Say nóng, say nắng trong môi trường lao động là do tác động của:", opts: ["Độ ẩm thấp", "Nhiệt độ cao và bức xạ nhiệt", "Áp suất cao", "Tiếng ồn"], ans: 1 },
+    { q: "Sử dụng đồ bảo hộ tai (nút tai, chụp tai) có thể giảm độ ồn bao nhiêu dB?", opts: ["2-5 dB", "15-30 dB", "80-100 dB", "Giảm hoàn toàn"], ans: 1 },
+    { q: "Bệnh lý cơ xương khớp nghề nghiệp thường do yếu tố nào?", opts: ["Tư thế gò bó, lặp đi lặp lại, mang vác nặng", "Do ăn uống thiếu chất", "Do di truyền", "Do lười vận động"], ans: 0 },
+    { q: "Hội chứng ống cổ tay thường gặp ở người làm công việc nào?", opts: ["Lao động chân tay nặng", "Đánh máy, may mặc, cử động cổ tay nhiều", "Đứng lâu", "Nói nhiều"], ans: 1 },
+    { q: "Bức xạ không ion hóa bao gồm loại nào dưới đây?", opts: ["Tia X", "Tia cực tím (UV), tia hồng ngoại, sóng radio", "Tia Gamma", "Hạt Alpha"], ans: 1 },
+    { q: "Độ ồn tối đa cho phép trong 8 giờ làm việc tại VN là:", opts: ["70 dBA", "85 dBA", "100 dBA", "110 dBA"], ans: 1 },
+    { q: "Tác hại của rung toàn thân (như lái máy xúc, xe tải nặng) chủ yếu ở:", opts: ["Mắt", "Cột sống thắt lưng", "Răng", "Tai"], ans: 1 },
+    { q: "Để đánh giá môi trường nhiệt độ làm việc, người ta dùng chỉ số nào?", opts: ["Chỉ số IQ", "Chỉ số WBGT", "Chỉ số BMI", "Chỉ số GDP"], ans: 1 },
+
+    // Vi sinh vật & Khác (46-60)
+    { q: "Bệnh lao nghề nghiệp thường được xem xét cho đối tượng nào?", opts: ["Nông dân", "Nhân viên y tế tiếp xúc với nguồn bệnh", "Thợ xây dựng", "Bán hàng"], ans: 1 },
+    { q: "Viêm gan B, C nghề nghiệp thường lây truyền qua đường nào trong BV?", opts: ["Ăn uống chung", "Tiếp xúc máu, dịch tiết qua kim tiêm đâm/vết thương", "Hô hấp", "Côn trùng đốt"], ans: 1 },
+    { q: "Bệnh Than (Anthrax) nghề nghiệp thường gặp ở người làm nghề:", opts: ["Chăm sóc, giết mổ, chế biến da lông gia súc", "Sản xuất phần mềm", "Dạy học", "Kế toán"], ans: 0 },
+    { q: "Bệnh Leptospira (xoắn khuẩn) thường lây qua môi trường nào?", opts: ["Nước bẩn, đất ẩm nhiễm nước tiểu chuột/gia súc", "Không khí phòng máy lạnh", "Ánh sáng mặt trời", "Tiếng ồn"], ans: 0 },
+    { q: "Stress nghề nghiệp kéo dài có thể dẫn đến hội chứng gì?", opts: ["Hội chứng Down", "Hội chứng Burnout (kiệt sức)", "Hội chứng Cushing", "Hội chứng ruột kích thích"], ans: 1 },
+    { q: "Viêm da tiếp xúc nghề nghiệp chiếm tỷ lệ bao nhiêu trong các bệnh da liễu nghề nghiệp?", opts: ["10%", "30%", "80-90%", "100%"], ans: 2 },
+    { q: "Khám sức khỏe định kỳ cho NLĐ làm công việc nặng nhọc, độc hại ít nhất bao nhiêu lần?", opts: ["2 năm 1 lần", "1 năm 1 lần", "6 tháng 1 lần", "3 tháng 1 lần"], ans: 2 },
+    { q: "NLĐ bị bệnh nghề nghiệp có được chi trả chi phí điều trị không?", opts: ["Không, tự túc", "Được quỹ bảo hiểm tai nạn lao động, BNN chi trả", "Chỉ được trả 10%", "Do NLĐ khác đóng góp"], ans: 1 },
+    { q: "Danh mục bệnh nghề nghiệp được bảo hiểm tại Việt Nam hiện nay có bao nhiêu bệnh?", opts: ["10 bệnh", "20 bệnh", "35 bệnh", "50 bệnh"], ans: 2 },
+    { q: "Bệnh loét da, loét vách ngăn mũi nghề nghiệp thường do tiếp xúc với:", opts: ["Chì", "Crôm (Chromium)", "Sắt", "Vàng"], ans: 1 },
+    { q: "Người lao động được chẩn đoán mắc BNN cần phải làm gì?", opts: ["Vẫn làm việc cũ bình thường", "Được điều trị, điều dưỡng và bố trí công việc phù hợp", "Nghỉ việc không lương", "Bị sa thải ngay"], ans: 1 },
+    { q: "Yếu tố tâm lý xã hội tại nơi làm việc bao gồm:", opts: ["Áp lực công việc, thiếu sự hỗ trợ, mất cân bằng công việc-cuộc sống", "Màu sơn tường", "Độ cao của trần nhà", "Giá điện"], ans: 0 },
+    { q: "Bệnh SARS-CoV-2 (COVID-19) có được bổ sung vào danh mục BNN tại VN không?", opts: ["Không bao giờ", "Đã được bổ sung (Thông tư 02/2023/TT-BYT)", "Chỉ tính cho người nước ngoài", "Đang xem xét"], ans: 1 },
+    { q: "Thời gian bảo đảm là gì?", opts: ["Thời gian làm việc tại xưởng", "Khoảng thời gian từ khi ngừng tiếp xúc đến khi phát hiện bệnh vẫn được công nhận là BNN", "Thời gian ăn trưa", "Thời gian thử việc"], ans: 1 },
+    { q: "Hồ sơ vệ sinh lao động dùng để làm gì?", opts: ["Để trang trí", "Quản lý các yếu tố nguy cơ và theo dõi sức khỏe NLĐ", "Để nộp phạt", "Để quảng cáo công ty"], ans: 1 }
+];
+
+let currentIndex = 0;
+let score = 0;
+let canAnswer = true;
+
+function startQuiz() {
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('quiz-screen').classList.remove('hidden');
+    loadQuestion();
+}
+
+function loadQuestion() {
+    canAnswer = true;
+    const q = questions[currentIndex];
+    document.getElementById('q-count').textContent = `Câu ${currentIndex + 1}/${questions.length}`;
+    document.getElementById('q-text').textContent = q.q;
+    document.getElementById('progress').style.width = `${(currentIndex / questions.length) * 100}%`;
+    
+    const optionsDiv = document.getElementById('options');
+    optionsDiv.innerHTML = '';
+    
+    q.opts.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.textContent = `${String.fromCharCode(65 + i)}. ${opt}`;
+        btn.onclick = () => checkAnswer(i, btn);
+        optionsDiv.appendChild(btn);
+    });
+}
+
+function checkAnswer(idx, btn) {
+    if (!canAnswer) return;
+    canAnswer = false;
+    
+    const correct = questions[currentIndex].ans;
+    const feedback = document.getElementById('feedback');
+    
+    if (idx === correct) {
+        score++;
+        btn.classList.add('correct-ans');
+        feedback.textContent = "✔";
+        feedback.style.color = "var(--correct)";
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+    } else {
+        btn.classList.add('wrong-ans');
+        document.querySelectorAll('.option-btn')[correct].classList.add('correct-ans');
+        feedback.textContent = "✘";
+        feedback.style.color = "var(--wrong)";
+    }
+    
+    document.getElementById('score').textContent = `Điểm: ${score}`;
+    feedback.classList.add('animate-pop');
+    
+    setTimeout(() => {
+        feedback.classList.remove('animate-pop');
+        currentIndex++;
+        if (currentIndex < questions.length) {
+            loadQuestion();
+        } else {
+            showResult();
+        }
+    }, 1200);
+}
+
+function showResult() {
+    document.getElementById('quiz-screen').classList.add('hidden');
+    document.getElementById('result-screen').classList.remove('hidden');
+    document.getElementById('final-score').textContent = `${score}/${questions.length}`;
+    document.getElementById('progress').style.width = `100%`;
+}
+</script>
+</body>
+</html>

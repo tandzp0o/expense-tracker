@@ -202,7 +202,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                                         cn(
                                             "relative z-[1] flex h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-[1.1rem] px-1 text-center text-[9px] font-semibold transition-all sm:text-[10px]",
                                             isActive
-                                                ? "bg-white/58 text-foreground shadow-[0_12px_30px_-22px_rgba(15,23,42,0.9)] ring-1 ring-white/60 dark:bg-white/12 dark:text-white dark:ring-white/10"
+                                                ? "bg-white text-foreground shadow-[0_12px_30px_-22px_rgba(15,23,42,0.9)] ring-1 ring-white/60 dark:bg-white/12 dark:text-white dark:ring-white/10"
                                                 : "text-muted-foreground hover:text-foreground",
                                         )
                                     }
