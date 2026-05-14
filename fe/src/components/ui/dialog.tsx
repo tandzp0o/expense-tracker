@@ -37,7 +37,8 @@ const dialogToneClassNames: Record<
     wallet: {
         glow: "from-sky-500/18 via-amber-400/10 to-transparent",
         icon: "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300",
-        eyebrow: "border-sky-500/18 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+        eyebrow:
+            "border-sky-500/18 bg-sky-500/10 text-sky-700 dark:text-sky-300",
     },
     budget: {
         glow: "from-amber-500/18 via-orange-500/10 to-transparent",
@@ -48,12 +49,14 @@ const dialogToneClassNames: Record<
     goal: {
         glow: "from-cyan-500/18 via-blue-500/10 to-transparent",
         icon: "border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
-        eyebrow: "border-cyan-500/18 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+        eyebrow:
+            "border-cyan-500/18 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
     },
     dish: {
         glow: "from-rose-500/18 via-orange-500/10 to-transparent",
         icon: "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300",
-        eyebrow: "border-rose-500/18 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+        eyebrow:
+            "border-rose-500/18 bg-rose-500/10 text-rose-700 dark:text-rose-300",
     },
     warning: {
         glow: "from-amber-500/20 via-yellow-500/10 to-transparent",
@@ -64,7 +67,8 @@ const dialogToneClassNames: Record<
     destructive: {
         glow: "from-rose-500/20 via-red-500/12 to-transparent",
         icon: "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300",
-        eyebrow: "border-rose-500/18 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+        eyebrow:
+            "border-rose-500/18 bg-rose-500/10 text-rose-700 dark:text-rose-300",
     },
 };
 
@@ -122,7 +126,7 @@ export const Dialog: React.FC<DialogProps> = ({
             <div
                 className={cn(
                     "relative z-[1] flex max-h-[calc(100vh-0.5rem)] w-full max-w-2xl flex-col overflow-hidden border border-border/80 bg-card text-card-foreground shadow-[0_24px_80px_-32px_rgba(15,23,42,0.42)] sm:max-h-[calc(100vh-2rem)]",
-                    "rounded-t-[calc(var(--app-radius-xl)+4px)] sm:rounded-[var(--app-radius-xl)]",
+                    "rounded-[calc(var(--app-radius-xl)+4px)] sm:rounded-[var(--app-radius-xl)]",
                     className,
                 )}
                 data-spotlight-boundary="dialog"
@@ -130,16 +134,16 @@ export const Dialog: React.FC<DialogProps> = ({
                 aria-modal="true"
             >
                 <div className="mx-auto mt-2.5 h-1 w-11 rounded-full bg-muted-foreground/20 sm:hidden" />
-                <div className="relative overflow-hidden border-b border-border/70 px-4 py-3.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
+                <div className="relative border-b border-border/70 px-4 py-3.5 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
                     <div
                         className={cn(
-                            "pointer-events-none absolute inset-x-0 top-0 h-full bg-gradient-to-br",
+                            "h-auto pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-br",
                             toneClasses.glow,
                         )}
                     />
                     <div className="pointer-events-none absolute -right-12 top-0 h-24 w-24 rounded-full bg-white/25 blur-3xl dark:bg-white/10" />
                     <div className="relative flex items-start justify-between gap-4">
-                        <div className="flex min-w-0 items-start gap-3.5">
+                        <div className="flex min-w-0 items-start gap-3.5 h-auto">
                             {Icon ? (
                                 <div
                                     className={cn(
@@ -165,7 +169,7 @@ export const Dialog: React.FC<DialogProps> = ({
                                     {title}
                                 </h2>
                                 {description ? (
-                                    <p className="mt-1 text-xs leading-5 text-muted-foreground sm:text-sm">
+                                    <p className="hidden md:block mt-1 text-xs leading-5 text-muted-foreground sm:text-sm">
                                         {description}
                                     </p>
                                 ) : null}
@@ -209,9 +213,13 @@ export const DialogSection: React.FC<DialogSectionProps> = ({
         )}
     >
         <div className="mb-3">
-            <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+            <h3 className="text-sm font-semibold tracking-tight text-foreground">
+                {title}
+            </h3>
             {description ? (
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {description}
+                </p>
             ) : null}
         </div>
         <div className="space-y-3">{children}</div>
@@ -261,7 +269,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     busy = false,
 }) => {
     const isEnglish =
-        typeof document !== "undefined" && document.documentElement.lang === "en";
+        typeof document !== "undefined" &&
+        document.documentElement.lang === "en";
     const busyLabel = isEnglish ? "Working..." : "\u0110ang x\u1eed l\u00fd...";
 
     return (
@@ -295,7 +304,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                     className="w-full sm:w-auto"
                     disabled={busy}
                     onClick={() => void onConfirm()}
-                    variant={variant === "destructive" ? "destructive" : "default"}
+                    variant={
+                        variant === "destructive" ? "destructive" : "default"
+                    }
                 >
                     {busy ? busyLabel : confirmLabel}
                 </Button>

@@ -45,6 +45,7 @@ import {
   DialogSection,
 } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
+import { AmountInput } from "../components/ui/amount-input";
 import { Select } from "../components/ui/select";
 import { Spinner } from "../components/ui/spinner";
 import { Textarea } from "../components/ui/textarea";
@@ -888,12 +889,8 @@ const Transactions: React.FC = () => {
     wallets.length,
   ]);
 
-  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const numericValue = parseWholeNumberInput(event.target.value);
-
-    setAmountInput(
-      numericValue > 0 ? formatWholeNumberInput(numericValue) : "",
-    );
+  const handleAmountChange = (value: string, numericValue: number) => {
+    setAmountInput(value);
     setFormValues((current) => ({
       ...current,
       amount: numericValue,
@@ -1478,7 +1475,8 @@ const Transactions: React.FC = () => {
             }
             title={isVietnamese ? "Thi\u1ebft l\u1eadp nhanh" : "Quick setup"}
           >
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2">
+                {/* loại */}
               <div>
                 <label className="mb-2 block text-sm font-medium">
                   {copy.type}
@@ -1511,6 +1509,7 @@ const Transactions: React.FC = () => {
                   <option value="INCOME">{copy.typeIncome}</option>
                 </Select>
               </div>
+                {/* trạng thái */}
               <div>
                 <label className="mb-2 block text-sm font-medium">
                   {copy.status}
@@ -1535,15 +1534,18 @@ const Transactions: React.FC = () => {
                   </option>
                 </Select>
               </div>
-              <div>
+                {/* số tiền */}
+              <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium">
                   {copy.amount}
                 </label>
-                <Input
-                  inputMode="numeric"
+                
+                <AmountInput
+                  className="w-full"
                   onChange={handleAmountChange}
-                  type="text"
                   value={amountInput}
+                  placeholder={copy.amount}
+                  type="desktop"
                 />
               </div>
             </div>

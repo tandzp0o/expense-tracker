@@ -63,7 +63,7 @@ export const Sheet: React.FC<SheetProps> = ({
                     <div>
                         <h2 className="text-base font-semibold">{title}</h2>
                         {description ? (
-                            <p className="mt-1 text-sm text-muted-foreground">
+                            <p className="hidden md:block mt-1 text-sm text-muted-foreground">
                                 {description}
                             </p>
                         ) : null}
@@ -76,7 +76,9 @@ export const Sheet: React.FC<SheetProps> = ({
                         <X className="h-4 w-4" />
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto overscroll-contain p-5">{children}</div>
+                <div className="flex-1 overflow-y-auto overscroll-contain p-5">
+                    {children}
+                </div>
             </div>
         </div>,
         document.body,

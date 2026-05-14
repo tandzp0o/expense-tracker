@@ -18,7 +18,13 @@ import { PageHeader } from "../components/app/page-header";
 import { MetricCard } from "../components/app/metric-card";
 import { Avatar } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Spinner } from "../components/ui/spinner";
 import { Textarea } from "../components/ui/textarea";
@@ -77,19 +83,21 @@ const Profile: React.FC = () => {
                 return;
             }
             const token = await user.getIdToken();
-            const [profileData, statsData, transactionResponse] = await Promise.all([
-                userApi.getProfile(token),
-                userApi.getProfileStats(token),
-                transactionApi.getTransactions({ limit: 5, page: 1 }, token),
-            ]);
+            const [profileData, statsData, transactionResponse] =
+                await Promise.all([
+                    userApi.getProfile(token),
+                    userApi.getProfileStats(token),
+                    transactionApi.getTransactions(
+                        { limit: 5, page: 1 },
+                        token,
+                    ),
+                ]);
 
             const fullProfile: UserProfile = {
                 displayName:
                     profileData.displayName ||
                     user.displayName ||
-                    (isVietnamese
-                        ? "Thành viên FinTrack"
-                        : "FinTrack member"),
+                    (isVietnamese ? "Thành viên FinTrack" : "FinTrack member"),
                 email: profileData.email || user.email || "",
                 phone: profileData.phone || "",
                 bio: profileData.bio || "",
@@ -105,7 +113,9 @@ const Profile: React.FC = () => {
 
             setProfile(fullProfile);
             setStats(statsData);
-            setRecentTransactions(transactionResponse?.data?.transactions || []);
+            setRecentTransactions(
+                transactionResponse?.data?.transactions || [],
+            );
             setFormValues({
                 displayName: fullProfile.displayName,
                 phone: fullProfile.phone || "",
@@ -244,7 +254,8 @@ const Profile: React.FC = () => {
               vsPreviousMonth: "so với tháng trước",
               currentMonthIncome: "Thu nhập của tháng hiện tại",
               currentMonthExpense: "Chi tiêu của tháng hiện tại",
-              activeGoals: (count: number) => `${count} mục tiêu đang hoạt động`,
+              activeGoals: (count: number) =>
+                  `${count} mục tiêu đang hoạt động`,
               editSection: "Chỉnh sửa hồ sơ",
               editSectionDesc:
                   "Chỉ hiển thị các trường mà API hồ sơ hiện hỗ trợ cập nhật.",
@@ -320,10 +331,7 @@ const Profile: React.FC = () => {
 
     return (
         <div className="space-y-4 sm:space-y-6">
-            <PageHeader
-                description={copy.description}
-                title={copy.title}
-            />
+            <PageHeader description={copy.description} title={copy.title} />
 
             <div className="grid gap-4 sm:gap-6 xl:grid-cols-[0.9fr,1.1fr]">
                 <Card className="overflow-hidden">
@@ -343,7 +351,9 @@ const Profile: React.FC = () => {
                             <label className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--app-radius-md)] border border-border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted/60">
                                 <Upload className="h-4 w-4" />
                                 <span>
-                                    {saving ? copy.uploading : copy.changeAvatar}
+                                    {saving
+                                        ? copy.uploading
+                                        : copy.changeAvatar}
                                 </span>
                                 <input
                                     accept="image/*"
@@ -355,11 +365,15 @@ const Profile: React.FC = () => {
                         </div>
 
                         <div>
-                            <h2 className="text-2xl font-semibold">{profile.displayName}</h2>
-                            <p className="mt-1 text-sm text-muted-foreground">
+                            <h2 className="text-2xl font-semibold">
+                                {profile.displayName}
+                            </h2>
+                            <p className="hidden md:block mt-1 text-sm text-muted-foreground">
                                 {copy.memberSince}{" "}
                                 {profile.createdAt
-                                    ? new Date(profile.createdAt).toLocaleDateString(
+                                    ? new Date(
+                                          profile.createdAt,
+                                      ).toLocaleDateString(
                                           isVietnamese ? "vi-VN" : "en-US",
                                           {
                                               month: "long",
@@ -377,7 +391,9 @@ const Profile: React.FC = () => {
                                 <Mail className="mt-0.5 h-4 w-4 text-muted-foreground" />
                                 <div>
                                     <p className="font-medium">{copy.email}</p>
-                                    <p className="text-muted-foreground">{profile.email}</p>
+                                    <p className="text-muted-foreground">
+                                        {profile.email}
+                                    </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         {loginEmailNote}
                                     </p>
@@ -395,7 +411,9 @@ const Profile: React.FC = () => {
                             <div className="flex items-start gap-3">
                                 <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
                                 <div>
-                                    <p className="font-medium">{copy.address}</p>
+                                    <p className="font-medium">
+                                        {copy.address}
+                                    </p>
                                     <p className="text-muted-foreground">
                                         {profile.address || copy.notSet}
                                     </p>
@@ -420,9 +438,13 @@ const Profile: React.FC = () => {
                             icon={CalendarDays}
                             subtitle={`${stats?.growth || 0}% ${copy.vsPreviousMonth}`}
                             title={copy.totalBalance}
-                            value={formatCurrency(stats?.totalBalance || profile.totalBalance, "VND", {
-                                displayMode: "full",
-                            })}
+                            value={formatCurrency(
+                                stats?.totalBalance || profile.totalBalance,
+                                "VND",
+                                {
+                                    displayMode: "full",
+                                },
+                            )}
                         />
                         <MetricCard
                             icon={CalendarDays}
@@ -462,7 +484,8 @@ const Profile: React.FC = () => {
                                             onChange={(event) =>
                                                 setFormValues((current) => ({
                                                     ...current,
-                                                    displayName: event.target.value,
+                                                    displayName:
+                                                        event.target.value,
                                                 }))
                                             }
                                             value={formValues.displayName}
@@ -515,8 +538,13 @@ const Profile: React.FC = () => {
                                     />
                                 </div>
                                 <div className="flex justify-end">
-                                    <Button disabled={saving} onClick={handleSaveProfile}>
-                                        {saving ? copy.saving : copy.saveProfile}
+                                    <Button
+                                        disabled={saving}
+                                        onClick={handleSaveProfile}
+                                    >
+                                        {saving
+                                            ? copy.saving
+                                            : copy.saveProfile}
                                     </Button>
                                 </div>
                             </CardContent>
@@ -549,7 +577,9 @@ const Profile: React.FC = () => {
 
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>{copy.recentTransactions}</CardTitle>
+                                    <CardTitle>
+                                        {copy.recentTransactions}
+                                    </CardTitle>
                                     <CardDescription>
                                         {copy.recentTransactionsDesc}
                                     </CardDescription>
@@ -557,31 +587,44 @@ const Profile: React.FC = () => {
                                 <CardContent>
                                     {recentTransactions.length > 0 ? (
                                         <div className="space-y-3">
-                                            {recentTransactions.map((transaction) => (
-                                                <div
-                                                    key={transaction._id}
-                                                    className="flex items-center justify-between rounded-[var(--app-radius-lg)] border border-border px-3 py-2.5 sm:px-4 sm:py-3"
-                                                >
-                                                    <div>
-                                                        <p className="font-medium">
-                                                            {transaction.note || transaction.category}
-                                                        </p>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            {formatDate(transaction.date)}
-                                                        </p>
-                                                    </div>
-                                                    <span
-                                                        className={
-                                                            transaction.type === "INCOME"
-                                                                ? "font-semibold text-emerald-600"
-                                                                : "font-semibold text-rose-600"
-                                                        }
+                                            {recentTransactions.map(
+                                                (transaction) => (
+                                                    <div
+                                                        key={transaction._id}
+                                                        className="flex items-center justify-between rounded-[var(--app-radius-lg)] border border-border px-3 py-2.5 sm:px-4 sm:py-3"
                                                     >
-                                                        {transaction.type === "INCOME" ? "+" : "-"}
-                                                        {formatCurrency(Number(transaction.amount))}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                                        <div>
+                                                            <p className="font-medium">
+                                                                {transaction.note ||
+                                                                    transaction.category}
+                                                            </p>
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {formatDate(
+                                                                    transaction.date,
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <span
+                                                            className={
+                                                                transaction.type ===
+                                                                "INCOME"
+                                                                    ? "font-semibold text-emerald-600"
+                                                                    : "font-semibold text-rose-600"
+                                                            }
+                                                        >
+                                                            {transaction.type ===
+                                                            "INCOME"
+                                                                ? "+"
+                                                                : "-"}
+                                                            {formatCurrency(
+                                                                Number(
+                                                                    transaction.amount,
+                                                                ),
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                ),
+                                            )}
                                         </div>
                                     ) : (
                                         <p className="text-sm text-muted-foreground">

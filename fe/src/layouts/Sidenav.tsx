@@ -38,7 +38,9 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                 <button
                     className="flex items-center gap-3"
                     onClick={() =>
-                        handleNavigate(navigationLocked ? "/wallets" : "/dashboard")
+                        handleNavigate(
+                            navigationLocked ? "/wallets" : "/dashboard",
+                        )
                     }
                     type="button"
                 >
@@ -107,7 +109,7 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                         <p className="text-sm font-semibold">
                             {isVietnamese ? "Thao tác nhanh" : "Quick action"}
                         </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="hidden md:block mt-1 text-sm text-muted-foreground">
                             {isVietnamese
                                 ? "Mở nhanh màn hình tạo giao dịch để cập nhật dòng tiền."
                                 : "Open the transaction form quickly to update cashflow."}
@@ -119,7 +121,9 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                         onClick={() => handleNavigate("/transactions")}
                     >
                         <span>
-                            {isVietnamese ? "Tạo giao dịch" : "Create transaction"}
+                            {isVietnamese
+                                ? "Tạo giao dịch"
+                                : "Create transaction"}
                         </span>
                         <ArrowRight className="h-4 w-4" />
                     </Button>
@@ -133,8 +137,9 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                 <p className="mt-4 text-xs text-muted-foreground">
                     {isVietnamese ? "Đang xem:" : "Viewing:"}{" "}
                     <span className="font-medium text-foreground">
-                        {navigationItems.find((item) => item.to === location.pathname)
-                            ?.label || "FinTrack"}
+                        {navigationItems.find(
+                            (item) => item.to === location.pathname,
+                        )?.label || "FinTrack"}
                     </span>
                 </p>
             </div>

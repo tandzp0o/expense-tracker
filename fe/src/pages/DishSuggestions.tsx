@@ -18,7 +18,12 @@ import { EmptyState } from "../components/app/empty-state";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent } from "../components/ui/card";
-import { ConfirmDialog, Dialog, DialogFooter, DialogSection } from "../components/ui/dialog";
+import {
+    ConfirmDialog,
+    Dialog,
+    DialogFooter,
+    DialogSection,
+} from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Spinner } from "../components/ui/spinner";
 import { Textarea } from "../components/ui/textarea";
@@ -57,8 +62,7 @@ const DishImageCarousel: React.FC<{
 }> = ({ images, name }) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const [transitionEnabled, setTransitionEnabled] = useState(true);
-    const extendedImages =
-        images.length > 1 ? [...images, images[0]] : images;
+    const extendedImages = images.length > 1 ? [...images, images[0]] : images;
 
     useEffect(() => {
         if (images.length < 2) {
@@ -110,7 +114,9 @@ const DishImageCarousel: React.FC<{
                 style={{
                     width: `${extendedImages.length * 100}%`,
                     transform: `translateX(-${activeIndex * (100 / extendedImages.length)}%)`,
-                    transition: transitionEnabled ? "transform 700ms ease-out" : "none",
+                    transition: transitionEnabled
+                        ? "transform 700ms ease-out"
+                        : "none",
                 }}
             >
                 {extendedImages.map((image, index) => (
@@ -137,7 +143,9 @@ const DishSuggestions: React.FC = () => {
     const [dishes, setDishes] = useState<Dish[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
+    const [selectedPreferences, setSelectedPreferences] = useState<string[]>(
+        [],
+    );
     const [editingDish, setEditingDish] = useState<Dish | null>(null);
     const [pendingDelete, setPendingDelete] = useState<Dish | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
@@ -192,7 +200,8 @@ const DishSuggestions: React.FC = () => {
               deleteFailed: "Xóa thất bại",
               deleteFailedDesc: "Không thể xóa món ăn.",
               noDishAvailable: "Không có món phù hợp",
-              noDishAvailableDesc: "Hãy chỉnh bộ lọc vị hoặc thêm nhiều món hơn.",
+              noDishAvailableDesc:
+                  "Hãy chỉnh bộ lọc vị hoặc thêm nhiều món hơn.",
               randomDishTitle: "Gợi ý món ngẫu nhiên",
               randomDishDesc:
                   "Chọn ngẫu nhiên chỉ dùng danh sách món đang được lọc hiện tại.",
@@ -242,7 +251,8 @@ const DishSuggestions: React.FC = () => {
               deleteFailed: "Delete failed",
               deleteFailedDesc: "Dish could not be deleted.",
               noDishAvailable: "No dish available",
-              noDishAvailableDesc: "Adjust the taste filters or add more dishes.",
+              noDishAvailableDesc:
+                  "Adjust the taste filters or add more dishes.",
               randomDishTitle: "Random dish suggestion",
               randomDishDesc:
                   "Random pick uses only the currently filtered dish list.",
@@ -271,7 +281,9 @@ const DishSuggestions: React.FC = () => {
     const retryText = isVietnamese ? "Vui lòng thử lại." : "Please retry.";
 
     const getPreferenceLabel = (preference: string) => {
-        const match = preferenceOptions.find((item) => item.value === preference);
+        const match = preferenceOptions.find(
+            (item) => item.value === preference,
+        );
         if (!match) {
             return preference;
         }
@@ -403,8 +415,14 @@ const DishSuggestions: React.FC = () => {
             const formData = new FormData();
             formData.append("name", formValues.name);
             formData.append("description", formValues.description);
-            formData.append("price", formValues.price ? String(formValues.price) : "");
-            formData.append("preferences", JSON.stringify(formValues.preferences));
+            formData.append(
+                "price",
+                formValues.price ? String(formValues.price) : "",
+            );
+            formData.append(
+                "preferences",
+                JSON.stringify(formValues.preferences),
+            );
             formData.append("address", formValues.address);
             formData.append(
                 "existingImages",
@@ -495,6 +513,32 @@ const DishSuggestions: React.FC = () => {
 
     return (
         <div className="space-y-6">
+            <div className="space-y-3 lg:hidden">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <h1 className="text-xl font-semibold">
+                            {copy.pageTitle}
+                        </h1>
+                        <p className="hidden md:block mt-1 text-sm text-muted-foreground">
+                            {copy.pageDescription}
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button
+                            onClick={handleRandomDish}
+                            size="sm"
+                            variant="outline"
+                        >
+                            <Dices className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => handleOpenModal()} size="sm">
+                            <Plus className="h-4 w-4" />
+                            {copy.newDish}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
             <PageHeader
                 actions={
                     <>
@@ -509,6 +553,7 @@ const DishSuggestions: React.FC = () => {
                     </>
                 }
                 description={copy.pageDescription}
+                hideTitleOnMobile
                 title={copy.pageTitle}
             />
 
@@ -519,7 +564,9 @@ const DishSuggestions: React.FC = () => {
                             {copy.filterByTaste}
                         </p>
                         {preferenceOptions.map((preference) => {
-                            const active = selectedPreferences.includes(preference.value);
+                            const active = selectedPreferences.includes(
+                                preference.value,
+                            );
                             return (
                                 <button
                                     key={preference.value}
@@ -531,13 +578,22 @@ const DishSuggestions: React.FC = () => {
                                     onClick={() =>
                                         setSelectedPreferences((current) =>
                                             current.includes(preference.value)
-                                                ? current.filter((item) => item !== preference.value)
-                                                : [...current, preference.value],
+                                                ? current.filter(
+                                                      (item) =>
+                                                          item !==
+                                                          preference.value,
+                                                  )
+                                                : [
+                                                      ...current,
+                                                      preference.value,
+                                                  ],
                                         )
                                     }
                                     type="button"
                                 >
-                                    {language === "vi" ? preference.vi : preference.en}
+                                    {language === "vi"
+                                        ? preference.vi
+                                        : preference.en}
                                 </button>
                             );
                         })}
@@ -548,22 +604,39 @@ const DishSuggestions: React.FC = () => {
             {filteredDishes.length > 0 ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {filteredDishes.map((dish) => (
-                        <Card key={dish._id} className="overflow-hidden border-border/80 bg-card/95">
+                        <Card
+                            key={dish._id}
+                            className="overflow-hidden border-border/80 bg-card/95"
+                        >
                             <div className="relative aspect-[4/4.35] overflow-hidden">
-                                <DishImageCarousel images={dish.imageUrls} name={dish.name} />
+                                <DishImageCarousel
+                                    images={dish.imageUrls}
+                                    name={dish.name}
+                                />
                                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.08)_0%,rgba(2,6,23,0.24)_38%,rgba(2,6,23,0.72)_72%,rgba(2,6,23,0.92)_100%)]" />
 
                                 <div className="absolute inset-x-0 top-0 z-10 flex items-start gap-2 p-3">
                                     <div className="flex flex-wrap gap-2">
-                                        <Badge className="border-white/15 bg-slate-950/35 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm" variant="outline">
-                                            {copy.imageCount(dish.imageUrls.length)}
+                                        <Badge
+                                            className="border-white/15 bg-slate-950/35 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                                            variant="outline"
+                                        >
+                                            {copy.imageCount(
+                                                dish.imageUrls.length,
+                                            )}
                                         </Badge>
                                         {dish.price ? (
-                                            <Badge className="border-white/15 bg-emerald-500/18 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm" variant="outline">
+                                            <Badge
+                                                className="border-white/15 bg-emerald-500/18 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                                                variant="outline"
+                                            >
                                                 {formatCurrency(dish.price)}
                                             </Badge>
                                         ) : (
-                                            <Badge className="border-white/15 bg-slate-950/35 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm" variant="outline">
+                                            <Badge
+                                                className="border-white/15 bg-slate-950/35 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                                                variant="outline"
+                                            >
                                                 {copy.contact}
                                             </Badge>
                                         )}
@@ -580,26 +653,33 @@ const DishSuggestions: React.FC = () => {
                                                 className="text-[12px] leading-4 text-white/78"
                                                 style={oneLineClampStyle}
                                             >
-                                                {dish.description || copy.noDescription}
+                                                {dish.description ||
+                                                    copy.noDescription}
                                             </p>
                                         </div>
 
                                         <div className="flex flex-wrap gap-2">
-                                            {dish.preferences.slice(0, 2).map((preference) => (
-                                                <Badge
-                                                    key={preference}
-                                                    className="border-white/10 bg-white/10 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
-                                                    variant="outline"
-                                                >
-                                                    {getPreferenceLabel(preference)}
-                                                </Badge>
-                                            ))}
+                                            {dish.preferences
+                                                .slice(0, 2)
+                                                .map((preference) => (
+                                                    <Badge
+                                                        key={preference}
+                                                        className="border-white/10 bg-white/10 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
+                                                        variant="outline"
+                                                    >
+                                                        {getPreferenceLabel(
+                                                            preference,
+                                                        )}
+                                                    </Badge>
+                                                ))}
                                             {dish.preferences.length > 2 ? (
                                                 <Badge
                                                     className="border-white/10 bg-white/10 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
                                                     variant="outline"
                                                 >
-                                                    +{dish.preferences.length - 2}
+                                                    +
+                                                    {dish.preferences.length -
+                                                        2}
                                                 </Badge>
                                             ) : null}
                                         </div>
@@ -608,13 +688,16 @@ const DishSuggestions: React.FC = () => {
                                             <div className="flex min-w-0 items-center gap-2 text-xs text-white/72">
                                                 <MapPin className="h-3.5 w-3.5 shrink-0" />
                                                 <span style={oneLineClampStyle}>
-                                                    {dish.address || copy.noAddress}
+                                                    {dish.address ||
+                                                        copy.noAddress}
                                                 </span>
                                             </div>
                                             <div className="flex shrink-0 items-center gap-2">
                                                 <Button
                                                     className="h-7 rounded-full bg-slate-950/45 px-2.5 text-[10px] text-white backdrop-blur-sm hover:bg-slate-950/65 hover:text-white"
-                                                    onClick={() => handleOpenModal(dish)}
+                                                    onClick={() =>
+                                                        handleOpenModal(dish)
+                                                    }
                                                     size="sm"
                                                     variant="ghost"
                                                 >
@@ -623,7 +706,9 @@ const DishSuggestions: React.FC = () => {
                                                 </Button>
                                                 <Button
                                                     className="h-7 w-7 rounded-full bg-slate-950/45 text-white backdrop-blur-sm hover:bg-slate-950/65 hover:text-white"
-                                                    onClick={() => setPendingDelete(dish)}
+                                                    onClick={() =>
+                                                        setPendingDelete(dish)
+                                                    }
                                                     size="icon"
                                                     variant="ghost"
                                                 >
@@ -672,11 +757,17 @@ const DishSuggestions: React.FC = () => {
                                 ? "L\u01b0u t\u00ean m\u00f3n, gi\u00e1 v\u00e0 m\u00f4 t\u1ea3 ng\u1eafn \u0111\u1ec3 d\u1ec5 quy\u1ebft \u0111\u1ecbnh."
                                 : "Capture the dish name, price, and a short description first."
                         }
-                        title={isVietnamese ? "Th\u00f4ng tin m\u00f3n" : "Dish details"}
+                        title={
+                            isVietnamese
+                                ? "Th\u00f4ng tin m\u00f3n"
+                                : "Dish details"
+                        }
                     >
                         <div className="grid gap-3 md:grid-cols-2">
                             <div>
-                                <label className="mb-2 block text-sm font-medium">{copy.dishName}</label>
+                                <label className="mb-2 block text-sm font-medium">
+                                    {copy.dishName}
+                                </label>
                                 <Input
                                     onChange={(event) =>
                                         setFormValues((current) => ({
@@ -688,13 +779,16 @@ const DishSuggestions: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="mb-2 block text-sm font-medium">{copy.price}</label>
+                                <label className="mb-2 block text-sm font-medium">
+                                    {copy.price}
+                                </label>
                                 <Input
                                     min={0}
                                     onChange={(event) =>
                                         setFormValues((current) => ({
                                             ...current,
-                                            price: Number(event.target.value) || 0,
+                                            price:
+                                                Number(event.target.value) || 0,
                                         }))
                                     }
                                     type="number"
@@ -704,7 +798,9 @@ const DishSuggestions: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.description}</label>
+                            <label className="mb-2 block text-sm font-medium">
+                                {copy.description}
+                            </label>
                             <Textarea
                                 onChange={(event) =>
                                     setFormValues((current) => ({
@@ -723,10 +819,16 @@ const DishSuggestions: React.FC = () => {
                                 ? "G\u1eafn \u0111\u1ecba \u0111i\u1ec3m v\u00e0 th\u1ebb h\u01b0\u01a1ng v\u1ecb \u0111\u1ec3 l\u1ecdc nhanh khi c\u1ea7n."
                                 : "Add location and taste tags so filtering feels more useful."
                         }
-                        title={isVietnamese ? "Ph\u00e2n bi\u1ec7t v\u00e0 g\u1ee3i \u00fd" : "Discovery details"}
+                        title={
+                            isVietnamese
+                                ? "Ph\u00e2n bi\u1ec7t v\u00e0 g\u1ee3i \u00fd"
+                                : "Discovery details"
+                        }
                     >
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.address}</label>
+                            <label className="mb-2 block text-sm font-medium">
+                                {copy.address}
+                            </label>
                             <Input
                                 onChange={(event) =>
                                     setFormValues((current) => ({
@@ -739,10 +841,15 @@ const DishSuggestions: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.tasteTags}</label>
+                            <label className="mb-2 block text-sm font-medium">
+                                {copy.tasteTags}
+                            </label>
                             <div className="flex flex-wrap gap-2">
                                 {preferenceOptions.map((preference) => {
-                                    const active = formValues.preferences.includes(preference.value);
+                                    const active =
+                                        formValues.preferences.includes(
+                                            preference.value,
+                                        );
                                     return (
                                         <button
                                             key={preference.value}
@@ -751,10 +858,16 @@ const DishSuggestions: React.FC = () => {
                                                     ? "border-primary bg-primary-soft text-primary"
                                                     : "border-border text-muted-foreground hover:bg-muted/70"
                                             }`}
-                                            onClick={() => handleTogglePreference(preference.value)}
+                                            onClick={() =>
+                                                handleTogglePreference(
+                                                    preference.value,
+                                                )
+                                            }
                                             type="button"
                                         >
-                                            {language === "vi" ? preference.vi : preference.en}
+                                            {language === "vi"
+                                                ? preference.vi
+                                                : preference.en}
                                         </button>
                                     );
                                 })}
@@ -771,8 +884,15 @@ const DishSuggestions: React.FC = () => {
                         title={isVietnamese ? "B\u1ed9 \u1ea3nh" : "Image set"}
                     >
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{copy.images}</label>
-                            <Input accept="image/*" multiple onChange={handleImageUpload} type="file" />
+                            <label className="mb-2 block text-sm font-medium">
+                                {copy.images}
+                            </label>
+                            <Input
+                                accept="image/*"
+                                multiple
+                                onChange={handleImageUpload}
+                                type="file"
+                            />
                             <div className="mt-3 grid grid-cols-3 gap-3">
                                 {formValues.existingImages.map((image) => (
                                     <div key={image} className="relative">
@@ -786,9 +906,11 @@ const DishSuggestions: React.FC = () => {
                                             onClick={() =>
                                                 setFormValues((current) => ({
                                                     ...current,
-                                                    existingImages: current.existingImages.filter(
-                                                        (item) => item !== image,
-                                                    ),
+                                                    existingImages:
+                                                        current.existingImages.filter(
+                                                            (item) =>
+                                                                item !== image,
+                                                        ),
                                                 }))
                                             }
                                             type="button"
@@ -798,7 +920,10 @@ const DishSuggestions: React.FC = () => {
                                     </div>
                                 ))}
                                 {formValues.newImages.map((image) => (
-                                    <div key={`${image.name}-${image.lastModified}`} className="relative">
+                                    <div
+                                        key={`${image.name}-${image.lastModified}`}
+                                        className="relative"
+                                    >
                                         <img
                                             alt={image.name}
                                             className="h-24 w-full rounded-[var(--app-radius-lg)] object-cover"
@@ -809,11 +934,14 @@ const DishSuggestions: React.FC = () => {
                                             onClick={() =>
                                                 setFormValues((current) => ({
                                                     ...current,
-                                                    newImages: current.newImages.filter(
-                                                        (item) =>
-                                                            item.name !== image.name ||
-                                                            item.lastModified !== image.lastModified,
-                                                    ),
+                                                    newImages:
+                                                        current.newImages.filter(
+                                                            (item) =>
+                                                                item.name !==
+                                                                    image.name ||
+                                                                item.lastModified !==
+                                                                    image.lastModified,
+                                                        ),
                                                 }))
                                             }
                                             type="button"
@@ -827,10 +955,18 @@ const DishSuggestions: React.FC = () => {
                     </DialogSection>
 
                     <DialogFooter>
-                        <Button className="w-full sm:w-auto" onClick={() => setModalOpen(false)} variant="outline">
+                        <Button
+                            className="w-full sm:w-auto"
+                            onClick={() => setModalOpen(false)}
+                            variant="outline"
+                        >
                             {copy.cancel}
                         </Button>
-                        <Button className="w-full sm:w-auto" disabled={saving} onClick={handleSubmit}>
+                        <Button
+                            className="w-full sm:w-auto"
+                            disabled={saving}
+                            onClick={handleSubmit}
+                        >
                             {saving
                                 ? copy.saving
                                 : editingDish
@@ -860,7 +996,9 @@ const DishSuggestions: React.FC = () => {
                             />
                         ) : null}
                         <div>
-                            <h3 className="text-xl font-semibold">{randomDish.name}</h3>
+                            <h3 className="text-xl font-semibold">
+                                {randomDish.name}
+                            </h3>
                             <p className="mt-2 text-sm text-muted-foreground">
                                 {randomDish.description || copy.noDescription}
                             </p>

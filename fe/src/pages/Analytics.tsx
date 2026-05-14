@@ -13,12 +13,21 @@ import { transactionApi } from "../services/api";
 import { formatCurrency } from "../utils/formatters";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
-import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
+import {
+    getAppearanceGradientColors,
+    useTheme,
+} from "../contexts/ThemeContext";
 import { hexToRgba } from "../lib/utils";
 import { PageHeader } from "../components/app/page-header";
 import { MetricCard } from "../components/app/metric-card";
 import { EmptyState } from "../components/app/empty-state";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Progress } from "../components/ui/progress";
 import { Select } from "../components/ui/select";
@@ -81,7 +90,8 @@ const Analytics: React.FC = () => {
               sixMonthTrendDesc:
                   "Biểu đồ đường dùng toàn bộ giao dịch đã tải, kể cả khi bộ lọc hiện tại ngắn hơn.",
               expenseMix: "Cơ cấu chi tiêu",
-              expenseMixDesc: "Các danh mục chi tiêu lớn nhất trong khoảng đã lọc.",
+              expenseMixDesc:
+                  "Các danh mục chi tiêu lớn nhất trong khoảng đã lọc.",
               noExpenseData: "Chưa có dữ liệu chi tiêu",
               noExpenseDataDesc: "Không có khoản chi nào trong khoảng đã chọn.",
               insight: "Nhận định",
@@ -116,9 +126,11 @@ const Analytics: React.FC = () => {
               sixMonthTrendDesc:
                   "Line chart combines all loaded transactions, even when the current filter is shorter.",
               expenseMix: "Expense mix",
-              expenseMixDesc: "Top categories based on filtered expense transactions.",
+              expenseMixDesc:
+                  "Top categories based on filtered expense transactions.",
               noExpenseData: "No expense data",
-              noExpenseDataDesc: "There are no expense rows in the selected range.",
+              noExpenseDataDesc:
+                  "There are no expense rows in the selected range.",
               insight: "Insight",
               efficiencyTitle: "Financial efficiency snapshot",
               insightDesc: (start: string, end: string) =>
@@ -196,7 +208,9 @@ const Analytics: React.FC = () => {
                 }
 
                 const token = await firebaseUser.getIdToken();
-                const chartStart = dayjs().subtract(5, "month").startOf("month");
+                const chartStart = dayjs()
+                    .subtract(5, "month")
+                    .startOf("month");
                 const currentRange = getDateRange();
                 const fetchStart = chartStart.isBefore(currentRange.start)
                     ? chartStart
@@ -234,8 +248,10 @@ const Analytics: React.FC = () => {
             transactions.filter((transaction) => {
                 const date = dayjs(transaction.date);
                 return (
-                    (date.isAfter(currentRange.start) || date.isSame(currentRange.start, "day")) &&
-                    (date.isBefore(currentRange.end) || date.isSame(currentRange.end, "day"))
+                    (date.isAfter(currentRange.start) ||
+                        date.isSame(currentRange.start, "day")) &&
+                    (date.isBefore(currentRange.end) ||
+                        date.isSame(currentRange.end, "day"))
                 );
             }),
         [currentRange.end, currentRange.start, transactions],
@@ -244,10 +260,16 @@ const Analytics: React.FC = () => {
     const stats = useMemo(() => {
         const income = filteredTransactions
             .filter((transaction) => transaction.type === "INCOME")
-            .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0);
+            .reduce(
+                (sum, transaction) => sum + parseAmount(transaction.amount),
+                0,
+            );
         const expense = filteredTransactions
             .filter((transaction) => transaction.type === "EXPENSE")
-            .reduce((sum, transaction) => sum + parseAmount(transaction.amount), 0);
+            .reduce(
+                (sum, transaction) => sum + parseAmount(transaction.amount),
+                0,
+            );
 
         return {
             income,
@@ -263,7 +285,8 @@ const Analytics: React.FC = () => {
             .filter((transaction) => transaction.type === "EXPENSE")
             .forEach((transaction) => {
                 map[transaction.category] =
-                    (map[transaction.category] || 0) + parseAmount(transaction.amount);
+                    (map[transaction.category] || 0) +
+                    parseAmount(transaction.amount);
             });
 
         const total = Object.values(map).reduce((sum, value) => sum + value, 0);
@@ -284,7 +307,9 @@ const Analytics: React.FC = () => {
         }
 
         return {
-            labels: months.map((month) => `${isVietnamese ? "T" : "M"}${month.month() + 1}`),
+            labels: months.map(
+                (month) => `${isVietnamese ? "T" : "M"}${month.month() + 1}`,
+            ),
             datasets: [
                 {
                     label: copy.incomeSeriesLabel,
@@ -293,10 +318,14 @@ const Analytics: React.FC = () => {
                             .filter(
                                 (transaction) =>
                                     transaction.type === "INCOME" &&
-                                    dayjs(transaction.date).isSame(month, "month"),
+                                    dayjs(transaction.date).isSame(
+                                        month,
+                                        "month",
+                                    ),
                             )
                             .reduce(
-                                (sum, transaction) => sum + parseAmount(transaction.amount),
+                                (sum, transaction) =>
+                                    sum + parseAmount(transaction.amount),
                                 0,
                             ),
                     ),
@@ -312,10 +341,14 @@ const Analytics: React.FC = () => {
                             .filter(
                                 (transaction) =>
                                     transaction.type === "EXPENSE" &&
-                                    dayjs(transaction.date).isSame(month, "month"),
+                                    dayjs(transaction.date).isSame(
+                                        month,
+                                        "month",
+                                    ),
                             )
                             .reduce(
-                                (sum, transaction) => sum + parseAmount(transaction.amount),
+                                (sum, transaction) =>
+                                    sum + parseAmount(transaction.amount),
                                 0,
                             ),
                     ),
@@ -391,7 +424,15 @@ const Analytics: React.FC = () => {
                 : "The immediate focus should be stabilizing income and keeping spending lean. Once cash flow is more predictable, savings targets become much easier to maintain.";
 
         return [health, spending, direction];
-    }, [breakdown, filteredTransactions, isVietnamese, savingRate, stats.expense, stats.income, stats.net]);
+    }, [
+        breakdown,
+        filteredTransactions,
+        isVietnamese,
+        savingRate,
+        stats.expense,
+        stats.income,
+        stats.net,
+    ]);
 
     const themeColors = getAppearanceGradientColors(appearance);
     const mobileHeroGradient =
@@ -428,14 +469,14 @@ const Analytics: React.FC = () => {
                             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/72">
                                 {isVietnamese ? "Tóm tắt từ AI" : "AI summary"}
                             </p>
-                            <h2 className="mt-2 text-xl font-semibold leading-tight">
+                            <h2 className="mt-2 text-base md:text-xl font-semibold leading-tight">
                                 {stats.net >= 0
                                     ? isVietnamese
                                         ? "Khoảng này bạn đang giữ chênh lệch dương khá ổn."
                                         : "You are holding a healthy positive net in this range."
                                     : isVietnamese
-                                        ? "Khoảng này đang âm, nên ưu tiên nhìn lại các nhóm chi tiêu lớn."
-                                        : "This range is negative, so revisit the largest spend groups first."}
+                                      ? "Khoảng này đang âm, nên ưu tiên nhìn lại các nhóm chi tiêu lớn."
+                                      : "This range is negative, so revisit the largest spend groups first."}
                             </h2>
                         </div>
                         <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/12 px-2.5 py-1 text-[11px] font-semibold">
@@ -472,26 +513,38 @@ const Analytics: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="hidden gap-2 rounded-[var(--app-radius-xl)] border border-border/70 bg-card/80 p-2 shadow-soft">
+                <div className="flex gap-2 rounded-[var(--app-radius-xl)] border border-border/70 bg-card/80 p-2 shadow-soft">
                     <Select
-                        onChange={(event) => setSelectedPeriod(event.target.value)}
+                        onChange={(event) =>
+                            setSelectedPeriod(event.target.value)
+                        }
                         value={selectedPeriod}
                     >
-                        <option value="current_month">{copy.currentMonth}</option>
+                        <option value="current_month">
+                            {copy.currentMonth}
+                        </option>
                         <option value="last_month">{copy.lastMonth}</option>
-                        <option value="last_3_months">{copy.last3Months}</option>
-                        <option value="last_6_months">{copy.last6Months}</option>
+                        <option value="last_3_months">
+                            {copy.last3Months}
+                        </option>
+                        <option value="last_6_months">
+                            {copy.last6Months}
+                        </option>
                         <option value="custom">{copy.customRange}</option>
                     </Select>
                     {selectedPeriod === "custom" ? (
                         <div className="grid grid-cols-2 gap-2">
                             <Input
-                                onChange={(event) => setCustomStart(event.target.value)}
+                                onChange={(event) =>
+                                    setCustomStart(event.target.value)
+                                }
                                 type="date"
                                 value={customStart}
                             />
                             <Input
-                                onChange={(event) => setCustomEnd(event.target.value)}
+                                onChange={(event) =>
+                                    setCustomEnd(event.target.value)
+                                }
                                 type="date"
                                 value={customEnd}
                             />
@@ -504,24 +557,36 @@ const Analytics: React.FC = () => {
                 actions={
                     <div className="flex flex-wrap gap-2.5 sm:gap-3">
                         <Select
-                            onChange={(event) => setSelectedPeriod(event.target.value)}
+                            onChange={(event) =>
+                                setSelectedPeriod(event.target.value)
+                            }
                             value={selectedPeriod}
                         >
-                            <option value="current_month">{copy.currentMonth}</option>
+                            <option value="current_month">
+                                {copy.currentMonth}
+                            </option>
                             <option value="last_month">{copy.lastMonth}</option>
-                            <option value="last_3_months">{copy.last3Months}</option>
-                            <option value="last_6_months">{copy.last6Months}</option>
+                            <option value="last_3_months">
+                                {copy.last3Months}
+                            </option>
+                            <option value="last_6_months">
+                                {copy.last6Months}
+                            </option>
                             <option value="custom">{copy.customRange}</option>
                         </Select>
                         {selectedPeriod === "custom" ? (
                             <>
                                 <Input
-                                    onChange={(event) => setCustomStart(event.target.value)}
+                                    onChange={(event) =>
+                                        setCustomStart(event.target.value)
+                                    }
                                     type="date"
                                     value={customStart}
                                 />
                                 <Input
-                                    onChange={(event) => setCustomEnd(event.target.value)}
+                                    onChange={(event) =>
+                                        setCustomEnd(event.target.value)
+                                    }
                                     type="date"
                                     value={customEnd}
                                 />
@@ -530,7 +595,6 @@ const Analytics: React.FC = () => {
                     </div>
                 }
                 description={copy.pageDescription}
-                hideActionsOnMobile
                 hideDescriptionOnMobile
                 hideTitleOnMobile
                 title={copy.pageTitle}
@@ -588,8 +652,12 @@ const Analytics: React.FC = () => {
                                         },
                                         y: {
                                             ticks: {
-                                                callback: (value: number | string) =>
-                                                    Number(value).toLocaleString(
+                                                callback: (
+                                                    value: number | string,
+                                                ) =>
+                                                    Number(
+                                                        value,
+                                                    ).toLocaleString(
                                                         isVietnamese
                                                             ? "vi-VN"
                                                             : "en-US",
@@ -606,9 +674,7 @@ const Analytics: React.FC = () => {
                 <Card>
                     <CardHeader>
                         <CardTitle>{copy.expenseMix}</CardTitle>
-                        <CardDescription>
-                            {copy.expenseMixDesc}
-                        </CardDescription>
+                        <CardDescription>{copy.expenseMixDesc}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {breakdown.length > 0 ? (
@@ -616,7 +682,9 @@ const Analytics: React.FC = () => {
                                 {breakdown.map((item) => (
                                     <div key={item.name} className="space-y-2">
                                         <div className="flex items-center justify-between text-sm">
-                                            <span className="font-medium">{item.name}</span>
+                                            <span className="font-medium">
+                                                {item.name}
+                                            </span>
                                             <span className="text-muted-foreground">
                                                 {formatCurrency(item.value)}
                                             </span>
@@ -658,12 +726,15 @@ const Analytics: React.FC = () => {
                         </div>
                     </div>
                     <div className="rounded-[var(--app-radius-lg)] bg-primary-soft p-4 sm:p-5">
-                        <p className="text-sm text-muted-foreground">{copy.savingRate}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {copy.savingRate}
+                        </p>
                         <p className="mt-2 text-3xl font-semibold text-primary">
                             {Math.round(savingRate)}%
                         </p>
                         <p className="mt-3 text-sm text-muted-foreground">
-                            {copy.projectedYearlyNet}: {formatCurrency(stats.net * 12)}
+                            {copy.projectedYearlyNet}:{" "}
+                            {formatCurrency(stats.net * 12)}
                         </p>
                     </div>
                 </CardContent>
