@@ -4,6 +4,19 @@ export interface IBudget extends Document {
     userId: string;
     walletId: string;
     category: string;
+    categoryType?: "standard" | "custom";
+    customCategoryName?: string;
+    subcategory?: string;
+    icon?: string;
+    tags?: string[];
+    subBudgets?: Array<{
+        name: string;
+        amount: number;
+        spent?: number;
+        icon?: string;
+        color?: string;
+        tags?: string[];
+    }>;
     amount: number;
     month: number;
     year: number;
@@ -17,6 +30,28 @@ const BudgetSchema: Schema = new Schema({
     userId: { type: String, required: true, index: true },
     walletId: { type: Schema.Types.ObjectId, ref: "Wallet", required: true, index: true },
     category: { type: String, required: true },
+    categoryType: {
+        type: String,
+        enum: ["standard", "custom"],
+        default: "standard",
+    },
+    customCategoryName: { type: String },
+    subcategory: { type: String },
+    icon: { type: String },
+    tags: { type: [String], default: [] },
+    subBudgets: {
+        type: [
+            {
+                name: { type: String, required: true, trim: true },
+                amount: { type: Number, required: true, min: 0 },
+                spent: { type: Number, default: 0, min: 0 },
+                icon: { type: String },
+                color: { type: String },
+                tags: { type: [String], default: [] },
+            },
+        ],
+        default: [],
+    },
     amount: { type: Number, required: true, min: 0 },
     month: { type: Number, required: true, min: 1, max: 12, index: true },
     year: { type: Number, required: true, index: true },

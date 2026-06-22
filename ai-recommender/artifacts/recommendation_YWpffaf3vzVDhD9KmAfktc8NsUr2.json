@@ -1,0 +1,53 @@
+{
+  "user_id": "YWpffaf3vzVDhD9KmAfktc8NsUr2",
+  "period": "2026-05",
+  "cluster": {
+    "macro": 2,
+    "micro": 0
+  },
+  "metrics": {
+    "income": 9000000.0,
+    "expense_so_far": 4375400.0,
+    "expense_to_income_ratio": 0.4861555555555555,
+    "anomaly_count": 4,
+    "goal_completion_rate": 0.0,
+    "predicted_expense_end_month": 8202268.298368296,
+    "predicted_overrun_vs_income": 0.0,
+    "top_spend_category": "Giải trí",
+    "top_spend_category_share": 0.3302555194953604
+  },
+  "leader_baseline": [
+    {
+      "userId": "YWpffaf3vzVDhD9KmAfktc8NsUr2",
+      "ym": "2026-05",
+      "leader_score": -0.7458466666666667,
+      "expense_to_income_ratio": 0.48615555555555556,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 4,
+      "category_distribution": {
+        "Ăn uống": 0.29240755130959456,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.3101430726333592,
+        "Giải trí": 0.3302555194953604,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.06719385656168579
+      }
+    }
+  ],
+  "system_guidance": {
+    "rule": "Không tạo số liệu ngoài context. Đưa ra gợi ý hành động cụ thể.",
+    "suggestion_seed": [
+      "Nếu dự báo thâm hụt, ưu tiên cắt 10-20% danh mục có tỷ trọng lớn nhất.",
+      "Đối chiếu với user hình mẫu cùng cụm để đề xuất tỷ lệ chi hợp lý.",
+      "Nếu anomaly_count cao, cảnh báo và gợi ý duyệt lại giao dịch lớn bất thường."
+    ]
+  },
+  "forecast_debug": {
+    "predicted_expense_eom": 8202268.298368296,
+    "observed_so_far": 4375400.0,
+    "method": "linear_regression",
+    "last_day_seen": 23
+  }
+}

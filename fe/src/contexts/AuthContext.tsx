@@ -17,7 +17,7 @@ import {
     registerWithEmailPassword,
     signInWithEmailPassword,
     signInWithGoogle,
-} from "../firebase/config";
+} from "../lib/firebase/config";
 import { API_URL } from "../config/api";
 import { authApi, clearApiCaches } from "../services/api";
 

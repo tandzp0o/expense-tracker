@@ -1,0 +1,71 @@
+{
+  "records": 9370,
+  "macro": {
+    "0": {
+      "size": 6179,
+      "avg_income": 84080750.12137887,
+      "avg_expense_income_ratio": 0.021475867936277048,
+      "micro": {
+        "0": {
+          "size": 4440,
+          "avg_anomaly": 1.05,
+          "avg_goal_completion": 0.0
+        },
+        "1": {
+          "size": 1738,
+          "avg_anomaly": 2.0339470655926353,
+          "avg_goal_completion": 0.0
+        },
+        "2": {
+          "size": 1,
+          "avg_anomaly": 0.0,
+          "avg_goal_completion": 0.0
+        }
+      }
+    },
+    "1": {
+      "size": 1277,
+      "avg_income": 297266523.101018,
+      "avg_expense_income_ratio": 0.005150882033473273,
+      "micro": {
+        "0": {
+          "size": 1043,
+          "avg_anomaly": 1.1351869606903164,
+          "avg_goal_completion": 0.5
+        },
+        "1": {
+          "size": 5,
+          "avg_anomaly": 3.2,
+          "avg_goal_completion": 0.0
+        },
+        "2": {
+          "size": 229,
+          "avg_anomaly": 2.2489082969432315,
+          "avg_goal_completion": 0.5
+        }
+      }
+    },
+    "2": {
+      "size": 1914,
+      "avg_income": 153207757.57575756,
+      "avg_expense_income_ratio": 0.007908634387545252,
+      "micro": {
+        "0": {
+          "size": 1393,
+          "avg_anomaly": 1.1026561378320172,
+          "avg_goal_completion": 0.5
+        },
+        "1": {
+          "size": 50,
+          "avg_anomaly": 2.44,
+          "avg_goal_completion": 0.0
+        },
+        "2": {
+          "size": 471,
+          "avg_anomaly": 1.9235668789808917,
+          "avg_goal_completion": 0.5
+        }
+      }
+    }
+  }
+}

@@ -10,6 +10,7 @@ import dishRoutes from "./routers/dish.routes";
 import goalRoutes from "./routers/goal.routes";
 import userRoutes from "./routers/user.routes";
 import budgetRoutes from "./routers/budget.routes";
+import aiRoutes from "./routers/ai.routes";
 
 dotenv.config();
 
@@ -76,6 +77,7 @@ app.use("/api/dishes", dishRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/budgets", budgetRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Health check — Back4App sẽ hit endpoint này
 app.get("/health", (req, res) => {

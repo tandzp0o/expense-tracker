@@ -6,13 +6,48 @@ import Transaction, {
     TransactionType,
 } from "../models/Transaction";
 import Wallet from "../models/Wallet";
+import { normalizeStandardCategory } from "../constants/categories";
 
-const toNumber = (value: any, fallback: number) => {
+const toNumber = (value: unknown, fallback: number) => {
     const numericValue = Number(value);
     return Number.isFinite(numericValue) ? numericValue : fallback;
 };
 
-const normalizeCategory = (value: unknown) => String(value || "").trim();
+const normalizeStringArray = (value: unknown) => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((item) => String(item || "").trim())
+        .filter((item) => Boolean(item));
+};
+
+const parseSubBudgets = (value: unknown) => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((item) => {
+            const row = item as Record<string, unknown>;
+            const name = String(row?.name || "").trim();
+            const amount = toNumber(row?.amount, 0);
+            if (!name || !Number.isFinite(amount) || amount < 0) {
+                return null;
+            }
+
+            return {
+                name,
+                amount,
+                spent: Math.max(0, toNumber(row?.spent, 0)),
+                icon: String(row?.icon || "").trim() || undefined,
+                color: String(row?.color || "").trim() || undefined,
+                tags: normalizeStringArray(row?.tags),
+            };
+        })
+        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+};
 
 const buildCompletedStatusQuery = () => ({
     $or: [
@@ -34,6 +69,19 @@ type BudgetSummaryItem = {
     percent: number;
     note?: string;
     color?: string;
+    categoryType?: "standard" | "custom";
+    customCategoryName?: string;
+    subcategory?: string;
+    icon?: string;
+    tags?: string[];
+    subBudgets?: Array<{
+        name: string;
+        amount: number;
+        spent?: number;
+        icon?: string;
+        color?: string;
+        tags?: string[];
+    }>;
     month: number;
     year: number;
     createdAt: Date;
@@ -53,11 +101,7 @@ type WalletBudgetSummary = {
 
 const loadWalletForBudget = async (walletId: string, userId: string) => {
     const wallet = await Wallet.findOne({ _id: walletId, userId });
-    if (!wallet) {
-        return null;
-    }
-
-    return wallet;
+    return wallet || null;
 };
 
 const buildBudgetFilter = ({
@@ -83,9 +127,11 @@ const buildBudgetFilter = ({
         filter.year = toNumber(year, undefined as any);
     }
 
-    const normalizedCategory = normalizeCategory(category);
-    if (normalizedCategory) {
-        filter.category = normalizedCategory;
+    if (category !== undefined && category !== null && category !== "") {
+        const normalized = normalizeStandardCategory(category) || String(category).trim();
+        if (normalized) {
+            filter.category = normalized;
+        }
     }
 
     if (walletId) {
@@ -143,35 +189,43 @@ const buildBudgetSummaryPayload = async ({
 
     const items: BudgetSummaryItem[] = (budgets as IBudget[]).map(
         (budget: IBudget) => {
-        const spent = spentByBudget.get(String(budget._id)) || 0;
-        const remaining = Math.max(Number(budget.amount) - spent, 0);
-        const overspent = Math.max(spent - Number(budget.amount), 0);
-        const percent =
-            budget.amount > 0 ? Math.min((spent / budget.amount) * 100, 999) : 0;
-        const walletData =
-            typeof budget.walletId === "object" && budget.walletId !== null
-                ? (budget.walletId as any)
-                : null;
+            const spent = spentByBudget.get(String(budget._id)) || 0;
+            const remaining = Math.max(Number(budget.amount) - spent, 0);
+            const overspent = Math.max(spent - Number(budget.amount), 0);
+            const percent =
+                budget.amount > 0
+                    ? Math.min((spent / budget.amount) * 100, 999)
+                    : 0;
+            const walletData =
+                typeof budget.walletId === "object" && budget.walletId !== null
+                    ? (budget.walletId as any)
+                    : null;
 
-        return {
-            _id: budget._id,
-            walletId: walletData?._id || budget.walletId,
-            walletName: walletData?.name || "",
-            walletCurrency: walletData?.currency || "VND",
-            category: budget.category,
-            amount: budget.amount,
-            spent,
-            remaining,
-            overspent,
-            percent,
-            note: budget.note,
-            color: budget.color,
-            month: budget.month,
-            year: budget.year,
-            createdAt: budget.createdAt,
-            updatedAt: budget.updatedAt,
-        };
-    },
+            return {
+                _id: budget._id,
+                walletId: walletData?._id || budget.walletId,
+                walletName: walletData?.name || "",
+                walletCurrency: walletData?.currency || "VND",
+                category: budget.category,
+                amount: budget.amount,
+                spent,
+                remaining,
+                overspent,
+                percent,
+                note: budget.note,
+                color: budget.color,
+                categoryType: budget.categoryType as any,
+                customCategoryName: budget.customCategoryName,
+                subcategory: budget.subcategory,
+                icon: budget.icon,
+                tags: budget.tags || [],
+                subBudgets: budget.subBudgets || [],
+                month: budget.month,
+                year: budget.year,
+                createdAt: budget.createdAt,
+                updatedAt: budget.updatedAt,
+            };
+        },
     );
 
     const totalBudget = items.reduce((sum, item) => sum + (item.amount || 0), 0);
@@ -205,7 +259,6 @@ const buildBudgetSummaryPayload = async ({
             : 0;
 
     const walletSummariesMap = new Map<string, WalletBudgetSummary>();
-
     items.forEach((item) => {
         const walletKey = String(item.walletId || "");
         const existing =
@@ -246,9 +299,23 @@ const buildBudgetSummaryPayload = async ({
 export const createBudget = async (req: any, res: Response) => {
     try {
         const userId = req.user.uid;
-        const { walletId, category, amount, month, year, note, color } = req.body;
+        const {
+            walletId,
+            category,
+            amount,
+            month,
+            year,
+            note,
+            color,
+            categoryType,
+            customCategoryName,
+            subcategory,
+            icon,
+            tags,
+            subBudgets,
+        } = req.body;
 
-        const normalizedCategory = normalizeCategory(category);
+        const normalizedCategory = normalizeStandardCategory(category);
         const monthNum = toNumber(month, new Date().getMonth() + 1);
         const yearNum = toNumber(year, new Date().getFullYear());
         const amountNum = toNumber(amount, 0);
@@ -257,12 +324,13 @@ export const createBudget = async (req: any, res: Response) => {
             return res.status(400).json({ message: "Thiếu ví áp dụng ngân sách" });
         }
         if (!normalizedCategory) {
-            return res.status(400).json({ message: "Thiếu danh mục" });
+            return res.status(400).json({
+                message:
+                    "Danh mục không hợp lệ. Vui lòng chọn một danh mục chuẩn.",
+            });
         }
         if (!Number.isFinite(amountNum) || amountNum <= 0) {
-            return res
-                .status(400)
-                .json({ message: "Số tiền ngân sách không hợp lệ" });
+            return res.status(400).json({ message: "Số tiền ngân sách không hợp lệ" });
         }
         if (monthNum < 1 || monthNum > 12) {
             return res.status(400).json({ message: "Tháng không hợp lệ" });
@@ -291,6 +359,15 @@ export const createBudget = async (req: any, res: Response) => {
             userId,
             walletId: wallet._id,
             category: normalizedCategory,
+            categoryType:
+                String(categoryType || "standard").trim() === "custom"
+                    ? "custom"
+                    : "standard",
+            customCategoryName: String(customCategoryName || "").trim() || undefined,
+            subcategory: String(subcategory || "").trim() || undefined,
+            icon: String(icon || "").trim() || undefined,
+            tags: normalizeStringArray(tags),
+            subBudgets: parseSubBudgets(subBudgets),
             amount: amountNum,
             month: monthNum,
             year: yearNum,
@@ -363,7 +440,21 @@ export const updateBudget = async (req: any, res: Response) => {
     try {
         const userId = req.user.uid;
         const { id } = req.params;
-        const { walletId, category, amount, month, year, note, color } = req.body;
+        const {
+            walletId,
+            category,
+            amount,
+            month,
+            year,
+            note,
+            color,
+            categoryType,
+            customCategoryName,
+            subcategory,
+            icon,
+            tags,
+            subBudgets,
+        } = req.body;
 
         const budget = await Budget.findOne({ _id: id, userId });
         if (!budget) {
@@ -372,8 +463,10 @@ export const updateBudget = async (req: any, res: Response) => {
 
         const nextWalletId =
             walletId !== undefined ? String(walletId) : String(budget.walletId);
+        const nextCategoryRaw =
+            category !== undefined ? String(category || "").trim() : budget.category;
         const nextCategory =
-            category !== undefined ? normalizeCategory(category) : budget.category;
+            normalizeStandardCategory(nextCategoryRaw) || "";
         const nextAmount =
             amount !== undefined ? toNumber(amount, budget.amount) : budget.amount;
         const nextMonth =
@@ -382,12 +475,13 @@ export const updateBudget = async (req: any, res: Response) => {
             year !== undefined ? toNumber(year, budget.year) : budget.year;
 
         if (!nextCategory) {
-            return res.status(400).json({ message: "Thiếu danh mục" });
+            return res.status(400).json({
+                message:
+                    "Danh mục không hợp lệ. Vui lòng chọn một danh mục chuẩn.",
+            });
         }
         if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
-            return res
-                .status(400)
-                .json({ message: "Số tiền ngân sách không hợp lệ" });
+            return res.status(400).json({ message: "Số tiền ngân sách không hợp lệ" });
         }
         if (nextMonth < 1 || nextMonth > 12) {
             return res.status(400).json({ message: "Tháng không hợp lệ" });
@@ -438,6 +532,28 @@ export const updateBudget = async (req: any, res: Response) => {
         }
         if (color !== undefined) {
             budget.color = color;
+        }
+        if (categoryType !== undefined) {
+            budget.categoryType =
+                String(categoryType || "").trim() === "custom"
+                    ? "custom"
+                    : "standard";
+        }
+        if (customCategoryName !== undefined) {
+            budget.customCategoryName =
+                String(customCategoryName || "").trim() || undefined;
+        }
+        if (subcategory !== undefined) {
+            budget.subcategory = String(subcategory || "").trim() || undefined;
+        }
+        if (icon !== undefined) {
+            budget.icon = String(icon || "").trim() || undefined;
+        }
+        if (tags !== undefined) {
+            budget.tags = normalizeStringArray(tags);
+        }
+        if (subBudgets !== undefined) {
+            budget.subBudgets = parseSubBudgets(subBudgets) as any;
         }
 
         await budget.save();
@@ -498,3 +614,4 @@ export const getBudgetSummary = async (req: any, res: Response) => {
         return res.status(500).json({ message: "Lỗi lấy tổng quan ngân sách" });
     }
 };
+

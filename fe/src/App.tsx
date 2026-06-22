@@ -8,16 +8,17 @@ import {
     useLocation,
 } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
-import Dashboard from "./pages/Dashboard";
-import Wallets from "./pages/Wallets";
-import Budgets from "./pages/Budgets";
-import Goals from "./pages/Goals";
-import Transactions from "./pages/Transactions";
-import DishSuggestions from "./pages/DishSuggestions";
-import Profile from "./pages/Profile";
-import Analytics from "./pages/Analytics";
-import Settings from "./pages/Settings";
-import { Login, Register } from "./components";
+import { LoginPage, RegisterPage } from "./features/auth";
+import { DashboardPage } from "./features/dashboard";
+import { TransactionsPage } from "./features/transactions";
+import { BudgetsPage } from "./features/budgets";
+import { GoalsPage } from "./features/goals";
+import { AnalyticsPage } from "./features/analytics";
+import { WalletsPage } from "./features/wallets";
+import { DishSuggestionsPage } from "./features/dishes";
+import { ProfilePage } from "./features/profile";
+import { SettingsPage } from "./features/settings";
+import { AIModelPage } from "./features/ai";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -99,7 +100,7 @@ function App() {
                                 <Route
                                     element={
                                         <PublicOnlyRoute>
-                                            <Login />
+                                            <LoginPage />
                                         </PublicOnlyRoute>
                                     }
                                     path="/login"
@@ -107,7 +108,7 @@ function App() {
                                 <Route
                                     element={
                                         <PublicOnlyRoute>
-                                            <Register />
+                                            <RegisterPage />
                                         </PublicOnlyRoute>
                                     }
                                     path="/register"
@@ -118,26 +119,30 @@ function App() {
                                 />
 
                                 <Route element={<ProtectedRoute />}>
-                                    <Route element={<Dashboard />} path="/dashboard" />
+                                    <Route element={<DashboardPage />} path="/dashboard" />
                                     <Route
-                                        element={<Transactions />}
+                                        element={<TransactionsPage />}
                                         path="/transactions"
                                     />
-                                    <Route element={<Budgets />} path="/budgets" />
-                                    <Route element={<Goals />} path="/goals" />
+                                    <Route element={<BudgetsPage />} path="/budgets" />
+                                    <Route element={<GoalsPage />} path="/goals" />
                                     <Route
-                                        element={<Analytics />}
+                                        element={<AnalyticsPage />}
                                         path="/analytics"
                                     />
-                                    <Route element={<Wallets />} path="/wallets" />
+                                    <Route element={<WalletsPage />} path="/wallets" />
                                     <Route
-                                        element={<DishSuggestions />}
+                                        element={<DishSuggestionsPage />}
                                         path="/dishes"
                                     />
-                                    <Route element={<Profile />} path="/profile" />
+                                    <Route element={<ProfilePage />} path="/profile" />
                                     <Route
-                                        element={<Settings />}
+                                        element={<SettingsPage />}
                                         path="/settings"
+                                    />
+                                    <Route
+                                        element={<AIModelPage />}
+                                        path="/ai-model"
                                     />
                                 </Route>
                             </Routes>

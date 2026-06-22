@@ -3,7 +3,6 @@ import { Mic, PencilLine, ScanLine, Sparkles } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import Sidenav from "./Sidenav";
-import Footer from "./Footer";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
@@ -99,7 +98,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                         >
                             <div className="mx-auto w-full max-w-[1600px]">
                                 {children}
-                                <Footer />
                             </div>
                         </main>
                     </div>

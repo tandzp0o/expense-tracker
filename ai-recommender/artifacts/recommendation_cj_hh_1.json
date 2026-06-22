@@ -1,0 +1,89 @@
+{
+  "user_id": "cj_hh_1",
+  "period": "2017-12",
+  "cluster": {
+    "macro": 0,
+    "micro": 0
+  },
+  "metrics": {
+    "income": 88542000.0,
+    "expense_so_far": 1601000.0,
+    "expense_to_income_ratio": 0.0180818142802285,
+    "anomaly_count": 2,
+    "goal_completion_rate": 0.0,
+    "predicted_expense_end_month": 1633793.300071276,
+    "predicted_overrun_vs_income": 0.0,
+    "top_spend_category": "Ăn uống",
+    "top_spend_category_share": 0.8157401623985009
+  },
+  "leader_baseline": [
+    {
+      "userId": "cj_hh_764",
+      "ym": "2017-06",
+      "leader_score": -2.7648070779061194e-05,
+      "expense_to_income_ratio": 9.216023593020399e-05,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_86",
+      "ym": "2017-03",
+      "leader_score": -9.14820085383208e-05,
+      "expense_to_income_ratio": 0.00030494002846106935,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1848",
+      "ym": "2017-09",
+      "leader_score": -9.874267658481996e-05,
+      "expense_to_income_ratio": 0.0003291422552827332,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "system_guidance": {
+    "rule": "Không tạo số liệu ngoài context. Đưa ra gợi ý hành động cụ thể.",
+    "suggestion_seed": [
+      "Nếu dự báo thâm hụt, ưu tiên cắt 10-20% danh mục có tỷ trọng lớn nhất.",
+      "Đối chiếu với user hình mẫu cùng cụm để đề xuất tỷ lệ chi hợp lý.",
+      "Nếu anomaly_count cao, cảnh báo và gợi ý duyệt lại giao dịch lớn bất thường."
+    ]
+  },
+  "forecast_debug": {
+    "predicted_expense_eom": 1633793.300071276,
+    "observed_so_far": 1601000.0,
+    "method": "linear_regression",
+    "last_day_seen": 31
+  }
+}

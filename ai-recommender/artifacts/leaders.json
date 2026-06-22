@@ -1,0 +1,470 @@
+{
+  "0:0": [
+    {
+      "userId": "cj_hh_764",
+      "ym": "2017-06",
+      "leader_score": -2.7648070779061194e-05,
+      "expense_to_income_ratio": 9.216023593020399e-05,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_86",
+      "ym": "2017-03",
+      "leader_score": -9.14820085383208e-05,
+      "expense_to_income_ratio": 0.00030494002846106935,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1848",
+      "ym": "2017-09",
+      "leader_score": -9.874267658481996e-05,
+      "expense_to_income_ratio": 0.0003291422552827332,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "0:1": [
+    {
+      "userId": "cj_hh_149",
+      "ym": "2017-01",
+      "leader_score": -2.7105780307650606e-05,
+      "expense_to_income_ratio": 9.035260102550202e-05,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 1.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_104",
+      "ym": "2017-09",
+      "leader_score": -5.759978315375754e-05,
+      "expense_to_income_ratio": 0.0001919992771791918,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 1.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1634",
+      "ym": "2017-10",
+      "leader_score": -8.470556346140814e-05,
+      "expense_to_income_ratio": 0.00028235187820469383,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 1.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "0:2": [
+    {
+      "userId": "cj_hh_40",
+      "ym": "2017-06",
+      "leader_score": -0.0015,
+      "expense_to_income_ratio": 0.005,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 1.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "1:0": [
+    {
+      "userId": "cj_hh_1814",
+      "ym": "2017-02",
+      "leader_score": 0.9999663261870019,
+      "expense_to_income_ratio": 0.00011224604332697273,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1820",
+      "ym": "2017-12",
+      "leader_score": 0.9999645538810547,
+      "expense_to_income_ratio": 0.00011815372981786603,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.7,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.3,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1802",
+      "ym": "2017-02",
+      "leader_score": 0.9999494892805029,
+      "expense_to_income_ratio": 0.0001683690649904591,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "1:1": [
+    {
+      "userId": "cj_hh_2397",
+      "ym": "2017-07",
+      "leader_score": -0.0008420082525186939,
+      "expense_to_income_ratio": 0.002806694175062313,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.7922885572139303,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.20771144278606965,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_2397",
+      "ym": "2017-09",
+      "leader_score": -0.15231761724231824,
+      "expense_to_income_ratio": 0.007725390807727485,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 1,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_2397",
+      "ym": "2017-11",
+      "leader_score": -0.754964078503655,
+      "expense_to_income_ratio": 0.01654692834551662,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 5,
+      "category_distribution": {
+        "Ăn uống": 0.8529535864978903,
+        "Di chuyển": 0.026371308016877638,
+        "Mua sắm": 0.12067510548523207,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "1:2": [
+    {
+      "userId": "cj_hh_1197",
+      "ym": "2018-01",
+      "leader_score": 0.999867077053955,
+      "expense_to_income_ratio": 0.0004430764868169976,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0,
+        "Di chuyển": 1.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_601",
+      "ym": "2017-12",
+      "leader_score": 0.99984,
+      "expense_to_income_ratio": 0.0005333333333333334,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 1.0
+      }
+    },
+    {
+      "userId": "cj_hh_1800",
+      "ym": "2017-04",
+      "leader_score": 0.999030784,
+      "expense_to_income_ratio": 0.00323072,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0491283676703645,
+        "Di chuyển": 0.9508716323296355,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "2:0": [
+    {
+      "userId": "cj_hh_490",
+      "ym": "2017-09",
+      "leader_score": 0.9999374629714963,
+      "expense_to_income_ratio": 0.00020845676167906437,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_7",
+      "ym": "2017-07",
+      "leader_score": 0.9999354878348489,
+      "expense_to_income_ratio": 0.0002150405505038093,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1678",
+      "ym": "2017-09",
+      "leader_score": 0.9999308801263906,
+      "expense_to_income_ratio": 0.00023039957869791324,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "2:1": [
+    {
+      "userId": "cj_hh_1257",
+      "ym": "2017-12",
+      "leader_score": -0.0002442246252150405,
+      "expense_to_income_ratio": 0.0008140820840501352,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 1.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1257",
+      "ym": "2017-05",
+      "leader_score": -0.0002833927254853772,
+      "expense_to_income_ratio": 0.0009446424182845908,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.7560975609756098,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.24390243902439024,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1572",
+      "ym": "2017-08",
+      "leader_score": -0.0006763873346060167,
+      "expense_to_income_ratio": 0.0022546244486867225,
+      "goal_completion_rate": 0.0,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.6593673965936739,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.340632603406326,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ],
+  "2:2": [
+    {
+      "userId": "cj_hh_1692",
+      "ym": "2017-05",
+      "leader_score": 0.9999285758171541,
+      "expense_to_income_ratio": 0.00023808060948636028,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 1.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_428",
+      "ym": "2017-10",
+      "leader_score": 0.9999124477758663,
+      "expense_to_income_ratio": 0.00029184074711231263,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.0,
+        "Di chuyển": 0.0,
+        "Mua sắm": 1.0,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    },
+    {
+      "userId": "cj_hh_1928",
+      "ym": "2017-02",
+      "leader_score": 0.9999061944572444,
+      "expense_to_income_ratio": 0.0003126851425185965,
+      "goal_completion_rate": 0.5,
+      "anomaly_count": 0,
+      "category_distribution": {
+        "Ăn uống": 0.5614035087719298,
+        "Di chuyển": 0.0,
+        "Mua sắm": 0.43859649122807015,
+        "Giải trí": 0.0,
+        "Sức khỏe": 0.0,
+        "Giáo dục": 0.0,
+        "Hóa đơn": 0.0,
+        "Khác": 0.0
+      }
+    }
+  ]
+}

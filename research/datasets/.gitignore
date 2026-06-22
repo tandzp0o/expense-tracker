@@ -1,0 +1,9 @@
+# Raw and processed research data can be large. Keep reproducible metadata/scripts in Git.
+**/raw/*
+**/processed/*
+
+!**/raw/.gitkeep
+!**/processed/.gitkeep
+!**/SOURCE.md
+!**/MANIFEST.sha256
+!**/README.md

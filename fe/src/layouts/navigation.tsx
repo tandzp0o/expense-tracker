@@ -1,5 +1,6 @@
 import {
     BarChart3,
+    BrainCircuit,
     CreditCard,
     Goal,
     LayoutDashboard,
@@ -23,6 +24,7 @@ const text = {
         dishes: "Món ăn",
         profile: "Hồ sơ",
         settings: "Cài đặt",
+        aiModel: "Mô hình AI",
         add: "Thêm",
     },
     en: {
@@ -35,6 +37,7 @@ const text = {
         dishes: "Dishes",
         profile: "Profile",
         settings: "Settings",
+        aiModel: "AI Model",
         add: "Add",
     },
 } satisfies Record<Language, Record<string, string>>;
@@ -87,6 +90,11 @@ export const buildNavigationItems = (language: Language) => {
             label: copy.settings,
             icon: Settings,
         },
+        {
+            to: "/ai-model",
+            label: copy.aiModel,
+            icon: BrainCircuit,
+        },
     ] as const;
 };
 
@@ -105,3 +113,4 @@ export const buildMobileNavigationItems = (language: Language) => {
         items[5],
     ] as const;
 };
+

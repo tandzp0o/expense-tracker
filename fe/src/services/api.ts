@@ -659,6 +659,45 @@ export const authApi = {
     },
 };
 
+export const aiApi = {
+    getStatus: async (token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.get("/ai/status");
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+    train: async (token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.post("/ai/train");
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+    getUsers: async (token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.get("/ai/users");
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+    recommend: async (userId: string, token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.post("/ai/recommend", { userId });
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+};
+
 // --- User API ---
 export const userApi = {
     // Get user profile
@@ -711,6 +750,7 @@ export const userApi = {
 
 const api = {
     auth: authApi,
+    ai: aiApi,
     wallet: walletApi,
     transaction: transactionApi,
     dish: dishApi,
