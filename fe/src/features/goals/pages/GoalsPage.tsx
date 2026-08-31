@@ -7,9 +7,17 @@ import {
 import { getFeatureGuideCopy } from "components/app/feature-guide-content";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
-import { Goal as GoalIcon, Calendar, Plus, Target, Trophy } from "lucide-react";
+import {
+  Goal as GoalIcon,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Calendar,
+  Plus,
+  Target,
+  Trophy,
+} from "lucide-react";
 import { auth } from "lib/firebase/config";
-import { goalApi } from "services/api";
+import { goalApi, transactionApi, walletApi } from "services/api";
 import { useToast } from "contexts/ToastContext";
 import { useLocale } from "contexts/LocaleContext";
 import {
@@ -31,8 +39,16 @@ import { Spinner } from "components/ui/spinner";
 import { Progress } from "components/ui/progress";
 import { GoalFormModal } from "../modals/GoalFormModal";
 import { DeleteGoalModal } from "../modals/DeleteGoalModal";
+import {
+  ContributionMode,
+  ContributionWallet,
+  GoalContributionModal,
+} from "../modals/GoalContributionModal";
 
 dayjs.locale("vi");
+
+/** Category stored on goal deposits/withdrawals; the API requires a non-empty one. */
+const GOAL_TRANSACTION_CATEGORY = "Goal";
 
 interface GoalItem {
   _id: string;
@@ -47,7 +63,7 @@ interface GoalItem {
 }
 
 const Goals: React.FC = () => {
-  const { isVietnamese } = useLocale();
+  const { isVietnamese, timezoneOffsetMinutes } = useLocale();
   const { toast } = useToast();
   const [goals, setGoals] = useState<GoalItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,15 +74,24 @@ const Goals: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [targetAmountInput, setTargetAmountInput] = useState("");
-  const [currentAmountInput, setCurrentAmountInput] = useState("");
   const [form, setForm] = useState({
     title: "",
     targetAmount: 0,
-    currentAmount: 0,
     deadline: "",
     description: "",
     category: "general",
   });
+  const [wallets, setWallets] = useState<ContributionWallet[]>([]);
+  const [contributionGoal, setContributionGoal] = useState<GoalItem | null>(
+    null,
+  );
+  const [contributionMode, setContributionMode] =
+    useState<ContributionMode>("deposit");
+  const [contributionWalletId, setContributionWalletId] = useState("");
+  const [contributionAmount, setContributionAmount] = useState(0);
+  const [contributionAmountInput, setContributionAmountInput] = useState("");
+  const [contributionNote, setContributionNote] = useState("");
+  const [contributing, setContributing] = useState(false);
 
   const baseCopy = isVietnamese
     ? {
@@ -91,12 +116,11 @@ const Goals: React.FC = () => {
           "Mục tiêu giúp màn phân tích và hồ sơ hiển thị tiến độ và số lượng hoàn thành.",
         createGoal: "Tạo mục tiêu",
         formDescription:
-          "Biểu mẫu này giữ nguyên upload ảnh, tiêu đề, số tiền mục tiêu, số tiền hiện có, danh mục và hạn.",
+          "Đặt tiêu đề, số tiền cần đạt, danh mục, hạn và ảnh bìa. Tiền tiết kiệm được nạp riêng từ ví.",
         editGoal: "Chỉnh sửa mục tiêu",
         createGoalTitle: "Tạo mục tiêu",
         title: "Tiêu đề",
         targetAmount: "Số tiền mục tiêu",
-        currentAmount: "Số tiền hiện có",
         category: "Danh mục",
         deadlineLabel: "Hạn",
         coverImage: "Ảnh bìa",
@@ -122,6 +146,22 @@ const Goals: React.FC = () => {
         deleteGoalDesc: (title: string) => `Xóa mục tiêu "${title}"?`,
         loadFailed: "Không thể tải mục tiêu",
         retry: "Vui lòng thử lại.",
+        deposit: "Nạp tiền",
+        withdraw: "Rút về ví",
+        walletRequired: "Cần chọn ví",
+        walletRequiredDesc: "Hãy chọn ví sẽ chuyển tiền cho mục tiêu này.",
+        invalidAmount: "Số tiền không hợp lệ",
+        invalidAmountDesc: "Số tiền phải lớn hơn 0.",
+        withdrawTooMuchDesc:
+          "Số tiền rút không được lớn hơn số đang có trong mục tiêu.",
+        depositDone: "Đã nạp vào mục tiêu",
+        withdrawDone: "Đã rút về ví",
+        depositFailed: "Nạp tiền thất bại",
+        withdrawFailed: "Rút tiền thất bại",
+        depositNote: (title: string) => `Nạp cho mục tiêu ${title}`,
+        withdrawNote: (title: string) => `Rút từ mục tiêu ${title}`,
+        noWalletForGoal:
+          "Bạn cần có ít nhất một ví trước khi nạp tiền cho mục tiêu.",
         general: "Tổng quát",
         statuses: {
           active: "Đang thực hiện",
@@ -151,12 +191,11 @@ const Goals: React.FC = () => {
           "Goals help the analytics and profile screens show progress and completion counts.",
         createGoal: "Create goal",
         formDescription:
-          "This form preserves image upload, title, target, current amount, category and deadline.",
+          "Set the title, target amount, category, deadline and cover image. Savings are deposited separately from a wallet.",
         editGoal: "Edit goal",
         createGoalTitle: "Create goal",
         title: "Title",
         targetAmount: "Target amount",
-        currentAmount: "Current amount",
         category: "Category",
         deadlineLabel: "Deadline",
         coverImage: "Cover image",
@@ -182,6 +221,22 @@ const Goals: React.FC = () => {
         deleteGoalDesc: (title: string) => `Delete goal "${title}"?`,
         loadFailed: "Could not load goals",
         retry: "Please retry.",
+        deposit: "Add money",
+        withdraw: "Withdraw",
+        walletRequired: "Wallet required",
+        walletRequiredDesc: "Choose the wallet this money moves from.",
+        invalidAmount: "Invalid amount",
+        invalidAmountDesc: "Amount must be greater than zero.",
+        withdrawTooMuchDesc:
+          "You cannot withdraw more than the goal currently holds.",
+        depositDone: "Added to the goal",
+        withdrawDone: "Returned to the wallet",
+        depositFailed: "Deposit failed",
+        withdrawFailed: "Withdrawal failed",
+        depositNote: (title: string) => `Deposit for goal ${title}`,
+        withdrawNote: (title: string) => `Withdrawal from goal ${title}`,
+        noWalletForGoal:
+          "You need at least one wallet before adding money to a goal.",
         general: "General",
         statuses: {
           active: "Active",
@@ -213,8 +268,12 @@ const Goals: React.FC = () => {
       if (!token) {
         return;
       }
-      const data = await goalApi.getGoals(token);
+      const [data, walletResponse] = await Promise.all([
+        goalApi.getGoals(token),
+        walletApi.getWallets(token),
+      ]);
       setGoals(Array.isArray(data) ? data : []);
+      setWallets(walletResponse?.wallets || []);
     } catch (error: any) {
       toast({
         title: copy.loadFailed,
@@ -234,8 +293,12 @@ const Goals: React.FC = () => {
         if (!token) {
           return;
         }
-        const data = await goalApi.getGoals(token);
+        const [data, walletResponse] = await Promise.all([
+          goalApi.getGoals(token),
+          walletApi.getWallets(token),
+        ]);
         setGoals(Array.isArray(data) ? data : []);
+        setWallets(walletResponse?.wallets || []);
       } catch (error: any) {
         toast({
           title: copy.loadFailed,
@@ -280,7 +343,6 @@ const Goals: React.FC = () => {
     setForm({
       title: "",
       targetAmount: 0,
-      currentAmount: 0,
       deadline: "",
       description: "",
       category: "general",
@@ -288,7 +350,6 @@ const Goals: React.FC = () => {
     setImageFile(null);
     setImagePreview("");
     setTargetAmountInput("");
-    setCurrentAmountInput("");
   };
 
   const openCreate = () => {
@@ -301,7 +362,6 @@ const Goals: React.FC = () => {
     setForm({
       title: goal.title,
       targetAmount: goal.targetAmount,
-      currentAmount: goal.currentAmount,
       deadline: goal.deadline ? dayjs(goal.deadline).format("YYYY-MM-DD") : "",
       description: goal.description || "",
       category: goal.category || "general",
@@ -309,7 +369,6 @@ const Goals: React.FC = () => {
     setImageFile(null);
     setImagePreview(goal.imageUrl || "");
     setTargetAmountInput(formatWholeNumberInput(goal.targetAmount));
-    setCurrentAmountInput(formatWholeNumberInput(goal.currentAmount));
     setModalOpen(true);
   };
 
@@ -321,12 +380,103 @@ const Goals: React.FC = () => {
     }));
   };
 
-  const handleCurrentAmountChange = (value: string, numericValue: number) => {
-    setCurrentAmountInput(value);
-    setForm((current) => ({
-      ...current,
-      currentAmount: numericValue,
-    }));
+  const openContribution = (goal: GoalItem, mode: ContributionMode) => {
+    if (wallets.length === 0) {
+      toast({
+        title: copy.walletRequired,
+        description: copy.noWalletForGoal,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setContributionGoal(goal);
+    setContributionMode(mode);
+    setContributionWalletId(wallets[0]?._id || "");
+    setContributionAmount(0);
+    setContributionAmountInput("");
+    setContributionNote("");
+  };
+
+  const closeContribution = () => {
+    setContributionGoal(null);
+  };
+
+  const handleContributionSubmit = async () => {
+    if (!contributionGoal) {
+      return;
+    }
+
+    if (!contributionWalletId) {
+      toast({
+        title: copy.walletRequired,
+        description: copy.walletRequiredDesc,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (contributionAmount <= 0) {
+      toast({
+        title: copy.invalidAmount,
+        description: copy.invalidAmountDesc,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const isDeposit = contributionMode === "deposit";
+
+    if (!isDeposit && contributionAmount > contributionGoal.currentAmount) {
+      toast({
+        title: copy.invalidAmount,
+        description: copy.withdrawTooMuchDesc,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setContributing(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        return;
+      }
+
+      await transactionApi.createTransaction(
+        {
+          type: isDeposit ? "GOAL_DEPOSIT" : "GOAL_WITHDRAW",
+          status: "COMPLETED",
+          amount: contributionAmount,
+          walletId: contributionWalletId,
+          goalId: contributionGoal._id,
+          category: GOAL_TRANSACTION_CATEGORY,
+          note:
+            contributionNote.trim() ||
+            (isDeposit
+              ? copy.depositNote(contributionGoal.title)
+              : copy.withdrawNote(contributionGoal.title)),
+          date: new Date().toISOString(),
+          timezoneOffset: timezoneOffsetMinutes,
+        },
+        token,
+      );
+
+      toast({
+        title: isDeposit ? copy.depositDone : copy.withdrawDone,
+        variant: "success",
+      });
+      setContributionGoal(null);
+      await loadGoals();
+    } catch (error: any) {
+      toast({
+        title: isDeposit ? copy.depositFailed : copy.withdrawFailed,
+        description: error.message || copy.retry,
+        variant: "destructive",
+      });
+    } finally {
+      setContributing(false);
+    }
   };
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -369,7 +519,6 @@ const Goals: React.FC = () => {
       const formData = new FormData();
       formData.append("title", form.title);
       formData.append("targetAmount", String(form.targetAmount));
-      formData.append("currentAmount", String(form.currentAmount));
       formData.append("category", form.category || "general");
       if (form.deadline) {
         formData.append(
@@ -554,6 +703,31 @@ const Goals: React.FC = () => {
                       indicatorClassName="bg-white"
                       value={progress}
                     />
+                    <div className="flex gap-1.5 pt-1">
+                      <button
+                        className="flex flex-1 items-center justify-center gap-1 rounded-[var(--app-radius-md)] border border-white/25 bg-white/15 px-2 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/25"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openContribution(goal, "deposit");
+                        }}
+                        type="button"
+                      >
+                        <ArrowDownToLine className="h-3.5 w-3.5" />
+                        {copy.deposit}
+                      </button>
+                      <button
+                        className="flex flex-1 items-center justify-center gap-1 rounded-[var(--app-radius-md)] border border-white/25 bg-white/10 px-2 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/25 disabled:opacity-40"
+                        disabled={goal.currentAmount <= 0}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openContribution(goal, "withdraw");
+                        }}
+                        type="button"
+                      >
+                        <ArrowUpFromLine className="h-3.5 w-3.5" />
+                        {copy.withdraw}
+                      </button>
+                    </div>
                   </div>
                 }
                 footerLeading={
@@ -626,7 +800,6 @@ const Goals: React.FC = () => {
           coverImage: copy.coverImage,
           createGoal: copy.createGoal,
           createGoalTitle: copy.createGoalTitle,
-          currentAmount: copy.currentAmount,
           deadlineLabel: copy.deadlineLabel,
           description: copy.description,
           editGoal: copy.editGoal,
@@ -637,13 +810,11 @@ const Goals: React.FC = () => {
           title: copy.title,
           updateGoal: copy.updateGoal,
         }}
-        currentAmountInput={currentAmountInput}
         editing={editing}
         form={form}
         imagePreview={imagePreview}
         isVietnamese={isVietnamese}
         onClose={() => setModalOpen(false)}
-        onCurrentAmountChange={handleCurrentAmountChange}
         onFormChange={setForm}
         onImageChange={handleImageChange}
         onSubmit={handleSubmit}
@@ -651,6 +822,26 @@ const Goals: React.FC = () => {
         open={modalOpen}
         saving={saving}
         targetAmountInput={targetAmountInput}
+      />
+
+      <GoalContributionModal
+        amountInput={contributionAmountInput}
+        goal={contributionGoal}
+        isVietnamese={isVietnamese}
+        mode={contributionMode}
+        note={contributionNote}
+        onAmountChange={(value, numericValue) => {
+          setContributionAmountInput(value);
+          setContributionAmount(numericValue);
+        }}
+        onClose={closeContribution}
+        onNoteChange={setContributionNote}
+        onSubmit={handleContributionSubmit}
+        onWalletChange={setContributionWalletId}
+        open={!!contributionGoal}
+        submitting={contributing}
+        walletId={contributionWalletId}
+        wallets={wallets}
       />
 
       <DeleteGoalModal

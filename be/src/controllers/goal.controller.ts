@@ -18,14 +18,8 @@ export const createGoal = [
     upload.single("image"), // Allow single image upload
     async (req: any, res: Response) => {
         try {
-            const {
-                title,
-                description,
-                targetAmount,
-                currentAmount,
-                category,
-                deadline,
-            } = req.body;
+            const { title, description, targetAmount, category, deadline } =
+                req.body;
             const userId = req.user.uid;
 
             let imageUrl: string | undefined;
@@ -48,7 +42,9 @@ export const createGoal = [
                 title,
                 description,
                 targetAmount: parseFloat(targetAmount),
-                currentAmount: currentAmount ? parseFloat(currentAmount) : 0,
+                // Saved amounts only move through GOAL_DEPOSIT/GOAL_WITHDRAW
+                // transactions, so a goal always starts empty.
+                currentAmount: 0,
                 category,
                 deadline: deadline ? new Date(deadline) : undefined,
                 status: "active",
@@ -126,7 +122,6 @@ export const updateGoal = [
                 title,
                 description,
                 targetAmount,
-                currentAmount,
                 category,
                 deadline,
                 status,
@@ -160,8 +155,10 @@ export const updateGoal = [
             if (description !== undefined) goal.description = description;
             if (targetAmount !== undefined)
                 goal.targetAmount = parseFloat(targetAmount);
-            if (currentAmount !== undefined)
-                goal.currentAmount = parseFloat(currentAmount);
+            // currentAmount is deliberately not editable here: it is the sum
+            // of the goal's deposits and withdrawals, which move real money in
+            // and out of a wallet. Editing it directly would let a goal claim
+            // savings that never left the wallet.
             if (category !== undefined) goal.category = category;
             if (deadline !== undefined)
                 goal.deadline = deadline ? new Date(deadline) : undefined;

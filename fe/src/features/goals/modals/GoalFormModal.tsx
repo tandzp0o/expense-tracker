@@ -13,7 +13,6 @@ import { Textarea } from "components/ui/textarea";
 export interface GoalFormData {
   title: string;
   targetAmount: number;
-  currentAmount: number;
   deadline: string;
   description: string;
   category: string;
@@ -26,7 +25,6 @@ export interface GoalFormModalCopy {
   title: string;
   category: string;
   targetAmount: string;
-  currentAmount: string;
   deadlineLabel: string;
   coverImage: string;
   goalPreview: string;
@@ -44,14 +42,12 @@ export interface GoalFormModalProps {
   copy: GoalFormModalCopy;
   form: GoalFormData;
   targetAmountInput: string;
-  currentAmountInput: string;
   imagePreview: string;
   saving: boolean;
   onClose: () => void;
   onSubmit: () => void;
   onFormChange: React.Dispatch<React.SetStateAction<GoalFormData>>;
   onTargetAmountChange: (value: string, numericValue: number) => void;
-  onCurrentAmountChange: (value: string, numericValue: number) => void;
   onImageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -62,14 +58,12 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
   copy,
   form,
   targetAmountInput,
-  currentAmountInput,
   imagePreview,
   saving,
   onClose,
   onSubmit,
   onFormChange,
   onTargetAmountChange,
-  onCurrentAmountChange,
   onImageChange,
 }) => (
   <Dialog
@@ -130,8 +124,8 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
       <DialogSection
         description={
           isVietnamese
-            ? "Theo dõi cả số tiền cần đạt, số đã có và mốc thời gian."
-            : "Track the target, current progress, and deadline in one place."
+            ? "Đặt số tiền cần đạt và mốc thời gian. Số đã tiết kiệm được cộng lên qua từng lần nạp tiền từ ví."
+            : "Set the target amount and deadline. Saved progress builds up through deposits from a wallet."
         }
         title={isVietnamese ? "Tiến độ" : "Progress setup"}
       >
@@ -141,12 +135,6 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
             onChange={onTargetAmountChange}
             placeholder={copy.targetAmount}
             value={targetAmountInput}
-          />
-          <MoneyField
-            label={copy.currentAmount}
-            onChange={onCurrentAmountChange}
-            placeholder={copy.currentAmount}
-            value={currentAmountInput}
           />
         </div>
         <div>
