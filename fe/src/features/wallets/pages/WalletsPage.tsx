@@ -3,9 +3,9 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import {
@@ -55,12 +55,13 @@ import {
 import { MoneyField } from "components/app/money-field";
 import { Select } from "components/ui/select";
 import { Spinner } from "components/ui/spinner";
-import SpotlightGuide from "../components/SpotlightGuide";
+import WalletOnboardingDialog from "../components/WalletOnboardingDialog";
 import LineChart from "components/charts/LineChart";
 import { colorOptions, walletTypeText } from "../constants";
 import { ConfirmWalletTypeChangeModal } from "../modals/ConfirmWalletTypeChangeModal";
 import { DeleteWalletModal } from "../modals/DeleteWalletModal";
 import { WalletFormModal } from "../modals/WalletFormModal";
+import type { WalletFormValues } from "../modals/WalletFormModal";
 
 dayjs.locale("vi");
 
@@ -113,23 +114,6 @@ interface WalletBudgetSummaryResponse {
   items: WalletBudgetItem[];
 }
 
-type WalletGuideStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-
-type GuideConfig = {
-  targetRef: React.RefObject<HTMLElement | null>;
-  title: string;
-  description: string;
-  placement: "top" | "bottom" | "left" | "right";
-  actionLabel?: string;
-  actionDisabled?: boolean;
-  onAction?: () => void;
-};
-
-type GuideStepUpdate =
-  | WalletGuideStep
-  | null
-  | ((current: WalletGuideStep | null) => WalletGuideStep | null);
-
 const walletIconMap = {
   account_balance: Building2,
   payments: Wallet,
@@ -142,8 +126,6 @@ const walletIconMap = {
   shopping_cart: ShoppingCart,
   restaurant: UtensilsCrossed,
 } as const;
-
-const WALLET_GUIDE_STEP_COUNT = 9;
 
 const getTransferDestinationWalletId = (
   walletList: WalletItem[],
@@ -173,7 +155,8 @@ const getTransferDestinationWalletId = (
 
 const Wallets: React.FC = () => {
   const { currentUser, updateUserStatus } = useAuth();
-  const { language, isVietnamese } = useLocale();
+  const { defaultCurrency, language, isVietnamese, timezoneOffsetMinutes } =
+    useLocale();
   const { toast } = useToast();
   const { appearance } = useTheme();
   const themeColors = getAppearanceGradientColors(appearance);
@@ -207,32 +190,6 @@ const Wallets: React.FC = () => {
         transferCompleted: "Đã chuyển tiền",
         transferFailed: "Chuyển tiền thất bại",
         transferFailedDesc: "Không thể hoàn tất chuyển tiền nội bộ.",
-        firstWalletGuide: "Tạo ví đầu tiên",
-        firstWalletGuideDesc:
-          "Mở form tạo ví trước. Hướng dẫn sẽ tiếp tục trên các trường trong hộp thoại.",
-        imageGuide: "Thêm ảnh nếu bạn muốn",
-        imageGuideDesc:
-          "Bạn có thể tải ảnh thêm cho ví này để dễ nhận ra hơn. Không bắt buộc, nên bạn có thể bước tiếp ngay.",
-        clearNameGuide: "Đặt tên dễ nhận biết",
-        clearNameGuideDesc:
-          "Ví dụ: Tiền mặt, Techcombank hoặc Momo. Nhập xong rồi bấm Tiếp tục để sang bước sau.",
-        walletTypeGuide: "Chọn đúng loại ví",
-        walletTypeGuideDesc:
-          "Loại ví ảnh hưởng tới cách hệ thống gom số dư trong báo cáo.",
-        currencyGuide: "Chọn loại tiền tệ",
-        currencyGuideDesc:
-          "Chọn đúng tiền tệ ngay từ đầu để các báo cáo và giao dịch không bị sai định dạng.",
-        iconGuide: "Chọn biểu tượng",
-        iconGuideDesc:
-          "Bạn có thể gõ tên biểu tượng, dán tên có sẵn hoặc chọn một giá trị gợi ý.",
-        startingBalanceGuide: "Nhập số dư ban đầu",
-        startingBalanceGuideDesc:
-          "Đây là số tiền hiện đang có trong ví tại thời điểm tạo.",
-        saveGuide: "Lưu để tiếp tục",
-        saveGuideDesc:
-          "Sau khi lưu ví đầu tiên, ứng dụng sẽ mở khóa giao dịch, ngân sách và mục tiêu.",
-        continue: "Tiếp tục",
-        stepLabel: (step: number) => `Bước ${step}/${WALLET_GUIDE_STEP_COUNT}`,
         pageTitle: "Ví tiền",
         pageDescription:
           "Màn ví giữ nguyên luồng tạo, cập nhật, lưu trữ/xóa và chuyển nội bộ theo các API hiện có.",
@@ -335,32 +292,6 @@ const Wallets: React.FC = () => {
         transferCompleted: "Transfer completed",
         transferFailed: "Transfer failed",
         transferFailedDesc: "Internal transfer could not be completed.",
-        firstWalletGuide: "Create the first wallet",
-        firstWalletGuideDesc:
-          "Open the wallet form first. The guide will continue on the fields inside the dialog.",
-        imageGuide: "Add an image if you want",
-        imageGuideDesc:
-          "You can upload an image to make this wallet easier to recognize. It is optional, so you can continue right away.",
-        clearNameGuide: "Give it a clear name",
-        clearNameGuideDesc:
-          "Examples: Cash, Techcombank or Momo. Once the name looks right, press Continue to move on.",
-        walletTypeGuide: "Pick the right wallet type",
-        walletTypeGuideDesc:
-          "This affects how reports group your balances later.",
-        currencyGuide: "Choose the wallet currency",
-        currencyGuideDesc:
-          "Pick the correct currency from the start so reports and transactions stay consistent.",
-        iconGuide: "Choose an icon",
-        iconGuideDesc:
-          "You can type an icon name, paste one from elsewhere, or use one of the suggested values.",
-        startingBalanceGuide: "Enter the starting balance",
-        startingBalanceGuideDesc:
-          "This should be the amount currently available in the wallet.",
-        saveGuide: "Save and continue",
-        saveGuideDesc:
-          "After saving your first wallet, the app unlocks transactions, budgets and goals.",
-        continue: "Continue",
-        stepLabel: (step: number) => `Step ${step}/${WALLET_GUIDE_STEP_COUNT}`,
         pageTitle: "Wallets",
         pageDescription:
           "Wallet page keeps create, update, archive/delete and internal transfer flows tied to the existing APIs.",
@@ -477,9 +408,6 @@ const Wallets: React.FC = () => {
       ? "Ng\u00e2n s\u00e1ch c\u00f2n l\u1ea1i \u0111ang l\u1edbn h\u01a1n s\u1ed1 d\u01b0 v\u00ed, c\u1ea7n gi\u1ea3m reserve ho\u1eb7c n\u1ea1p th\u00eam ti\u1ec1n."
       : "Remaining budget reserves are larger than the wallet balance. Reduce allocations or top up the wallet.",
   };
-  const guideOpenFormLabel = isVietnamese
-    ? "M\u1edf form \u2192"
-    : "Open form ->";
   const onboardingNoticeTitle = isVietnamese
     ? "Ví tiền: lần đầu bạn truy cập app, hãy tạo 1 ví đầu tiên"
     : "Wallets: create your first wallet on your first visit";
@@ -490,12 +418,6 @@ const Wallets: React.FC = () => {
   const onboardingPageDescription = isVietnamese
     ? "Lần đầu truy cập app? Hãy tạo ví đầu tiên để mở khóa toàn bộ tính năng."
     : "First time in the app? Create your first wallet to unlock the rest of the experience.";
-  const accountNumberGuideTitle = isVietnamese
-    ? "Thêm số tài khoản nếu cần"
-    : "Add an account number if needed";
-  const accountNumberGuideDescription = isVietnamese
-    ? "Bước này không bắt buộc. Bạn có thể nhập số tài khoản, số thẻ hoặc 4 số cuối để dễ phân biệt ví."
-    : "This step is optional. You can enter an account number, card number, or just the last four digits to identify the wallet faster.";
   const getWalletTypeLabel = (type: WalletItem["type"]) =>
     walletTypeText[type][language];
   const [loading, setLoading] = useState(true);
@@ -510,13 +432,15 @@ const Wallets: React.FC = () => {
   const [imagePreview, setImagePreview] = useState("");
   const [pendingDelete, setPendingDelete] = useState<WalletItem | null>(null);
   const [confirmTypeChangeOpen, setConfirmTypeChangeOpen] = useState(false);
-  const [guideStep, setGuideStep] = useState<WalletGuideStep | null>(null);
-  const [formValues, setFormValues] = useState({
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [autoCreateRequested, setAutoCreateRequested] = useState(false);
+  const [formValues, setFormValues] = useState<WalletFormValues>({
     name: "",
     accountNumber: "",
     initialBalance: 0,
-    type: "cash" as "cash" | "bank" | "ewallet",
-    currency: "VND",
+    type: "cash",
+    currency: defaultCurrency,
     icon: "",
     color: appearance.primaryColor,
   });
@@ -529,16 +453,6 @@ const Wallets: React.FC = () => {
   const [transferAmountInput, setTransferAmountInput] = useState("");
   const [expandedWalletId, setExpandedWalletId] = useState<string | null>(null);
 
-  const addWalletButtonRef = useRef<HTMLButtonElement | null>(null);
-  const imageFieldRef = useRef<HTMLElement | null>(null);
-  const nameFieldRef = useRef<HTMLElement | null>(null);
-  const accountNumberFieldRef = useRef<HTMLElement | null>(null);
-  const typeFieldRef = useRef<HTMLElement | null>(null);
-  const currencyFieldRef = useRef<HTMLElement | null>(null);
-  const iconFieldRef = useRef<HTMLElement | null>(null);
-  const balanceFieldRef = useRef<HTMLElement | null>(null);
-  const submitButtonRef = useRef<HTMLButtonElement | null>(null);
-  const pendingGuideStepRef = useRef<WalletGuideStep | null>(null);
 
   const onboardingStorageKey = useMemo(
     () =>
@@ -554,37 +468,6 @@ const Wallets: React.FC = () => {
   );
   const hasWallets = wallets.length > 0;
   const isGuideEligible = !!currentUser?.newUser && !hasWallets;
-  const logGuide = useCallback(
-    (event: string, details?: Record<string, unknown>) => {
-      console.info("[WalletGuide]", event, {
-        currentUserId: currentUser?.uid || null,
-        guideStep,
-        hasWallets,
-        isGuideEligible,
-        modalOpen,
-        ...details,
-      });
-    },
-    [currentUser?.uid, guideStep, hasWallets, isGuideEligible, modalOpen],
-  );
-  const setGuideStepWithLog = useCallback(
-    (next: GuideStepUpdate, reason: string) => {
-      setGuideStep((current) => {
-        const resolved = typeof next === "function" ? next(current) : next;
-
-        if (current !== resolved) {
-          logGuide("Guide step changed", {
-            from: current,
-            reason,
-            to: resolved,
-          });
-        }
-
-        return resolved;
-      });
-    },
-    [logGuide],
-  );
   const getGuideState = useCallback(() => {
     if (!onboardingStorageKey || typeof window === "undefined") {
       return null;
@@ -674,24 +557,9 @@ const Wallets: React.FC = () => {
   }, [fetchData]);
 
   useEffect(() => {
-    logGuide("Guide state snapshot", {
-      onboardingStorageKey,
-      persistedState: getGuideState(),
-      sessionSkipState: getGuideSessionSkipState(),
-    });
-  }, [
-    getGuideSessionSkipState,
-    getGuideState,
-    logGuide,
-    onboardingSessionSkipKey,
-    onboardingStorageKey,
-  ]);
-
-  useEffect(() => {
     if (!currentUser?.newUser || !hasWallets) {
       return;
     }
-    logGuide("User now has wallet, marking onboarding done");
     updateUserStatus(false);
     if (onboardingStorageKey) {
       window.localStorage.setItem(onboardingStorageKey, "done");
@@ -702,193 +570,42 @@ const Wallets: React.FC = () => {
   }, [
     currentUser?.newUser,
     hasWallets,
-    logGuide,
     onboardingSessionSkipKey,
     onboardingStorageKey,
     updateUserStatus,
   ]);
 
   useEffect(() => {
-    if (loading || modalOpen || !isGuideEligible || !onboardingStorageKey) {
-      logGuide("Guide bootstrap skipped", {
-        loading,
-        modalOpen,
-        onboardingStorageKey,
-      });
+    if (
+      loading ||
+      modalOpen ||
+      autoCreateRequested ||
+      !isGuideEligible ||
+      !onboardingStorageKey
+    ) {
       return;
     }
 
-    const sessionSkipState = getGuideSessionSkipState();
-    if (sessionSkipState === "skip") {
-      logGuide("Guide bootstrap blocked for this session");
+    if (getGuideSessionSkipState() === "skip" || getGuideState() === "done") {
       return;
     }
 
-    let guideState = getGuideState();
-    if (guideState === "done") {
-      logGuide(
-        "Detected stale persisted done state for eligible user, resetting it",
-      );
-      window.localStorage.removeItem(onboardingStorageKey);
-      guideState = null;
-    }
-
-    let frameId = 0;
-    let attempts = 0;
-    let cancelled = false;
-
-    const ensureGuideStarts = () => {
-      if (cancelled) {
-        return;
-      }
-
-      if (addWalletButtonRef.current) {
-        logGuide("Step 0 target ready, showing guide", {
-          attempts,
-        });
-        setGuideStepWithLog((current) => current ?? 0, "bootstrap step 0");
-        return;
-      }
-
-      if (attempts >= 24) {
-        logGuide("Step 0 target still missing after retries", {
-          attempts,
-        });
-        return;
-      }
-
-      attempts += 1;
-      logGuide("Waiting for step 0 target ref", {
-        attempts,
-      });
-      frameId = window.requestAnimationFrame(ensureGuideStarts);
-    };
-
-    logGuide("Starting guide bootstrap", {
-      persistedState: guideState,
-      sessionSkipState,
-    });
-    frameId = window.requestAnimationFrame(ensureGuideStarts);
-
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frameId);
-    };
+    setOnboardingOpen(true);
   }, [
+    autoCreateRequested,
     getGuideSessionSkipState,
     getGuideState,
     isGuideEligible,
     loading,
-    logGuide,
     modalOpen,
     onboardingStorageKey,
-    setGuideStepWithLog,
   ]);
 
   useEffect(() => {
-    if (guideStep === null) {
-      logGuide("Guide hidden");
-      return;
+    if (!isGuideEligible) {
+      setOnboardingOpen(false);
     }
-
-    logGuide("Guide visible", {
-      step: guideStep,
-    });
-  }, [guideStep, logGuide]);
-
-  useEffect(() => {
-    if (!modalOpen || pendingGuideStepRef.current === null) {
-      return;
-    }
-
-    logGuide("Dialog opened, preparing next guided step", {
-      pendingStep: pendingGuideStepRef.current,
-    });
-    let frameId = 0;
-    let attempts = 0;
-
-    const getPendingTarget = (step: WalletGuideStep) => {
-      if (step === 1) {
-        return imageFieldRef.current;
-      }
-
-      if (step === 2) {
-        return nameFieldRef.current;
-      }
-
-      if (step === 3) {
-        return accountNumberFieldRef.current;
-      }
-
-      if (step === 4) {
-        return typeFieldRef.current;
-      }
-
-      if (step === 5) {
-        return currencyFieldRef.current;
-      }
-
-      if (step === 6) {
-        return iconFieldRef.current;
-      }
-
-      if (step === 7) {
-        return balanceFieldRef.current;
-      }
-
-      if (step === 8) {
-        return submitButtonRef.current;
-      }
-
-      return addWalletButtonRef.current;
-    };
-
-    const continueGuideInsideDialog = () => {
-      const pendingStep = pendingGuideStepRef.current;
-      if (pendingStep === null) {
-        return;
-      }
-
-      if (getPendingTarget(pendingStep)) {
-        logGuide("Dialog target ready, continuing guide", {
-          pendingStep,
-        });
-        setGuideStepWithLog(pendingStep, "dialog target mounted");
-        pendingGuideStepRef.current = null;
-        return;
-      }
-
-      if (attempts >= 24) {
-        logGuide("Dialog target missing after retries", {
-          attempts,
-          pendingStep,
-        });
-        pendingGuideStepRef.current = null;
-        return;
-      }
-
-      attempts += 1;
-      logGuide("Waiting for dialog target ref", {
-        attempts,
-        pendingStep,
-      });
-      frameId = window.requestAnimationFrame(continueGuideInsideDialog);
-    };
-
-    frameId = window.requestAnimationFrame(continueGuideInsideDialog);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [
-    accountNumberFieldRef,
-    currencyFieldRef,
-    iconFieldRef,
-    imageFieldRef,
-    logGuide,
-    modalOpen,
-    setGuideStepWithLog,
-  ]);
+  }, [isGuideEligible]);
 
   const finishOnboarding = (status: "done" | "skip") => {
     if (status === "done" && onboardingStorageKey) {
@@ -900,57 +617,18 @@ const Wallets: React.FC = () => {
     if (status === "done" && onboardingSessionSkipKey) {
       window.sessionStorage.removeItem(onboardingSessionSkipKey);
     }
-    logGuide("Finishing onboarding", {
-      status,
-    });
-    setGuideStepWithLog(null, `finish onboarding: ${status}`);
+    setOnboardingOpen(false);
   };
 
-  const bindTargetRef =
-    (
-      targetRef: React.MutableRefObject<HTMLElement | null>,
-      selector?: string,
-    ) =>
-    (node: HTMLDivElement | null) => {
-      if (!node) {
-        targetRef.current = null;
-        logGuide("Guide target cleared", {
-          selector: selector || "self",
-        });
-        return;
-      }
-      targetRef.current = selector
-        ? (node.querySelector(selector) as HTMLElement | null) || node
-        : node;
-      logGuide("Guide target attached", {
-        resolved: targetRef.current?.tagName || null,
-        selector: selector || "self",
-      });
-    };
-
-  const openCreate = (
-    source: "empty-state" | "guide-cta" | "header" = "header",
-  ) => {
-    const persistedGuideState = getGuideState();
-    const sessionSkipState = getGuideSessionSkipState();
-    const shouldContinueGuide =
-      isGuideEligible &&
-      persistedGuideState !== "done" &&
-      sessionSkipState !== "skip";
-    logGuide("Open create wallet requested", {
-      persistedGuideState,
-      sessionSkipState,
-      shouldContinueGuide,
-      source,
-    });
-
+  const openCreate = () => {
+    setOnboardingOpen(false);
     setEditing(null);
     setFormValues({
       name: "",
       accountNumber: "",
       initialBalance: 0,
       type: "cash",
-      currency: "VND",
+      currency: defaultCurrency,
       icon: "",
       color: appearance.primaryColor,
     });
@@ -958,15 +636,29 @@ const Wallets: React.FC = () => {
     setImageFile(null);
     setImagePreview("");
     setModalOpen(true);
-
-    if (shouldContinueGuide) {
-      pendingGuideStepRef.current = 1;
-      logGuide("Queued guide step 1 after opening dialog");
-      setGuideStepWithLog(null, "opening create dialog");
-    } else {
-      pendingGuideStepRef.current = null;
-    }
   };
+
+  // "Create a wallet" from the locked-navigation notice lands here with
+  // ?create=1 so the form opens immediately instead of just showing the page.
+  useEffect(() => {
+    if (loading || searchParams.get("create") !== "1") {
+      return;
+    }
+
+    setAutoCreateRequested(true);
+    openCreate();
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("create");
+        return next;
+      },
+      { replace: true },
+    );
+    // openCreate only resets local form state; re-running on its identity would
+    // wipe what the user has already typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, searchParams, setSearchParams]);
 
   const openEdit = (wallet: WalletItem) => {
     setEditing(wallet);
@@ -975,7 +667,7 @@ const Wallets: React.FC = () => {
       accountNumber: wallet.accountNumber || "",
       initialBalance: wallet.initialBalance ?? wallet.balance,
       type: wallet.type,
-      currency: wallet.currency || "VND",
+      currency: wallet.currency || defaultCurrency,
       icon: wallet.icon || "",
       color: wallet.color || appearance.primaryColor,
     });
@@ -984,17 +676,10 @@ const Wallets: React.FC = () => {
     );
     setImageFile(null);
     setImagePreview(wallet.imageUrl || "");
-    pendingGuideStepRef.current = null;
-    logGuide("Open edit wallet dialog", {
-      walletId: wallet._id,
-    });
     setModalOpen(true);
   };
 
   const handleCloseModal = () => {
-    pendingGuideStepRef.current = null;
-    logGuide("Closing wallet dialog");
-    setGuideStepWithLog(null, "dialog closed");
     setModalOpen(false);
   };
 
@@ -1241,6 +926,7 @@ const Wallets: React.FC = () => {
           toWalletId: transferValues.toWalletId,
           amount: transferValues.amount,
           date: new Date().toISOString(),
+          timezoneOffset: timezoneOffsetMinutes,
           sourceNote: copy.transferTo(destinationWallet?.name),
           destinationNote: copy.transferFrom(sourceWallet?.name),
         },
@@ -1270,80 +956,6 @@ const Wallets: React.FC = () => {
 
   const totalBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0);
 
-  const guideConfigs: Record<WalletGuideStep, GuideConfig> = {
-    0: {
-      targetRef: addWalletButtonRef,
-      title: copy.firstWalletGuide,
-      description: copy.firstWalletGuideDesc,
-      placement: "left",
-      actionLabel: guideOpenFormLabel,
-      onAction: () => openCreate("guide-cta"),
-    },
-    1: {
-      targetRef: imageFieldRef,
-      title: copy.imageGuide,
-      description: copy.imageGuideDesc,
-      placement: "top",
-      actionLabel: copy.continue,
-      onAction: () => setGuideStepWithLog(2, "step 1 CTA"),
-    },
-    2: {
-      targetRef: nameFieldRef,
-      title: copy.clearNameGuide,
-      description: copy.clearNameGuideDesc,
-      placement: "top",
-      actionLabel: copy.continue,
-      onAction: () => setGuideStepWithLog(3, "step 2 CTA"),
-      actionDisabled: !formValues.name.trim(),
-    },
-    3: {
-      targetRef: accountNumberFieldRef,
-      title: accountNumberGuideTitle,
-      description: accountNumberGuideDescription,
-      placement: "top",
-      actionLabel: copy.continue,
-      onAction: () => setGuideStepWithLog(4, "step 3 CTA"),
-    },
-    4: {
-      targetRef: typeFieldRef,
-      title: copy.walletTypeGuide,
-      description: copy.walletTypeGuideDesc,
-      placement: "top",
-      actionLabel: copy.continue,
-      onAction: () => setGuideStepWithLog(5, "step 4 CTA"),
-    },
-    5: {
-      targetRef: currencyFieldRef,
-      title: copy.currencyGuide,
-      description: copy.currencyGuideDesc,
-      placement: "top",
-      actionLabel: copy.continue,
-      onAction: () => setGuideStepWithLog(6, "step 5 CTA"),
-    },
-    6: {
-      targetRef: iconFieldRef,
-      title: copy.iconGuide,
-      description: copy.iconGuideDesc,
-      placement: "top",
-      actionLabel: copy.continue,
-      onAction: () => setGuideStepWithLog(7, "step 6 CTA"),
-    },
-    7: {
-      targetRef: balanceFieldRef,
-      title: copy.startingBalanceGuide,
-      description: copy.startingBalanceGuideDesc,
-      placement: "top",
-      actionLabel: copy.continue,
-      onAction: () => setGuideStepWithLog(8, "step 7 CTA"),
-    },
-    8: {
-      targetRef: submitButtonRef,
-      title: copy.saveGuide,
-      description: copy.saveGuideDesc,
-      placement: "top",
-    },
-  };
-
   const chartData = {
     labels: stats?.history?.map((item: any) => item.month) || [],
     datasets: [
@@ -1358,9 +970,6 @@ const Wallets: React.FC = () => {
     ],
   };
 
-  const currentGuide =
-    guideStep !== null && isGuideEligible ? guideConfigs[guideStep] : null;
-
   if (loading) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
@@ -1371,20 +980,13 @@ const Wallets: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {currentGuide ? (
-        <SpotlightGuide
-          actionDisabled={currentGuide.actionDisabled}
-          actionLabel={currentGuide.actionLabel}
-          description={currentGuide.description}
-          onAction={currentGuide.onAction}
-          onSkip={() => finishOnboarding("skip")}
-          open
-          placement={currentGuide.placement}
-          stepLabel={copy.stepLabel((guideStep || 0) + 1)}
-          targetRef={currentGuide.targetRef}
-          title={currentGuide.title}
-        />
-      ) : null}
+      <WalletOnboardingDialog
+        isVietnamese={isVietnamese}
+        onSkip={() => finishOnboarding("skip")}
+        onStart={() => openCreate()}
+        open={onboardingOpen}
+        primaryColor={appearance.primaryColor}
+      />
 
       {currentUser?.newUser ? (
         <div
@@ -1421,6 +1023,19 @@ const Wallets: React.FC = () => {
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {onboardingNoticeDescription}
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button onClick={() => openCreate()} size="sm">
+                  <Plus className="h-4 w-4" />
+                  {isVietnamese ? "Tạo ví đầu tiên" : "Create first wallet"}
+                </Button>
+                <Button
+                  onClick={() => setOnboardingOpen(true)}
+                  size="sm"
+                  variant="outline"
+                >
+                  {isVietnamese ? "Xem hướng dẫn" : "Show the quick tour"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1437,9 +1052,8 @@ const Wallets: React.FC = () => {
             </p>
           </div>
           <Button
-            onClick={() => openCreate("header")}
+            onClick={() => openCreate()}
             size="sm"
-            ref={addWalletButtonRef}
           >
             <Plus className="h-4 w-4" />
             {copy.newWallet}
@@ -1449,7 +1063,7 @@ const Wallets: React.FC = () => {
 
       <PageHeader
         actions={
-          <Button onClick={() => openCreate("header")} ref={addWalletButtonRef}>
+          <Button onClick={() => openCreate()}>
             <Plus className="h-4 w-4" />
             {copy.newWallet}
           </Button>
@@ -1467,7 +1081,7 @@ const Wallets: React.FC = () => {
           icon={WalletCards}
           subtitle={copy.activeWallets(wallets.length)}
           title={copy.totalBalance}
-          value={formatCurrency(stats?.totalBalance || totalBalance, "VND", {
+          value={formatCurrency(stats?.totalBalance || totalBalance, defaultCurrency, {
             displayMode: "full",
           })}
         />
@@ -1852,24 +1466,14 @@ const Wallets: React.FC = () => {
           actionLabel={copy.createWallet}
           description={copy.noWalletsDesc}
           icon={WalletCards}
-          onAction={() => openCreate("empty-state")}
+          onAction={() => openCreate()}
           title={copy.noWallets}
         />
       )}
 
       <WalletFormModal
-        bindTargetRef={bindTargetRef}
         copy={copy}
         editing={editing}
-        fieldRefs={{
-          accountNumber: accountNumberFieldRef,
-          balance: balanceFieldRef,
-          currency: currencyFieldRef,
-          icon: iconFieldRef,
-          image: imageFieldRef,
-          name: nameFieldRef,
-          type: typeFieldRef,
-        }}
         formValues={formValues}
         imagePreview={imagePreview}
         initialBalanceInput={initialBalanceInput}
@@ -1881,7 +1485,6 @@ const Wallets: React.FC = () => {
         onInitialBalanceChange={handleInitialBalanceChange}
         onSubmit={() => void submitWallet(false)}
         open={modalOpen}
-        submitButtonRef={submitButtonRef}
         submitting={submitting}
       />
 

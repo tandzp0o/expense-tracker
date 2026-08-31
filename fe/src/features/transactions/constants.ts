@@ -9,7 +9,12 @@ export const categoryOptions = [
   { value: "Giao duc", vi: "Giáo dục", en: "Education" },
   { value: "Hoa don", vi: "Hóa đơn", en: "Bills" },
   { value: "Khac", vi: "Khác", en: "Other" },
+  { value: "Chi tieu tu do", vi: "Chi tiêu tự do", en: "Free spending" },
 ] as const;
+
+// Expenses do not require a budget. When none is picked the transaction is
+// still categorised so reports and the backend category rule stay satisfied.
+export const FREE_SPENDING_CATEGORY = "Chi tieu tu do";
 
 export const incomeCategoryOptions = [
   { value: "Salary", vi: "Lương", en: "Salary" },

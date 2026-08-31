@@ -19,8 +19,75 @@ export class TransactionRuleError extends Error {
     }
 }
 
-export const normalizeToCalendarDate = (value: Date) =>
-    new Date(value.getFullYear(), value.getMonth(), value.getDate());
+/** Widest real offset is UTC+14 / UTC-12, in getTimezoneOffset() minutes. */
+const MAX_TIMEZONE_OFFSET_MINUTES = 840;
+
+/**
+ * Business timezone of the app. Requests that do not state a timezone are
+ * recorded on the Vietnamese calendar day rather than the server's, so a
+ * container running in UTC no longer shifts dates by seven hours.
+ * Override with APP_TIMEZONE_OFFSET_MINUTES (getTimezoneOffset convention).
+ */
+export const DEFAULT_TIMEZONE_OFFSET_MINUTES = (() => {
+    const configured = Number(process.env.APP_TIMEZONE_OFFSET_MINUTES);
+
+    if (
+        Number.isFinite(configured) &&
+        Math.abs(configured) <= MAX_TIMEZONE_OFFSET_MINUTES
+    ) {
+        return Math.trunc(configured);
+    }
+
+    // Asia/Ho_Chi_Minh is UTC+7, which getTimezoneOffset() reports as -420.
+    return -420;
+})();
+
+/**
+ * Minutes as reported by the client's Date.prototype.getTimezoneOffset(), i.e.
+ * the value to add to local time to reach UTC (UTC+7 sends -420). Requests
+ * without it fall back to UTC so older clients keep the previous behaviour.
+ */
+export const parseTimezoneOffset = (value: unknown) => {
+    if (value === undefined || value === null || value === "") {
+        return DEFAULT_TIMEZONE_OFFSET_MINUTES;
+    }
+
+    const parsed = Number(value);
+
+    if (!Number.isFinite(parsed)) {
+        return DEFAULT_TIMEZONE_OFFSET_MINUTES;
+    }
+
+    const rounded = Math.trunc(parsed);
+
+    if (Math.abs(rounded) > MAX_TIMEZONE_OFFSET_MINUTES) {
+        return DEFAULT_TIMEZONE_OFFSET_MINUTES;
+    }
+
+    return rounded;
+};
+
+/**
+ * Calendar day of an instant as seen by the client, not by the server. Using
+ * the server's local getters made "today" in UTC+7 look like tomorrow to a UTC
+ * server for the first seven hours of every day.
+ */
+export const normalizeToCalendarDate = (
+    value: Date,
+    timezoneOffsetMinutes = DEFAULT_TIMEZONE_OFFSET_MINUTES,
+) => {
+    const shifted = new Date(
+        value.getTime() - timezoneOffsetMinutes * 60 * 1000,
+    );
+
+    return new Date(
+        Date.UTC(
+            shifted.getUTCFullYear(),
+            shifted.getUTCMonth(),
+            shifted.getUTCDate(),
+        ),
+    );
+};
 
 export const parseTransactionDateInput = (value: unknown) => {
     if (value === undefined || value === null || value === "") {
@@ -31,9 +98,12 @@ export const parseTransactionDateInput = (value: unknown) => {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-export const isFutureCalendarDate = (value: Date) =>
-    normalizeToCalendarDate(value).getTime() >
-    normalizeToCalendarDate(new Date()).getTime();
+export const isFutureCalendarDate = (
+    value: Date,
+    timezoneOffsetMinutes = DEFAULT_TIMEZONE_OFFSET_MINUTES,
+) =>
+    normalizeToCalendarDate(value, timezoneOffsetMinutes).getTime() >
+    normalizeToCalendarDate(new Date(), timezoneOffsetMinutes).getTime();
 
 export const normalizeTransactionType = (value: unknown) => {
     const normalized = String(value || "").trim().toUpperCase();
@@ -159,12 +229,14 @@ export const ensureTransactionStatusAllowed = ({
     date,
     status,
     isSystemGenerated = false,
+    timezoneOffsetMinutes = DEFAULT_TIMEZONE_OFFSET_MINUTES,
 }: {
     date: Date;
     status: TransactionStatus;
     isSystemGenerated?: boolean;
+    timezoneOffsetMinutes?: number;
 }) => {
-    if (isFutureCalendarDate(date)) {
+    if (isFutureCalendarDate(date, timezoneOffsetMinutes)) {
         if (
             status !== TransactionStatus.SCHEDULED &&
             status !== TransactionStatus.PENDING
@@ -196,6 +268,7 @@ export const ensureTransactionDateAllowed = (
     value: Date | null,
     status: TransactionStatus = TransactionStatus.COMPLETED,
     isSystemGenerated = false,
+    timezoneOffsetMinutes = DEFAULT_TIMEZONE_OFFSET_MINUTES,
 ) => {
     if (!value) {
         throw new TransactionRuleError(400, "Invalid transaction date");
@@ -205,6 +278,7 @@ export const ensureTransactionDateAllowed = (
         date: value,
         status,
         isSystemGenerated,
+        timezoneOffsetMinutes,
     });
 
     return value;

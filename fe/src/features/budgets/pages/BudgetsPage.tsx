@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FeatureGuideDialog,
+  useFeatureGuide,
+} from "components/app/feature-guide";
+import { getFeatureGuideCopy } from "components/app/feature-guide-content";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
-import { CreditCard, Plus } from "lucide-react";
+import { CreditCard, PiggyBank, Plus } from "lucide-react";
 import { auth } from "lib/firebase/config";
 import { budgetApi, walletApi } from "../services/budgetApi";
 import {
@@ -404,6 +409,12 @@ const BudgetsPage: React.FC = () => {
     }
   };
 
+  const featureGuide = useFeatureGuide("budgets", !loading);
+  const featureGuideCopy = getFeatureGuideCopy(
+    "budgets",
+    isVietnamese,
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
@@ -414,6 +425,18 @@ const BudgetsPage: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <FeatureGuideDialog
+        copy={featureGuideCopy}
+        icon={PiggyBank}
+        isVietnamese={isVietnamese}
+        onAction={() => {
+        featureGuide.dismiss();
+        openCreate();
+        }}
+        onSkip={featureGuide.dismiss}
+        open={featureGuide.open}
+      />
+
       <div className="space-y-3 lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <div>

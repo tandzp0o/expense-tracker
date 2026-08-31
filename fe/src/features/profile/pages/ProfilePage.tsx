@@ -15,6 +15,7 @@ import { useLocale } from "contexts/LocaleContext";
 import { useTheme } from "contexts/ThemeContext";
 import { hexToRgba } from "lib/utils";
 import { PageHeader } from "components/app/page-header";
+import { QuestPanel } from "components/app/quest-panel";
 import { MetricCard } from "components/app/metric-card";
 import { Avatar } from "components/ui/avatar";
 import { Button } from "components/ui/button";
@@ -465,6 +466,8 @@ const Profile: React.FC = () => {
                             value={String(profile.goalsCompleted)}
                         />
                     </div>
+
+                    <QuestPanel />
 
                     {isEditing ? (
                         <Card>

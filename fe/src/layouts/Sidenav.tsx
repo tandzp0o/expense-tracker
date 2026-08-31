@@ -1,11 +1,11 @@
 import React from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import { useAuth } from "../contexts/AuthContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { buildNavigationItems } from "./navigation";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/button";
+import { useNavigationLock } from "../contexts/NavigationLockContext";
 
 interface SidenavProps {
     onCloseMenu?: () => void;
@@ -14,18 +14,17 @@ interface SidenavProps {
 const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { currentUser } = useAuth();
     const { language, isVietnamese } = useLocale();
     const navigationItems = buildNavigationItems(language);
-    const navigationLocked = !!currentUser?.newUser;
+    const { isItemLocked, navigationLocked, notifyNavigationLocked } =
+        useNavigationLock();
     const navigationLockHint = isVietnamese
         ? "Tạo ví đầu tiên để mở khóa các màn hình khác."
         : "Create your first wallet to unlock the other sections.";
-    const isItemLocked = (target: string) =>
-        navigationLocked && target !== "/wallets";
-
     const handleNavigate = (target: string) => {
         if (isItemLocked(target)) {
+            notifyNavigationLocked();
+            onCloseMenu?.();
             return;
         }
         navigate(target);
@@ -72,8 +71,9 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                             <button
                                 key={item.to}
                                 aria-disabled="true"
-                                className="flex w-full cursor-not-allowed items-center gap-3 rounded-[var(--app-radius-lg)] px-4 py-3 text-sm font-medium text-muted-foreground/50"
-                                disabled
+                                className="flex w-full items-center gap-3 rounded-[var(--app-radius-lg)] px-4 py-3 text-sm font-medium text-muted-foreground/60 transition-colors hover:bg-muted/60 hover:text-muted-foreground"
+                                onClick={() => handleNavigate(item.to)}
+                                title={navigationLockHint}
                                 type="button"
                             >
                                 <Icon className="h-4 w-4" />
@@ -117,7 +117,6 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                     </div>
                     <Button
                         className="w-full justify-between"
-                        disabled={navigationLocked}
                         onClick={() => handleNavigate("/transactions")}
                     >
                         <span>

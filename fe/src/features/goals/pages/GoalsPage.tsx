@@ -1,5 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  FeatureGuideDialog,
+  useFeatureGuide,
+} from "components/app/feature-guide";
+import { getFeatureGuideCopy } from "components/app/feature-guide-content";
 import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import { Goal as GoalIcon, Calendar, Plus, Target, Trophy } from "lucide-react";
@@ -436,6 +441,12 @@ const Goals: React.FC = () => {
     }
   };
 
+  const featureGuide = useFeatureGuide("goals", !loading);
+  const featureGuideCopy = getFeatureGuideCopy(
+    "goals",
+    isVietnamese,
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
@@ -446,6 +457,18 @@ const Goals: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <FeatureGuideDialog
+        copy={featureGuideCopy}
+        icon={Target}
+        isVietnamese={isVietnamese}
+        onAction={() => {
+        featureGuide.dismiss();
+        openCreate();
+        }}
+        onSkip={featureGuide.dismiss}
+        open={featureGuide.open}
+      />
+
       <div className="space-y-3 lg:hidden">
         <div className="flex items-center justify-between gap-3">
           <div>

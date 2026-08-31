@@ -26,6 +26,24 @@ const getMoneyDisplayMode = () => {
 
 const getLocale = () => (getActiveLanguage() === "en" ? "en-US" : "vi-VN");
 
+/** Currency chosen in Settings; mirrored onto <html> by LocaleProvider. */
+export const getActiveCurrency = () => {
+    if (typeof document === "undefined") {
+        return "VND";
+    }
+
+    return document.documentElement.dataset.currency || "VND";
+};
+
+/** Timezone chosen in Settings; dates are rendered as seen from there. */
+const getActiveTimezone = () => {
+    if (typeof document === "undefined") {
+        return undefined;
+    }
+
+    return document.documentElement.dataset.timezone || undefined;
+};
+
 const formatNumericValue = (
     value: number,
     locale: string,
@@ -95,7 +113,7 @@ const formatCompactEnglishCurrency = (amount: number, currency: string) => {
 
 export const formatCurrency = (
     amount: number | null | undefined,
-    currency: string = "VND",
+    currency: string = getActiveCurrency(),
     options?: { displayMode?: "full" | "compact" },
 ): string => {
     if (amount == null) {
@@ -146,15 +164,67 @@ export const formatCompactNumber = (
         : "0";
 };
 
+/**
+ * Dates are always rendered as dd/MM/yyyy, regardless of the active language:
+ * toLocaleDateString would flip to M/D/YYYY on the English locale.
+ */
 export const formatDate = (date: string | number | Date): string => {
-    return new Date(date).toLocaleDateString(getLocale());
+    const parsed = new Date(date);
+
+    if (Number.isNaN(parsed.getTime())) {
+        return "";
+    }
+
+    const timeZone = getActiveTimezone();
+
+    try {
+        // en-GB gives dd/mm/yyyy in every language, and the timezone makes the
+        // rendered day match the one the user actually recorded.
+        return new Intl.DateTimeFormat("en-GB", {
+            timeZone,
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        }).format(parsed);
+    } catch {
+        const day = String(parsed.getDate()).padStart(2, "0");
+        const month = String(parsed.getMonth() + 1).padStart(2, "0");
+
+        return `${day}/${month}/${parsed.getFullYear()}`;
+    }
+};
+
+/**
+ * yyyy-MM-dd for a <input type="date">, expressed in the given timezone offset
+ * (getTimezoneOffset convention). Without the shift, "today" near midnight
+ * resolves to the browser's day rather than the configured one.
+ */
+export const toDateInputValue = (
+    date: string | number | Date,
+    timezoneOffsetMinutes = 0,
+): string => {
+    const parsed = new Date(date);
+
+    if (Number.isNaN(parsed.getTime())) {
+        return "";
+    }
+
+    return new Date(parsed.getTime() - timezoneOffsetMinutes * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
 };
 
 export const formatDateTime = (date: string | number | Date): string => {
     const d = new Date(date);
+
+    if (Number.isNaN(d.getTime())) {
+        return "";
+    }
+
     return `${d.toLocaleTimeString(getLocale(), {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: getActiveTimezone(),
     })} ${formatDate(d)}`;
 };
 

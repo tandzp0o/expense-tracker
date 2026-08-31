@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, Download, LogOut, Menu, Settings, UserRound } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useNavigationLock } from "../contexts/NavigationLockContext";
+import { useQuests } from "../contexts/QuestContext";
+import { QuestRing } from "../components/app/quest-ring";
 import { useLocale } from "../contexts/LocaleContext";
 import { useToast } from "../contexts/ToastContext";
 import { Avatar } from "../components/ui/avatar";
@@ -29,7 +32,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         () => buildNavigationItems(language),
         [language],
     );
-    const navigationLocked = !!currentUser?.newUser;
+    const { navigationLocked, notifyNavigationLocked } = useNavigationLock();
+    const { level, percent, points, totalPoints } = useQuests();
     const lockedNavigationHint = isVietnamese
         ? "Tạo ví đầu tiên để mở khóa Hồ sơ và Cài đặt."
         : "Create your first wallet to unlock Profile and Settings.";
@@ -207,11 +211,14 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                             onClick={() => setMenuOpen((current) => !current)}
                             type="button"
                         >
-                            <Avatar
-                                alt={currentUser?.displayName}
-                                fallback={currentUser?.displayName || "FT"}
-                                src={currentUser?.avatar || currentUser?.photoURL || undefined}
-                            />
+                            <QuestRing level={level} percent={percent}>
+                                <Avatar
+                                    alt={currentUser?.displayName}
+                                    className="rounded-full"
+                                    fallback={currentUser?.displayName || "FT"}
+                                    src={currentUser?.avatar || currentUser?.photoURL || undefined}
+                                />
+                            </QuestRing>
                             <div className="hidden max-w-[11rem] md:block">
                                 <p className="text-sm font-medium text-foreground">
                                     {currentUser?.displayName ||
@@ -231,15 +238,41 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
                         {menuOpen ? (
                             <div className="glass-panel absolute right-0 mt-3 w-[min(14rem,calc(100vw-1.5rem))] rounded-[var(--app-radius-lg)] border border-border/80 bg-card/95 p-2 shadow-soft backdrop-blur-xl sm:w-56">
+                                <div className="mb-1 rounded-[var(--app-radius-md)] border border-border/70 bg-muted/40 px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-semibold text-foreground">
+                                            {isVietnamese
+                                                ? "Nhiệm vụ khởi đầu"
+                                                : "Getting started"}
+                                        </span>
+                                        <span className="text-xs font-semibold text-primary">
+                                            {points}/{totalPoints}
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                                        <div
+                                            className="h-full rounded-full bg-primary transition-[width] duration-500"
+                                            style={{ width: `${percent}%` }}
+                                        />
+                                    </div>
+                                    <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+                                        {isVietnamese
+                                            ? "Mở hồ sơ để xem chi tiết từng nhiệm vụ."
+                                            : "Open your profile to see each quest."}
+                                    </p>
+                                </div>
                                 {navigationLocked ? (
                                     <>
                                         <button
                                             aria-disabled="true"
                                             className={cn(
                                                 menuItemClassName,
-                                                "w-full cursor-not-allowed text-muted-foreground/50",
+                                                "w-full text-muted-foreground/60 hover:bg-muted/60",
                                             )}
-                                            disabled
+                                            onClick={() => {
+                                                setMenuOpen(false);
+                                                notifyNavigationLocked();
+                                            }}
                                             type="button"
                                         >
                                             <UserRound className="h-4 w-4" />
@@ -253,9 +286,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                                             aria-disabled="true"
                                             className={cn(
                                                 menuItemClassName,
-                                                "w-full cursor-not-allowed text-muted-foreground/50",
+                                                "w-full text-muted-foreground/60 hover:bg-muted/60",
                                             )}
-                                            disabled
+                                            onClick={() => {
+                                                setMenuOpen(false);
+                                                notifyNavigationLocked();
+                                            }}
                                             type="button"
                                         >
                                             <Settings className="h-4 w-4" />

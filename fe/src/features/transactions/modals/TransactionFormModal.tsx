@@ -259,6 +259,13 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                       ? copy.budgetHint
                       : copy.budgetEmpty}
                 </p>
+                {!expenseBudgetsLoading && !formValues.budgetId ? (
+                  <p className="mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                    {isVietnamese
+                      ? "Khoản chi này sẽ được ghi vào mục Chi tiêu tự do."
+                      : "This expense will be recorded under Free spending."}
+                  </p>
+                ) : null}
               </>
             ) : (
               <Select

@@ -58,53 +58,53 @@ const Login: React.FC = () => {
             isVietnamese
                 ? {
                       tagline: "Digital Atelier of Wealth",
-                      title: "Dang nhap vao FinTrack",
+                      title: "Đăng nhập vào FinTrack",
                       description:
-                          "Dang nhap bang email va mat khau, hoac tiep tuc voi Google neu ban da quen thuoc.",
-                      email: "Email dang nhap",
+                          "Đăng nhập bằng email và mật khẩu, hoặc tiếp tục với Google nếu bạn đã quen thuộc.",
+                      email: "Email đăng nhập",
                       emailPlaceholder: "you@example.com",
                       emailHint:
-                          "Ten hien thi trong ho so khong duoc dung de dang nhap.",
-                      password: "Mat khau",
-                      passwordPlaceholder: "Nhap mat khau cua ban",
-                      forgotPassword: "Quen mat khau?",
-                      login: "Dang nhap",
-                      divider: "Hoac",
-                      continueWithGoogle: "Tiep tuc voi Google",
-                      signingIn: "Dang dang nhap...",
+                          "Tên hiển thị trong hồ sơ không được dùng để đăng nhập.",
+                      password: "Mật khẩu",
+                      passwordPlaceholder: "Nhập mật khẩu của bạn",
+                      forgotPassword: "Quên mật khẩu?",
+                      login: "Đăng nhập",
+                      divider: "Hoặc",
+                      continueWithGoogle: "Tiếp tục với Google",
+                      signingIn: "Đang đăng nhập...",
                       googleHelper:
-                          "Tai khoan Google van duoc ho tro song song trong phien ban nay.",
-                      bottomNote: "Chua co tai khoan?",
-                      bottomAction: "Dang ky",
+                          "Tài khoản Google vẫn được hỗ trợ song song trong phiên bản này.",
+                      bottomNote: "Chưa có tài khoản?",
+                      bottomAction: "Đăng ký",
                       footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
                       footerLinks: [
-                          "Chinh sach",
-                          "Dieu khoan",
-                          "Bao mat",
-                          "Lien he",
+                          "Chính sách",
+                          "Điều khoản",
+                          "Bảo mật",
+                          "Liên hệ",
                       ],
-                      forgotTitle: "Dat lai mat khau",
+                      forgotTitle: "Đặt lại mật khẩu",
                       forgotDescription:
-                          "Neu day la tai khoan Google, hay dung nut Google. Neu la tai khoan mat khau, hien tai ban can dat lai mat khau trong Firebase Console hoac luong quan tri.",
-                      loginErrorTitle: "Dang nhap that bai",
+                          "Nếu đây là tài khoản Google, hãy dùng nút Google. Nếu là tài khoản mật khẩu, hiện tại bạn cần đặt lại mật khẩu trong Firebase Console hoặc luồng quản trị.",
+                      loginErrorTitle: "Đăng nhập thất bại",
                       missingCredentials:
-                          "Vui long nhap day du email va mat khau.",
-                      invalidEmail: "Vui long nhap email hop le.",
+                          "Vui lòng nhập đầy đủ email và mật khẩu.",
+                      invalidEmail: "Vui lòng nhập email hợp lệ.",
                       accountNotRegistered:
-                          "Tai khoan nay chua duoc dang ky. Vui long dang ky truoc.",
+                          "Tài khoản này chưa được đăng ký. Vui lòng đăng ký trước.",
                       invalidCredentials:
-                          "Email hoac mat khau khong dung.",
+                          "Email hoặc mật khẩu không đúng.",
                       googleOnlyAccount:
-                          "Tai khoan nay dang dung Google. Hay chon dang nhap voi Google.",
+                          "Tài khoản này đang dùng Google. Hãy chọn đăng nhập với Google.",
                       tooManyRequests:
-                          "Ban thu sai qua nhieu lan. Vui long thu lai sau it phut.",
+                          "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút.",
                       genericLoginError:
-                          "Khong the dang nhap. Vui long kiem tra thong tin va thu lai.",
+                          "Không thể đăng nhập. Vui lòng kiểm tra thông tin và thử lại.",
                       googleError:
-                          "Khong the xac thuc voi Google. Vui long thu lai.",
-                      infoTitle: "Thong tin dang cap nhat",
+                          "Không thể xác thực với Google. Vui lòng thử lại.",
+                      infoTitle: "Thông tin đang cập nhật",
                       infoDescription:
-                          "Muc nay chua co hanh dong rieng trong giao dien hien tai.",
+                          "Mục này chưa có hành động riêng trong giao diện hiện tại.",
                   }
                 : {
                       tagline: "Digital Atelier of Wealth",

@@ -176,7 +176,8 @@ export const Dialog: React.FC<DialogProps> = ({
                             </div>
                         </div>
                         <button
-                            className="shrink-0 rounded-full border border-border/70 bg-background/70 p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            aria-label="Close"
+                            className="shrink-0 rounded-full border border-red-300 bg-red-400/80 p-2 text-red-600 shadow-sm transition-colors hover:bg-red-500 hover:text-white dark:border-red-500/45 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white"
                             onClick={onClose}
                             type="button"
                         >
@@ -237,7 +238,7 @@ export const DialogFooter: React.FC<DialogFooterProps> = ({
 }) => (
     <div
         className={cn(
-            "sticky bottom-0 z-[1] flex flex-col-reverse gap-2 rounded-[calc(var(--app-radius-xl)+2px)] border border-border/70 bg-background/95 p-2.5 shadow-[0_-16px_28px_-28px_rgba(15,23,42,0.8)] backdrop-blur-sm sm:flex-row sm:justify-end sm:gap-3 sm:p-3",
+            "sticky bottom-0 z-[1] flex flex-row items-center justify-end gap-2 rounded-[calc(var(--app-radius-xl)+2px)] border border-border/70 bg-background/95 p-2.5 shadow-[0_-16px_28px_-28px_rgba(15,23,42,0.8)] backdrop-blur-sm sm:gap-3 sm:p-3",
             className,
         )}
     >

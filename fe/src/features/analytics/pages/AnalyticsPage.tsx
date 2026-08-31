@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FeatureGuideDialog,
+  useFeatureGuide,
+} from "components/app/feature-guide";
+import { getFeatureGuideCopy } from "components/app/feature-guide-content";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/vi";
 import {
+    BarChart3,
     ChartColumnBig,
     CircleDollarSign,
     PiggyBank,
@@ -449,6 +455,12 @@ const Analytics: React.FC = () => {
                   0.7,
               )} 52%, rgba(15, 23, 42, 0.84) 100%)`;
 
+    const featureGuide = useFeatureGuide("analytics", !loading);
+    const featureGuideCopy = getFeatureGuideCopy(
+      "analytics",
+      isVietnamese,
+    );
+
     if (loading) {
         return (
             <div className="flex min-h-[420px] items-center justify-center">
@@ -459,6 +471,17 @@ const Analytics: React.FC = () => {
 
     return (
         <div className="space-y-4 sm:space-y-6">
+            <FeatureGuideDialog
+              copy={featureGuideCopy}
+              icon={BarChart3}
+              isVietnamese={isVietnamese}
+              onAction={() => {
+              featureGuide.dismiss();
+              }}
+              onSkip={featureGuide.dismiss}
+              open={featureGuide.open}
+            />
+
             <div className="space-y-3 lg:hidden">
                 <div
                     className="overflow-hidden rounded-[calc(var(--app-radius-xl)+4px)] border border-white/70 p-4 text-white shadow-soft dark:border-white/10"

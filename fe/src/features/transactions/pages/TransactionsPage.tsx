@@ -11,13 +11,20 @@ import dayjs from "dayjs";
 import "dayjs/locale/vi";
 import {
   Plus,
+  Receipt,
   ReceiptText,
 } from "lucide-react";
+import {
+  FeatureGuideDialog,
+  useFeatureGuide,
+} from "components/app/feature-guide";
+import { getFeatureGuideCopy } from "components/app/feature-guide-content";
 import { auth } from "lib/firebase/config";
 import {
   formatCurrency,
   formatDate,
   formatWholeNumberInput,
+  toDateInputValue,
 } from "utils/formatters";
 import { useLocale } from "contexts/LocaleContext";
 import { useToast } from "contexts/ToastContext";
@@ -35,6 +42,7 @@ import {
   categoryOptions,
   incomeCategoryOptions,
   transactionStatusText,
+  FREE_SPENDING_CATEGORY,
 } from "../constants";
 import { budgetApi, transactionApi, walletApi } from "../services/transactionApi";
 import { TransactionFilters } from "../components/TransactionFilters";
@@ -91,7 +99,7 @@ const isLedgerTransaction = (transaction: Pick<Transaction, "status">) =>
 const TransactionsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { language, isVietnamese } = useLocale();
+  const { language, isVietnamese, timezoneOffsetMinutes } = useLocale();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -122,7 +130,7 @@ const TransactionsPage: React.FC = () => {
     category: "",
     budgetId: "",
     walletId: "",
-    date: dayjs().format("YYYY-MM-DD"),
+    date: toDateInputValue(new Date(), timezoneOffsetMinutes),
   });
   const [amountInput, setAmountInput] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -300,20 +308,14 @@ const TransactionsPage: React.FC = () => {
       ? "Nh\u00f3m thu nh\u1eadp"
       : "Income category",
     selectBudget: isVietnamese
-      ? "Ch\u1ecdn ng\u00e2n s\u00e1ch"
-      : "Select budget",
-    budgetRequired: isVietnamese
-      ? "C\u1ea7n ch\u1ecdn ng\u00e2n s\u00e1ch"
-      : "Budget required",
-    budgetRequiredDesc: isVietnamese
-      ? "Kho\u1ea3n chi ph\u1ea3i g\u1eafn v\u1edbi ng\u00e2n s\u00e1ch c\u1ee7a v\u00ed v\u00e0 \u0111\u00fang th\u00e1ng giao d\u1ecbch."
-      : "Expense transactions must be linked to a wallet budget for the same month.",
+      ? "Không dùng ngân sách (chi tiêu tự do)"
+      : "No budget (free spending)",
     budgetHint: isVietnamese
-      ? "Danh m\u1ee5c chi s\u1ebd l\u1ea5y t\u1ef1 \u0111\u1ed9ng t\u1eeb ng\u00e2n s\u00e1ch c\u1ee7a v\u00ed."
-      : "Expense categories come directly from the selected wallet budget.",
+      ? "Chọn ngân sách nếu bạn muốn khoản chi này được trừ vào hạn mức tháng. Bỏ trống cũng được, khoản chi vẫn được ghi nhận vào mục Chi tiêu tự do."
+      : "Pick a budget if you want this expense counted against a monthly limit. Leaving it empty is fine, the expense is recorded under Free spending.",
     budgetEmpty: isVietnamese
-      ? "V\u00ed n\u00e0y ch\u01b0a c\u00f3 ng\u00e2n s\u00e1ch trong th\u00e1ng \u0111\u00e3 ch\u1ecdn."
-      : "This wallet has no budget in the selected month.",
+      ? "Ví này chưa có ngân sách trong tháng đã chọn, nên khoản chi sẽ vào mục Chi tiêu tự do. Chỉ cần lập ngân sách khi bạn muốn đặt hạn mức cho một nhóm chi."
+      : "This wallet has no budget for the selected month, so the expense goes to Free spending. Create a budget only when you want a spending limit for a category.",
     incomeCategoryRequiredDesc: isVietnamese
       ? "H\u00e3y ch\u1ecdn m\u1ed9t nh\u00f3m thu nh\u1eadp ph\u00f9 h\u1ee3p."
       : "Choose an income category.",
@@ -327,7 +329,7 @@ const TransactionsPage: React.FC = () => {
       ? "\u0110ang t\u1ea3i ng\u00e2n s\u00e1ch..."
       : "Loading budgets...",
   };
-  const todayDate = dayjs().format("YYYY-MM-DD");
+  const todayDate = toDateInputValue(new Date(), timezoneOffsetMinutes);
   const futureDateErrorTitle = copy.futureCompletedTitle;
   const futureDateErrorDesc = copy.futureCompletedDesc;
   const getCategoryLabel = (category: string) => {
@@ -436,7 +438,9 @@ const TransactionsPage: React.FC = () => {
   };
 
   const currentBudgetPeriod = useMemo(() => {
-    const selectedDate = dayjs(formValues.date || dayjs().format("YYYY-MM-DD"));
+    const selectedDate = dayjs(
+      formValues.date || toDateInputValue(new Date(), timezoneOffsetMinutes),
+    );
 
     return {
       month: selectedDate.month() + 1,
@@ -581,6 +585,8 @@ const TransactionsPage: React.FC = () => {
             return current;
           }
 
+          // Budgets are optional, so never auto-attach one the user did not
+          // choose: only keep a selection that is still valid for this wallet.
           const matchedBudget =
             nextBudgets.find((budget) => budget._id === current.budgetId) ||
             nextBudgets.find(
@@ -589,9 +595,7 @@ const TransactionsPage: React.FC = () => {
                 current.category &&
                 budget.category === current.category,
             ) ||
-            (!current.budgetId && !current.category && nextBudgets[0]
-              ? nextBudgets[0]
-              : null);
+            null;
 
           const nextBudgetId = matchedBudget?._id || "";
           const nextCategory = matchedBudget?.category || "";
@@ -778,7 +782,7 @@ const TransactionsPage: React.FC = () => {
           typeof transaction.walletId === "string"
             ? transaction.walletId
             : transaction.walletId?._id || "",
-        date: dayjs(transaction.date).format("YYYY-MM-DD"),
+        date: toDateInputValue(transaction.date, timezoneOffsetMinutes),
       });
       setAmountInput(formatWholeNumberInput(parsedAmount));
     } else {
@@ -792,7 +796,7 @@ const TransactionsPage: React.FC = () => {
         category: "",
         budgetId: "",
         walletId: wallets[0]?._id || "",
-        date: dayjs().format("YYYY-MM-DD"),
+        date: toDateInputValue(new Date(), timezoneOffsetMinutes),
       });
       setAmountInput("");
     }
@@ -864,15 +868,6 @@ const TransactionsPage: React.FC = () => {
       return;
     }
 
-    if (formValues.type === "EXPENSE" && !selectedExpenseBudget) {
-      toast({
-        title: copy.budgetRequired,
-        description: copy.budgetRequiredDesc,
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (
       formValues.type === "INCOME" &&
       !String(formValues.category || "").trim()
@@ -924,12 +919,25 @@ const TransactionsPage: React.FC = () => {
         walletId: formValues.walletId,
         category:
           formValues.type === "EXPENSE"
-            ? selectedExpenseBudget?.category || ""
+            ? selectedExpenseBudget?.category || FREE_SPENDING_CATEGORY
             : String(formValues.category || "").trim(),
         ...(formValues.type === "EXPENSE"
           ? { budgetId: selectedExpenseBudget?._id }
           : { budgetId: undefined }),
-        date: new Date(`${formValues.date}T12:00:00`).toISOString(),
+        // Midday of the picked day *in the selected timezone*, so the stored
+        // instant lands on that calendar day no matter where it is read from.
+        date: new Date(
+          Date.UTC(
+            Number(formValues.date.slice(0, 4)),
+            Number(formValues.date.slice(5, 7)) - 1,
+            Number(formValues.date.slice(8, 10)),
+            12,
+          ) +
+            timezoneOffsetMinutes * 60 * 1000,
+        ).toISOString(),
+        // The server decides whether a date is in the future; without this it
+        // would judge "today" in its own timezone, not the user's.
+        timezoneOffset: timezoneOffsetMinutes,
       };
 
       if (editing) {
@@ -1016,6 +1024,9 @@ const TransactionsPage: React.FC = () => {
 
   const totalPages = Math.max(1, Math.ceil(totalTransactions / pageSize));
 
+  const featureGuide = useFeatureGuide("transactions", !loading);
+  const featureGuideCopy = getFeatureGuideCopy("transactions", isVietnamese);
+
   if (loading) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
@@ -1026,6 +1037,18 @@ const TransactionsPage: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <FeatureGuideDialog
+        copy={featureGuideCopy}
+        icon={Receipt}
+        isVietnamese={isVietnamese}
+        onAction={() => {
+          featureGuide.dismiss();
+          handleOpenModal();
+        }}
+        onSkip={featureGuide.dismiss}
+        open={featureGuide.open}
+      />
+
       <PageHeader
         actions={
           <Button onClick={() => handleOpenModal()}>

@@ -8,6 +8,11 @@ import {
     useLocation,
 } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
+import {
+    NAVIGATION_LOCK_REDIRECT_KEY,
+    NavigationLockProvider,
+} from "./contexts/NavigationLockContext";
+import { QuestProvider } from "./contexts/QuestContext";
 import { LoginPage, RegisterPage } from "./features/auth";
 import { DashboardPage } from "./features/dashboard";
 import { TransactionsPage } from "./features/transactions";
@@ -56,13 +61,18 @@ const ProtectedRoute = () => {
     }
 
     if (currentUser.newUser && location.pathname !== "/wallets") {
+        window.sessionStorage.setItem(NAVIGATION_LOCK_REDIRECT_KEY, "1");
         return <Navigate replace to="/wallets" />;
     }
 
     return (
-        <MainLayout key={currentUser.uid}>
-            <Outlet />
-        </MainLayout>
+        <QuestProvider isVietnamese={isVietnamese}>
+            <NavigationLockProvider>
+                <MainLayout key={currentUser.uid}>
+                    <Outlet />
+                </MainLayout>
+            </NavigationLockProvider>
+        </QuestProvider>
     );
 };
 

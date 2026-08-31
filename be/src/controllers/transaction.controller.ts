@@ -12,6 +12,7 @@ import { touchTransactionCacheState } from "../utils/transaction-cache";
 import {
     assertNonNegativeLedgerValue,
     ensureTransactionDateAllowed,
+    parseTimezoneOffset,
     ensureTransferCategoryNotUsed,
     getGoalDeltaForTransaction,
     getWalletDeltaForTransaction,
@@ -429,7 +430,9 @@ export const createTransaction = async (req: any, res: Response) => {
             goalId,
             isSystemGenerated,
             isDeletable,
+            timezoneOffset,
         } = req.body;
+        const timezoneOffsetMinutes = parseTimezoneOffset(timezoneOffset);
 
         const normalizedType = normalizeTransactionType(type);
         const normalizedAmount = parseWholeMoneyAmount(amount);
@@ -441,6 +444,7 @@ export const createTransaction = async (req: any, res: Response) => {
             parseTransactionDateInput(date),
             normalizedStatus,
             Boolean(isSystemGenerated),
+            timezoneOffsetMinutes,
         );
         const providedCategory = parseOptionalCategory(category);
         const normalizedNote = normalizeOptionalNote(note);
@@ -606,6 +610,8 @@ export const createInternalTransfer = async (req: any, res: Response) => {
         const normalizedDate = ensureTransactionDateAllowed(
             parseTransactionDateInput(date),
             TransactionStatus.COMPLETED,
+            false,
+            parseTimezoneOffset(req.body.timezoneOffset),
         );
         const fromWallet = await loadWalletForUser(fromWalletId, userId, session);
         const toWallet = await loadWalletForUser(toWalletId, userId, session);
@@ -991,6 +997,7 @@ export const updateTransaction = async (req: any, res: Response) => {
                 : new Date(currentTransaction.date),
             nextStatus,
             Boolean(currentTransaction.isSystemGenerated),
+            parseTimezoneOffset(req.body.timezoneOffset),
         );
         const providedNextCategory =
             req.body.category !== undefined

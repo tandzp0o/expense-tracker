@@ -3,7 +3,7 @@ import { Mic, PencilLine, ScanLine, Sparkles } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import Header from "./Header";
 import Sidenav from "./Sidenav";
-import { useAuth } from "../contexts/AuthContext";
+import { useNavigationLock } from "../contexts/NavigationLockContext";
 import { useLocale } from "../contexts/LocaleContext";
 import { getAppearanceGradientColors, useTheme } from "../contexts/ThemeContext";
 import { useToast } from "../contexts/ToastContext";
@@ -21,13 +21,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     const [menuOpen, setMenuOpen] = useState(false);
     const [quickAddOpen, setQuickAddOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
-    const { currentUser } = useAuth();
     const { language, isVietnamese } = useLocale();
     const { appearance } = useTheme();
     const { toast } = useToast();
     const themeColors = getAppearanceGradientColors(appearance);
     const mobileNavigationItems = buildMobileNavigationItems(language);
-    const navigationLocked = !!currentUser?.newUser;
     const primaryGradient = `linear-gradient(135deg, ${hexToRgba(
         themeColors.primary,
         0.98,
@@ -36,8 +34,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         themeColors.secondary,
         0.88,
     )} 0%, ${hexToRgba(themeColors.primary, 0.7)} 100%)`;
-    const isItemLocked = (target: string) =>
-        navigationLocked && target !== "/wallets";
+    const { isItemLocked, notifyNavigationLocked } = useNavigationLock();
     const handleQuickAction = (mode: "manual" | "voice" | "scan" | "assistant") => {
         setQuickAddOpen(false);
 
@@ -133,12 +130,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                                         key={item.to}
                                         aria-disabled="true"
                                         className={cn(
-                                            "flex min-w-0 cursor-not-allowed flex-col items-center justify-center text-center",
+                                            "flex min-w-0 flex-col items-center justify-center text-center",
                                             isPrimary
                                                 ? "-mt-7 gap-1 px-0 pb-0 pt-0"
                                                 : "h-12 gap-1 rounded-[1.1rem] px-1 text-[9px] font-semibold text-muted-foreground/45 sm:text-[10px]",
                                         )}
-                                        disabled
+                                        onClick={notifyNavigationLocked}
                                         type="button"
                                     >
                                         {isPrimary ? (

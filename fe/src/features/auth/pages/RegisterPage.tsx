@@ -29,42 +29,42 @@ const Register: React.FC = () => {
             isVietnamese
                 ? {
                       tagline: "Digital Atelier of Wealth",
-                      title: "Tao tai khoan moi",
+                      title: "Tạo tài khoản mới",
                       description:
-                          "Dang ky bang email va mat khau. He thong se tu tao username noi bo tu email cua ban.",
+                          "Đăng ký bằng email và mật khẩu. Hệ thống sẽ tự tạo username nội bộ từ email của bạn.",
                       email: "Email",
                       emailPlaceholder: "you@example.com",
                       emailHint:
-                          "Email nay se duoc dung de dang nhap. Ten hien thi co the doi sau trong ho so.",
-                      password: "Mat khau",
-                      passwordPlaceholder: "Toi thieu 6 ky tu",
-                      confirmPassword: "Nhap lai mat khau",
-                      confirmPasswordPlaceholder: "Nhap lai mat khau",
-                      invalidEmail: "Vui long nhap email hop le.",
-                      register: "Dang ky",
-                      registering: "Dang tao tai khoan...",
-                      divider: "Hoac",
-                      continueWithGoogle: "Dang ky voi Google",
+                          "Email này sẽ được dùng để đăng nhập. Tên hiển thị có thể đổi sau trong hồ sơ.",
+                      password: "Mật khẩu",
+                      passwordPlaceholder: "Tối thiểu 6 ký tự",
+                      confirmPassword: "Nhập lại mật khẩu",
+                      confirmPasswordPlaceholder: "Nhập lại mật khẩu",
+                      invalidEmail: "Vui lòng nhập email hợp lệ.",
+                      register: "Đăng ký",
+                      registering: "Đang tạo tài khoản...",
+                      divider: "Hoặc",
+                      continueWithGoogle: "Đăng ký với Google",
                       googleHelper:
-                          "Neu muon, ban van co the bat dau nhanh bang Google.",
-                      bottomNote: "Da co tai khoan?",
-                      bottomAction: "Dang nhap",
+                          "Nếu muốn, bạn vẫn có thể bắt đầu nhanh bằng Google.",
+                      bottomNote: "Đã có tài khoản?",
+                      bottomAction: "Đăng nhập",
                       footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
                       footerLinks: [
-                          "Chinh sach",
-                          "Dieu khoan",
-                          "Bao mat",
-                          "Lien he",
+                          "Chính sách",
+                          "Điều khoản",
+                          "Bảo mật",
+                          "Liên hệ",
                       ],
-                      registerErrorTitle: "Dang ky that bai",
-                      registerSuccessTitle: "Tao tai khoan thanh cong",
+                      registerErrorTitle: "Đăng ký thất bại",
+                      registerSuccessTitle: "Tạo tài khoản thành công",
                       registerSuccessDescription:
-                          "Tai khoan da san sang. Ban se duoc chuyen vao ung dung.",
+                          "Tài khoản đã sẵn sàng. Bạn sẽ được chuyển vào ứng dụng.",
                       googleError:
-                          "Khong the xac thuc voi Google. Vui long thu lai.",
-                      infoTitle: "Thong tin dang cap nhat",
+                          "Không thể xác thực với Google. Vui lòng thử lại.",
+                      infoTitle: "Thông tin đang cập nhật",
                       infoDescription:
-                          "Muc nay chua co hanh dong rieng trong giao dien hien tai.",
+                          "Mục này chưa có hành động riêng trong giao diện hiện tại.",
                   }
                 : {
                       tagline: "Digital Atelier of Wealth",
@@ -118,7 +118,7 @@ const Register: React.FC = () => {
 
         if (!email || !formValues.password || !formValues.confirmPassword) {
             return isVietnamese
-                ? "Vui long nhap day du email va mat khau."
+                ? "Vui lòng nhập đầy đủ email và mật khẩu."
                 : "Please fill in your email and password.";
         }
 
@@ -128,13 +128,13 @@ const Register: React.FC = () => {
 
         if (formValues.password.length < 6) {
             return isVietnamese
-                ? "Mat khau phai co it nhat 6 ky tu."
+                ? "Mật khẩu phải có ít nhất 6 ký tự."
                 : "Password must contain at least 6 characters.";
         }
 
         if (formValues.password !== formValues.confirmPassword) {
             return isVietnamese
-                ? "Mat khau nhap lai khong khop."
+                ? "Mật khẩu nhập lại không khớp."
                 : "Password confirmation does not match.";
         }
 
@@ -173,7 +173,7 @@ const Register: React.FC = () => {
                 description:
                     error.message ||
                     (isVietnamese
-                        ? "Khong the tao tai khoan. Vui long thu lai."
+                        ? "Không thể tạo tài khoản. Vui lòng thử lại."
                         : "Could not create your account. Please try again."),
                 variant: "destructive",
             });
