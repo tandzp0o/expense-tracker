@@ -8,11 +8,9 @@ import {
   LucideIcon,
   ReceiptText,
   ShoppingBag,
-  Sparkles,
   UtensilsCrossed,
   Wallet,
 } from "lucide-react";
-import { STANDARD_EXPENSE_CATEGORY_OPTIONS } from "constants/categories";
 import { Button } from "components/ui/button";
 import {
   Dialog,
@@ -25,17 +23,27 @@ import { MoneyField } from "components/app/money-field";
 import { cn } from "lib/utils";
 import type { BudgetSummaryItem } from "../components/BudgetCards";
 
-const ICON_OPTIONS: { value: string; icon: LucideIcon; vi: string; en: string }[] =
-  [
-    { value: "shopping-bag", icon: ShoppingBag, vi: "Mua sắm", en: "Shopping" },
-    { value: "utensils", icon: UtensilsCrossed, vi: "Ăn uống", en: "Food" },
-    { value: "car", icon: Car, vi: "Di chuyển", en: "Transport" },
-    { value: "film", icon: Film, vi: "Giải trí", en: "Fun" },
-    { value: "heart-pulse", icon: HeartPulse, vi: "Sức khỏe", en: "Health" },
-    { value: "book-open", icon: BookOpen, vi: "Học tập", en: "Study" },
-    { value: "receipt-text", icon: ReceiptText, vi: "Hóa đơn", en: "Bills" },
-    { value: "wallet", icon: Wallet, vi: "Khác", en: "Other" },
-  ];
+/**
+ * Picking a category and picking its icon used to be two separate steps that
+ * always ended up saying the same thing, so the tiles below do both at once:
+ * `category` carries the meaning, `icon` is derived from the same choice.
+ */
+const CATEGORY_TILES: {
+  category: string;
+  icon: string;
+  Icon: LucideIcon;
+  vi: string;
+  en: string;
+}[] = [
+  { category: "Ăn uống", icon: "utensils", Icon: UtensilsCrossed, vi: "Ăn uống", en: "Food" },
+  { category: "Di chuyển", icon: "car", Icon: Car, vi: "Di chuyển", en: "Transport" },
+  { category: "Mua sắm", icon: "shopping-bag", Icon: ShoppingBag, vi: "Mua sắm", en: "Shopping" },
+  { category: "Giải trí", icon: "film", Icon: Film, vi: "Giải trí", en: "Entertainment" },
+  { category: "Sức khỏe", icon: "heart-pulse", Icon: HeartPulse, vi: "Sức khỏe", en: "Health" },
+  { category: "Giáo dục", icon: "book-open", Icon: BookOpen, vi: "Giáo dục", en: "Education" },
+  { category: "Hóa đơn", icon: "receipt-text", Icon: ReceiptText, vi: "Hóa đơn", en: "Bills" },
+  { category: "Khác", icon: "wallet", Icon: Wallet, vi: "Khác", en: "Other" },
+];
 
 const iconButtonClass = (active: boolean) =>
   cn(
@@ -140,50 +148,64 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
         }
         title={isVietnamese ? "Phạm vi áp dụng" : "Scope"}
       >
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-medium">{copy.wallet}</label>
-            <Select
-              onChange={(event) =>
-                onFormDataChange((current) => ({
-                  ...current,
-                  walletId: event.target.value,
-                }))
-              }
-              value={formData.walletId}
-            >
-              <option value="">{copy.wallet}</option>
-              {wallets.map((wallet) => (
-                <option key={wallet._id} value={wallet._id}>
-                  {wallet.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">
-              {isVietnamese ? "Danh mục cha" : "Parent category"}
-            </label>
-            <Select
-              onChange={(event) =>
-                onFormDataChange((current) => ({
-                  ...current,
-                  category: event.target.value,
-                }))
-              }
-              value={formData.category}
-            >
-              <option value="">
-                {isVietnamese ? "Chọn danh mục chuẩn" : "Select category"}
+        <div>
+          <label className="mb-2 block text-sm font-medium">{copy.wallet}</label>
+          <Select
+            onChange={(event) =>
+              onFormDataChange((current) => ({
+                ...current,
+                walletId: event.target.value,
+              }))
+            }
+            value={formData.walletId}
+          >
+            <option value="">{copy.wallet}</option>
+            {wallets.map((wallet) => (
+              <option key={wallet._id} value={wallet._id}>
+                {wallet.name}
               </option>
-              {STANDARD_EXPENSE_CATEGORY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {isVietnamese ? option.vi : option.en}
-                </option>
-              ))}
-            </Select>
-          </div>
+            ))}
+          </Select>
         </div>
+
+        <div className="min-w-0">
+          <label className="mb-2 block text-sm font-medium">
+            {isVietnamese ? "Nhóm chi tiêu" : "Spending category"}
+          </label>
+          <div className="-mx-1 flex w-full min-w-0 snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-2">
+            {CATEGORY_TILES.map((tile) => {
+              const TileIcon = tile.Icon;
+              const label = isVietnamese ? tile.vi : tile.en;
+
+              return (
+                <button
+                  className={iconButtonClass(formData.category === tile.category)}
+                  key={tile.category}
+                  onClick={() =>
+                    onFormDataChange((current) => ({
+                      ...current,
+                      category: tile.category,
+                      icon: tile.icon,
+                    }))
+                  }
+                  title={label}
+                  type="button"
+                >
+                  <TileIcon className="h-5 w-5" />
+                  <span className="max-w-full truncate text-[11px] leading-none">
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isVietnamese
+              ? "Lướt ngang để xem thêm. Biểu tượng của ngân sách lấy theo nhóm bạn chọn."
+              : "Swipe sideways for more. The budget icon follows the category you pick."}
+          </p>
+        </div>
+
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <div className="min-w-0">
             <label className="mb-2 block text-sm font-medium">
@@ -220,55 +242,6 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
               value={formData.subcategory}
             />
           </div>
-          <div className="min-w-0">
-            <label className="mb-2 block text-sm font-medium">
-              {isVietnamese ? "Icon" : "Icon"}
-            </label>
-            <div className="-mx-1 flex w-full min-w-0 snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-2">
-              <button
-                className={iconButtonClass(!formData.icon)}
-                onClick={() =>
-                  onFormDataChange((current) => ({ ...current, icon: "" }))
-                }
-                title={isVietnamese ? "Tự động" : "Auto"}
-                type="button"
-              >
-                <Sparkles className="h-5 w-5" />
-                <span className="text-[11px] leading-none">
-                  {isVietnamese ? "Tự động" : "Auto"}
-                </span>
-              </button>
-              {ICON_OPTIONS.map((option) => {
-                const OptionIcon = option.icon;
-                const label = isVietnamese ? option.vi : option.en;
-
-                return (
-                  <button
-                    className={iconButtonClass(formData.icon === option.value)}
-                    key={option.value}
-                    onClick={() =>
-                      onFormDataChange((current) => ({
-                        ...current,
-                        icon: option.value,
-                      }))
-                    }
-                    title={label}
-                    type="button"
-                  >
-                    <OptionIcon className="h-5 w-5" />
-                    <span className="max-w-full truncate text-[11px] leading-none">
-                      {label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {isVietnamese
-                ? "Lướt ngang để xem thêm biểu tượng."
-                : "Swipe sideways to see more icons."}
-            </p>
-          </div>
           <div>
             <label className="mb-2 block text-sm font-medium">
               {isVietnamese ? "Màu" : "Color"}
@@ -294,23 +267,6 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
                 />
               ))}
             </div>
-          </div>
-          <div className="md:col-span-2">
-            <label className="mb-2 block text-sm font-medium">
-              {isVietnamese ? "Tags (phân tách bằng dấu phẩy)" : "Tags (comma separated)"}
-            </label>
-            <Input
-              onChange={(event) =>
-                onFormDataChange((current) => ({
-                  ...current,
-                  tags: event.target.value,
-                }))
-              }
-              placeholder={
-                isVietnamese ? "cá nhân, gia đình, ưu tiên" : "personal, family, priority"
-              }
-              value={formData.tags}
-            />
           </div>
         </div>
       </DialogSection>
