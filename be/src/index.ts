@@ -11,6 +11,8 @@ import goalRoutes from "./routers/goal.routes";
 import userRoutes from "./routers/user.routes";
 import budgetRoutes from "./routers/budget.routes";
 import aiRoutes from "./routers/ai.routes";
+import configRoutes from "./routers/config.routes";
+import reminderRoutes from "./routers/reminder.routes";
 
 dotenv.config();
 
@@ -65,7 +67,15 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.json());
+// The raw body is kept so the QStash signature can be verified against the
+// exact bytes that were sent.
+app.use(
+    express.json({
+        verify: (req: any, _res, buffer) => {
+            req.rawBody = buffer.toString("utf8");
+        },
+    }),
+);
 app.use(morgan("dev"));
 app.use("/uploads", express.static("uploads"));
 
@@ -78,6 +88,8 @@ app.use("/api/goals", goalRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/budgets", budgetRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/config", configRoutes);
+app.use("/api/reminders", reminderRoutes);
 
 // Health check — Back4App sẽ hit endpoint này
 app.get("/health", (req, res) => {

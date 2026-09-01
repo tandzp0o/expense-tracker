@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Wallet, { IWallet } from "../models/Wallet";
 import Transaction, { TransactionType } from "../models/Transaction";
 import User from "../models/User";
+import { ensureUserConfig } from "./config.controller";
 import { Types } from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
@@ -76,6 +77,20 @@ export const createWallet = [
                 { uid: userId },
                 { $set: { newUser: false } },
             );
+
+            // Nhắc nhở chỉ có ý nghĩa khi đã có ví, nên mốc 20h mặc định được
+            // bật ngay sau ví đầu tiên. Lỗi ở đây không được làm hỏng việc tạo ví.
+            try {
+                await ensureUserConfig(userId, {
+                    withDefaultReminder: true,
+                    timezone: req.body.timezone,
+                });
+            } catch (configError) {
+                console.error(
+                    "Could not seed the default reminder config:",
+                    configError,
+                );
+            }
 
             res.status(201).json({
                 ...wallet.toObject(),

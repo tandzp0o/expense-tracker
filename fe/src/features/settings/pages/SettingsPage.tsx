@@ -22,6 +22,7 @@ import {
     SUPPORTED_TIMEZONES,
     useLocale,
 } from "contexts/LocaleContext";
+import { ReminderSettings } from "../components/ReminderSettings";
 
 const Settings: React.FC = () => {
     const {
@@ -241,6 +242,8 @@ const Settings: React.FC = () => {
                     </p>
                 </CardContent>
             </Card>
+
+            <ReminderSettings />
 
             <ThemeSwitcher embedded />
         </div>

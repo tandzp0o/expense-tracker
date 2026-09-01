@@ -748,6 +748,53 @@ export const userApi = {
     },
 };
 
+export const configApi = {
+    getConfig: async (token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.get("/config");
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    updateConfig: async (payload: any, token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.put("/config", payload);
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    registerDevice: async (
+        payload: { token: string; platform?: string },
+        token?: string,
+    ) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.post("/config/devices", payload);
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
+    removeDevice: async (deviceToken: string, token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.delete("/config/devices", {
+                data: { token: deviceToken },
+            });
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+};
+
 const api = {
     auth: authApi,
     ai: aiApi,
@@ -756,6 +803,7 @@ const api = {
     dish: dishApi,
     goal: goalApi,
     user: userApi,
+    config: configApi,
 };
 
 export default api;

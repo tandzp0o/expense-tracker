@@ -21,6 +21,7 @@ export interface IUser extends Document {
     createdAt: Date;
     updatedAt: Date;
     newUser: boolean;
+    isPremium: boolean;
     transactionCacheVersion: number;
     transactionsUpdatedAt: Date;
 }
@@ -53,6 +54,7 @@ const UserSchema = new Schema<IUser>(
         goalsCompleted: { type: Number, default: 0 },
         goalsActive: { type: Number, default: 0 },
         newUser: { type: Boolean, default: true },
+        isPremium: { type: Boolean, default: false },
         transactionCacheVersion: { type: Number, default: 0 },
         transactionsUpdatedAt: { type: Date, default: Date.now },
     },
