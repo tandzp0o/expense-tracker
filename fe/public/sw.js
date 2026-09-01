@@ -1,6 +1,6 @@
 // public/sw.js - Ton Finance PWA Service Worker
 // ✅ Tăng version khi muốn force refresh cache cho user
-const CACHE_NAME = "ton-finance-cache-v5";
+const CACHE_NAME = "ton-finance-cache-v6";
 
 const ASSETS_TO_CACHE = [
     "/",
@@ -86,7 +86,31 @@ self.addEventListener("fetch", (event) => {
 // ─── Push Notification ────────────────────────────────────
 self.addEventListener("push", (event) => {
     if (!event.data) return;
-    const data = event.data.json();
+
+    let payload = {};
+    try {
+        payload = event.data.json();
+    } catch (error) {
+        payload = { title: "FinTrack", body: event.data.text() };
+    }
+
+    // FCM nests the content under `notification`, while our own pushes put it
+    // at the top level. Reading only the top level made FCM messages render as
+    // an empty notification, which the browser then drops silently.
+    const content = payload.notification || payload;
+    const data = {
+        title: content.title || "FinTrack",
+        body: content.body || "",
+        tag: content.tag || payload.tag,
+        data: {
+            ...(payload.data || {}),
+            actionUrl:
+                payload.data?.actionUrl ||
+                payload.fcmOptions?.link ||
+                content.click_action ||
+                "/",
+        },
+    };
 
     event.waitUntil(
         self.registration.showNotification(data.title, {

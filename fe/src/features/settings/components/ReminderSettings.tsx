@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { BellRing, Plus, Send, Trash2 } from "lucide-react";
 import { auth } from "lib/firebase/config";
-import { isPushSupported, requestPushToken } from "lib/firebase/messaging";
+import {
+    isPushSupported,
+    listenForForegroundMessages,
+    requestPushToken,
+} from "lib/firebase/messaging";
 import { configApi } from "services/api";
 import { useLocale } from "contexts/LocaleContext";
 import { useToast } from "contexts/ToastContext";
@@ -132,6 +136,16 @@ export const ReminderSettings: React.FC = () => {
 
     useEffect(() => {
         void isPushSupported().then(setPushSupported);
+    }, []);
+
+    useEffect(() => {
+        let unsubscribe: (() => void) | undefined;
+
+        void listenForForegroundMessages().then((stop) => {
+            unsubscribe = stop;
+        });
+
+        return () => unsubscribe?.();
     }, []);
 
     useEffect(() => {

@@ -1,4 +1,9 @@
-import { getMessaging, getToken, isSupported } from "firebase/messaging";
+import {
+    getMessaging,
+    getToken,
+    isSupported,
+    onMessage,
+} from "firebase/messaging";
 import { firebaseApp } from "./config";
 
 const VAPID_KEY = process.env.REACT_APP_FIREBASE_VAPID_KEY?.trim();
@@ -46,9 +51,15 @@ export const requestPushToken = async (): Promise<PushPermissionResult> => {
             return { status: "denied" };
         }
 
+        // Must NOT use the default "/" scope: index.tsx registers the PWA
+        // service worker there on every load, and a scope only holds one
+        // script, so the two would keep overwriting each other. This is the
+        // scope the Firebase SDK uses internally.
         const registration = await navigator.serviceWorker.register(
             "/firebase-messaging-sw.js",
+            { scope: "/firebase-cloud-messaging-push-scope" },
         );
+        await navigator.serviceWorker.ready;
         const messaging = getMessaging(firebaseApp);
         const token = await getToken(messaging, {
             vapidKey: VAPID_KEY,
@@ -62,5 +73,42 @@ export const requestPushToken = async (): Promise<PushPermissionResult> => {
         return { status: "granted", token };
     } catch (error) {
         return { status: "failed", error };
+    }
+};
+
+/**
+ * Browsers do not display push notifications while the page has focus, so the
+ * foreground case has to draw one itself. Returns an unsubscribe function.
+ */
+export const listenForForegroundMessages = async () => {
+    if (!(await isPushSupported())) {
+        return () => undefined;
+    }
+
+    try {
+        const messaging = getMessaging(firebaseApp);
+
+        return onMessage(messaging, (payload) => {
+            const title = payload.notification?.title || "FinTrack";
+            const body = payload.notification?.body || "";
+
+            if (Notification.permission !== "granted") {
+                return;
+            }
+
+            void navigator.serviceWorker.ready.then((registration) =>
+                registration.showNotification(title, {
+                    body,
+                    icon: "/logo192.png",
+                    badge: "/logo192.png",
+                    data: {
+                        actionUrl: payload.fcmOptions?.link || "/transactions",
+                    },
+                }),
+            );
+        });
+    } catch (error) {
+        console.error("Could not listen for foreground messages:", error);
+        return () => undefined;
     }
 };
