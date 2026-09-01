@@ -185,7 +185,7 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
           </div>
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <div>
+          <div className="min-w-0">
             <label className="mb-2 block text-sm font-medium">
               {isVietnamese ? "Tên custom (nếu có)" : "Custom category name"}
             </label>
@@ -205,7 +205,7 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
               value={formData.customCategoryName}
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="mb-2 block text-sm font-medium">
               {isVietnamese ? "Danh mục con" : "Subcategory"}
             </label>
@@ -220,11 +220,11 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
               value={formData.subcategory}
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="mb-2 block text-sm font-medium">
               {isVietnamese ? "Icon" : "Icon"}
             </label>
-            <div className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-2">
+            <div className="-mx-1 flex w-full min-w-0 snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-2">
               <button
                 className={iconButtonClass(!formData.icon)}
                 onClick={() =>

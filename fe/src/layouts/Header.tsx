@@ -205,7 +205,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                     <div className="relative" ref={menuRef}>
                         <button
                             className={cn(
-                                "app-header-user-trigger flex items-center gap-2 rounded-[var(--app-radius-md)] md:px-2.5 md:py-2 text-left transition-colors sm:gap-3 sm:px-3",
+                                "md:app-header-user-trigger flex items-center gap-2 rounded-[var(--app-radius-md)] md:px-2.5 md:py-2 text-left transition-colors sm:gap-3 sm:px-3",
                                 isScrolled && "is-scrolled",
                             )}
                             onClick={() => setMenuOpen((current) => !current)}

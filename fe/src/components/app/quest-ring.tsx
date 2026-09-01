@@ -23,11 +23,14 @@ export const QuestRing: React.FC<QuestRingProps> = ({
     return (
         <div className={cn("relative shrink-0", className)}>
             <div
-                className="rounded-full p-[3px] transition-[background] duration-500"
+                className="rounded-full p-[3px] ring-1 ring-border transition-[background] duration-500"
                 style={{
+                    // This project themes with --app-* hex tokens; the shadcn
+                    // style hsl(var(--primary)) resolves to nothing here, which
+                    // made the whole gradient invalid and the ring invisible.
                     background: `conic-gradient(${
-                        complete ? "#f59e0b" : "hsl(var(--primary))"
-                    } ${safePercent * 3.6}deg, hsl(var(--muted)) 0deg)`,
+                        complete ? "#f59e0b" : "var(--app-primary)"
+                    } ${safePercent * 3.6}deg, var(--app-border) 0deg)`,
                 }}
             >
                 <div className="rounded-full bg-background p-[2px]">
