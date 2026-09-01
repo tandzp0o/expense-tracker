@@ -782,6 +782,16 @@ export const configApi = {
         }
     },
 
+    testNotification: async (token?: string) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.post("/config/test-notification");
+            return response.data;
+        } catch (error) {
+            return handleApiError(error);
+        }
+    },
+
     removeDevice: async (deviceToken: string, token?: string) => {
         try {
             const apiClient = createApiClient(token);

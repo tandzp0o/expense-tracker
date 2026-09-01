@@ -1,4 +1,5 @@
 import { Response } from "express";
+import admin from "firebase-admin";
 import User from "../models/User";
 import UserConfig from "../models/UserConfig";
 import {
@@ -163,5 +164,52 @@ export const removeDevice = async (req: any, res: Response) => {
     } catch (error) {
         console.error("Error removing device token:", error);
         res.status(500).json({ message: "Không thể gỡ thiết bị" });
+    }
+};
+
+/**
+ * Sends a push to the caller's own devices right now. Exists so the delivery
+ * path (permission, token, FCM credentials) can be verified without waiting
+ * for a scheduled slot, which is what the cron endpoint is gated on.
+ */
+export const sendTestNotification = async (req: any, res: Response) => {
+    try {
+        const userId = req.user.uid;
+        const config = await ensureUserConfig(userId);
+        const tokens = config.deviceTokens.map((device) => device.token);
+
+        if (tokens.length === 0) {
+            return res.status(400).json({
+                message:
+                    "Chưa có thiết bị nào đăng ký nhận thông báo trên tài khoản này",
+            });
+        }
+
+        const response = await admin.messaging().sendEachForMulticast({
+            tokens,
+            notification: {
+                title: "FinTrack: thử thông báo",
+                body: "Nếu bạn thấy thông báo này thì phần nhắc nhở đã hoạt động.",
+            },
+            webpush: { fcmOptions: { link: "/transactions" } },
+        });
+
+        const errors = response.responses
+            .filter((entry) => !entry.success)
+            .map((entry) => entry.error?.message || "unknown error");
+
+        res.json({
+            success: response.successCount > 0,
+            sent: response.successCount,
+            failed: response.failureCount,
+            deviceCount: tokens.length,
+            errors,
+        });
+    } catch (error: any) {
+        console.error("Test notification failed:", error);
+        res.status(500).json({
+            message: "Không gửi được thông báo thử",
+            detail: error?.message,
+        });
     }
 };

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { BellRing, Plus, Trash2 } from "lucide-react";
+import { BellRing, Plus, Send, Trash2 } from "lucide-react";
 import { auth } from "lib/firebase/config";
 import { isPushSupported, requestPushToken } from "lib/firebase/messaging";
 import { configApi } from "services/api";
@@ -80,6 +80,11 @@ export const ReminderSettings: React.FC = () => {
               deviceMisconfiguredDesc:
                   "Cần đặt REACT_APP_FIREBASE_VAPID_KEY trước khi bật thông báo.",
               deviceFailed: "Không bật được thông báo",
+              sendTest: "Gửi thử ngay",
+              testSent: "Đã gửi thông báo thử",
+              testSentDesc:
+                  "Nếu vài giây nữa vẫn chưa thấy gì, kiểm tra lại quyền thông báo của trình duyệt và hệ điều hành.",
+              testFailed: "Không gửi được thông báo thử",
               loadFailed: "Không tải được cấu hình nhắc nhở",
           }
         : {
@@ -117,6 +122,11 @@ export const ReminderSettings: React.FC = () => {
               deviceMisconfiguredDesc:
                   "REACT_APP_FIREBASE_VAPID_KEY must be set before enabling push.",
               deviceFailed: "Could not enable notifications",
+              sendTest: "Send a test now",
+              testSent: "Test notification sent",
+              testSentDesc:
+                  "If nothing shows up in a few seconds, check the notification permission in your browser and OS.",
+              testFailed: "Could not send the test notification",
               loadFailed: "Could not load the reminder settings",
           };
 
@@ -186,6 +196,31 @@ export const ReminderSettings: React.FC = () => {
         },
         [config, copy.saveFailed, copy.saved, timezone, toast],
     );
+
+    const handleSendTest = async () => {
+        setSaving(true);
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) {
+                return;
+            }
+
+            const result = await configApi.testNotification(token);
+            toast({
+                title: copy.testSent,
+                description: `${copy.testSentDesc} (sent: ${result.sent}, failed: ${result.failed})`,
+                variant: result.sent > 0 ? "success" : "destructive",
+            });
+        } catch (error: any) {
+            toast({
+                title: copy.testFailed,
+                description: error.message,
+                variant: "destructive",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const handleEnableDevice = async () => {
         const result = await requestPushToken();
@@ -384,15 +419,25 @@ export const ReminderSettings: React.FC = () => {
                     <p className="mt-1 text-xs text-muted-foreground">
                         {copy.deviceHint(config.deviceCount)}
                     </p>
-                    <Button
-                        className="mt-3"
-                        disabled={!pushSupported}
-                        onClick={() => void handleEnableDevice()}
-                        size="sm"
-                    >
-                        <BellRing className="h-4 w-4" />
-                        {copy.enableDevice}
-                    </Button>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                            disabled={!pushSupported}
+                            onClick={() => void handleEnableDevice()}
+                            size="sm"
+                        >
+                            <BellRing className="h-4 w-4" />
+                            {copy.enableDevice}
+                        </Button>
+                        <Button
+                            disabled={saving || config.deviceCount === 0}
+                            onClick={() => void handleSendTest()}
+                            size="sm"
+                            variant="outline"
+                        >
+                            <Send className="h-4 w-4" />
+                            {copy.sendTest}
+                        </Button>
+                    </div>
                     {!pushSupported ? (
                         <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
                             {copy.deviceUnsupportedDesc}

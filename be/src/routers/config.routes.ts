@@ -4,6 +4,7 @@ import {
     getConfig,
     registerDevice,
     removeDevice,
+    sendTestNotification,
     updateConfig,
 } from "../controllers/config.controller";
 
@@ -15,5 +16,6 @@ router.get("/", getConfig);
 router.put("/", updateConfig);
 router.post("/devices", registerDevice);
 router.delete("/devices", removeDevice);
+router.post("/test-notification", sendTestNotification);
 
 export default router;
