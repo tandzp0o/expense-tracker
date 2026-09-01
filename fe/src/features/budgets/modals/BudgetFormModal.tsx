@@ -1,5 +1,17 @@
 import React from "react";
-import { CreditCard } from "lucide-react";
+import {
+  BookOpen,
+  Car,
+  CreditCard,
+  Film,
+  HeartPulse,
+  LucideIcon,
+  ReceiptText,
+  ShoppingBag,
+  Sparkles,
+  UtensilsCrossed,
+  Wallet,
+} from "lucide-react";
 import { STANDARD_EXPENSE_CATEGORY_OPTIONS } from "constants/categories";
 import { Button } from "components/ui/button";
 import {
@@ -10,18 +22,28 @@ import {
 import { Input } from "components/ui/input";
 import { Select } from "components/ui/select";
 import { MoneyField } from "components/app/money-field";
+import { cn } from "lib/utils";
 import type { BudgetSummaryItem } from "../components/BudgetCards";
 
-const ICON_OPTIONS = [
-  "shopping-bag",
-  "utensils",
-  "car",
-  "film",
-  "heart-pulse",
-  "book-open",
-  "receipt-text",
-  "wallet",
-];
+const ICON_OPTIONS: { value: string; icon: LucideIcon; vi: string; en: string }[] =
+  [
+    { value: "shopping-bag", icon: ShoppingBag, vi: "Mua sắm", en: "Shopping" },
+    { value: "utensils", icon: UtensilsCrossed, vi: "Ăn uống", en: "Food" },
+    { value: "car", icon: Car, vi: "Di chuyển", en: "Transport" },
+    { value: "film", icon: Film, vi: "Giải trí", en: "Fun" },
+    { value: "heart-pulse", icon: HeartPulse, vi: "Sức khỏe", en: "Health" },
+    { value: "book-open", icon: BookOpen, vi: "Học tập", en: "Study" },
+    { value: "receipt-text", icon: ReceiptText, vi: "Hóa đơn", en: "Bills" },
+    { value: "wallet", icon: Wallet, vi: "Khác", en: "Other" },
+  ];
+
+const iconButtonClass = (active: boolean) =>
+  cn(
+    "flex h-[68px] w-[68px] shrink-0 snap-start flex-col items-center justify-center gap-1.5 rounded-[var(--app-radius-md)] border px-1 transition-colors",
+    active
+      ? "border-primary bg-primary/10 text-primary shadow-sm"
+      : "border-border bg-background text-muted-foreground hover:bg-muted",
+  );
 
 const COLOR_SWATCHES = [
   "#2E7D32",
@@ -202,22 +224,50 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
             <label className="mb-2 block text-sm font-medium">
               {isVietnamese ? "Icon" : "Icon"}
             </label>
-            <Select
-              onChange={(event) =>
-                onFormDataChange((current) => ({
-                  ...current,
-                  icon: event.target.value,
-                }))
-              }
-              value={formData.icon}
-            >
-              <option value="">{isVietnamese ? "Chọn icon" : "Select icon"}</option>
-              {ICON_OPTIONS.map((iconName) => (
-                <option key={iconName} value={iconName}>
-                  {iconName}
-                </option>
-              ))}
-            </Select>
+            <div className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-2">
+              <button
+                className={iconButtonClass(!formData.icon)}
+                onClick={() =>
+                  onFormDataChange((current) => ({ ...current, icon: "" }))
+                }
+                title={isVietnamese ? "Tự động" : "Auto"}
+                type="button"
+              >
+                <Sparkles className="h-5 w-5" />
+                <span className="text-[11px] leading-none">
+                  {isVietnamese ? "Tự động" : "Auto"}
+                </span>
+              </button>
+              {ICON_OPTIONS.map((option) => {
+                const OptionIcon = option.icon;
+                const label = isVietnamese ? option.vi : option.en;
+
+                return (
+                  <button
+                    className={iconButtonClass(formData.icon === option.value)}
+                    key={option.value}
+                    onClick={() =>
+                      onFormDataChange((current) => ({
+                        ...current,
+                        icon: option.value,
+                      }))
+                    }
+                    title={label}
+                    type="button"
+                  >
+                    <OptionIcon className="h-5 w-5" />
+                    <span className="max-w-full truncate text-[11px] leading-none">
+                      {label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isVietnamese
+                ? "Lướt ngang để xem thêm biểu tượng."
+                : "Swipe sideways to see more icons."}
+            </p>
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium">

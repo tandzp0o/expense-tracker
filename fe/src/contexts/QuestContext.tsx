@@ -28,6 +28,9 @@ export interface QuestStats {
     totalTransactions: number;
     totalGoals: number;
     completedGoals: number;
+    /** Current calendar month, already excluding transfers on the server. */
+    monthlyIncome: number;
+    monthlyExpense: number;
 }
 
 export interface Quest {
@@ -60,6 +63,8 @@ const EMPTY_STATS: QuestStats = {
     totalTransactions: 0,
     totalGoals: 0,
     completedGoals: 0,
+    monthlyIncome: 0,
+    monthlyExpense: 0,
 };
 
 /** Refetching on every navigation would hammer the stats endpoint. */
@@ -202,6 +207,8 @@ export const QuestProvider: React.FC<{
                 totalTransactions: Number(payload.totalTransactions || 0),
                 totalGoals: Number(payload.totalGoals || 0),
                 completedGoals: Number(payload.completedGoals || 0),
+                monthlyIncome: Number(payload.monthlyIncome || 0),
+                monthlyExpense: Number(payload.monthlyExpense || 0),
             });
         } catch {
             // Quests are a progress hint, never a blocking flow: a failed stats

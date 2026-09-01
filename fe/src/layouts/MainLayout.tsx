@@ -164,19 +164,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                                     <button
                                         key={item.to}
                                         className={cn(
-                                            "relative z-[1] flex min-w-0 -mt-7 flex-col items-center justify-center gap-1 px-0 pb-0 pt-0 text-center transition-all",
+                                            "relative z-[1] flex min-w-0 -mt-5 flex-col items-center justify-center gap-1 px-0 pb-0 pt-0 text-center transition-all",
                                             "text-foreground",
                                         )}
                                         onClick={() => setQuickAddOpen(true)}
                                         type="button"
                                     >
                                         <span
-                                            className="flex h-14 w-14 items-center justify-center rounded-full border-[6px] border-white text-white shadow-[0_18px_38px_-16px_rgba(236,72,153,0.9)] transition-transform duration-200 hover:-translate-y-0.5 dark:border-slate-950"
+                                            className="flex h-12 w-12 items-center justify-center rounded-full border-4 border-white text-white transition-transform duration-200 hover:-translate-y-0.5 dark:border-slate-950"
                                             style={{
-                                                background: primaryGradient,
-                                                boxShadow: `0 18px 38px -16px ${hexToRgba(
+                                                // Solid brand colour: the old
+                                                // translucent gradient let the
+                                                // page show through the button.
+                                                backgroundColor:
                                                     themeColors.primary,
-                                                    0.9,
+                                                boxShadow: `0 12px 26px -14px ${hexToRgba(
+                                                    themeColors.primary,
+                                                    0.85,
                                                 )}`,
                                             }}
                                         >

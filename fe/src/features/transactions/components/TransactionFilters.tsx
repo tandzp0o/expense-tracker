@@ -75,7 +75,7 @@ export const TransactionFilters: React.FC<TransactionFiltersProps> = ({
     <div className="relative min-w-0 flex-1">
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
-        className="pl-9"
+        className="border-border bg-muted/50 pl-9 focus-visible:bg-background"
         onChange={(event) => onSearchChange(event.target.value)}
         placeholder={copy.searchByNote}
         value={searchQuery}
@@ -143,7 +143,7 @@ export const TransactionFilters: React.FC<TransactionFiltersProps> = ({
             aria-expanded={mobileFiltersOpen}
             aria-label={toggleFiltersLabel}
             className={cn(
-              "relative shrink-0",
+              "relative shrink-0 border-border bg-muted/50 hover:bg-muted",
               hasActiveFilters &&
                 "border-primary/40 bg-primary-soft text-primary hover:bg-primary-soft",
             )}
@@ -158,21 +158,30 @@ export const TransactionFilters: React.FC<TransactionFiltersProps> = ({
           </Button>
         </div>
 
-        {mobileFiltersOpen ? (
-          <div className="grid gap-3">
-            {categorySelect}
-            {walletSelect}
-            {statusSelect}
-            {resetButton}
+        <div
+          className={cn(
+            "grid transition-all duration-300 ease-out",
+            mobileFiltersOpen
+              ? "grid-rows-[1fr] opacity-100"
+              : "grid-rows-[0fr] opacity-0",
+          )}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="grid gap-3 pt-1">
+              {categorySelect}
+              {walletSelect}
+              {statusSelect}
+              {resetButton}
+            </div>
           </div>
-        ) : null}
+        </div>
       </div>
 
       <div className="hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-[1.3fr,1fr,1fr,1fr,auto]">
         <div className="relative min-w-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="pl-9"
+            className="border-border bg-muted/50 pl-9 focus-visible:bg-background"
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={copy.searchByNote}
             value={searchQuery}

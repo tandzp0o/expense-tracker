@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         [language],
     );
     const { navigationLocked, notifyNavigationLocked } = useNavigationLock();
-    const { level, percent, points, totalPoints } = useQuests();
+    const { percent, points, totalPoints } = useQuests();
     const lockedNavigationHint = isVietnamese
         ? "Tạo ví đầu tiên để mở khóa Hồ sơ và Cài đặt."
         : "Create your first wallet to unlock Profile and Settings.";
@@ -211,7 +211,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                             onClick={() => setMenuOpen((current) => !current)}
                             type="button"
                         >
-                            <QuestRing level={level} percent={percent}>
+                            <QuestRing percent={percent}>
                                 <Avatar
                                     alt={currentUser?.displayName}
                                     className="rounded-full"

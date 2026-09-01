@@ -117,7 +117,7 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                     </div>
                     <Button
                         className="w-full justify-between"
-                        onClick={() => handleNavigate("/transactions")}
+                        onClick={() => handleNavigate("/transactions?composer=manual")}
                     >
                         <span>
                             {isVietnamese

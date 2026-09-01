@@ -381,11 +381,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         <p className="text-sm text-muted-foreground">
           {copy.showingRows(transactions.length)}
         </p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button className="w-full sm:w-auto" disabled={page <= 1} onClick={onPrevPage} variant="outline">
+        <div className="flex flex-row items-center gap-2">
+          <Button className="flex-1 sm:flex-none" disabled={page <= 1} onClick={onPrevPage} variant="outline">
             {copy.previous}
           </Button>
-          <Button className="w-full sm:w-auto" disabled={page >= totalPages} onClick={onNextPage} variant="outline">
+          <Button className="flex-1 sm:flex-none" disabled={page >= totalPages} onClick={onNextPage} variant="outline">
             {copy.next}
           </Button>
         </div>

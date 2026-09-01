@@ -219,10 +219,10 @@ const RightSidebar = forwardRef<HTMLDivElement, Props>(
                   return (
                     <div
                       key={wallet._id}
-                      className="w-[min(286px,calc(100vw-3rem))] shrink-0 overflow-hidden rounded-[var(--app-radius-xl)] border border-white/12 bg-card shadow-sm"
+                      className="flex h-full w-[min(286px,calc(100vw-3rem))] shrink-0 flex-col overflow-hidden rounded-[var(--app-radius-xl)] border border-white/12 bg-card shadow-sm"
                     >
                       <div
-                        className="relative min-h-[154px] overflow-hidden p-3.5 text-white sm:min-h-[238px] sm:p-5"
+                        className="relative flex min-h-[154px] flex-1 overflow-hidden p-3.5 text-white sm:min-h-[238px] sm:p-5"
                         style={{
                           backgroundImage: wallet.background,
                           backgroundPosition: "center",
@@ -230,7 +230,7 @@ const RightSidebar = forwardRef<HTMLDivElement, Props>(
                         }}
                       >
                         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.18)_0%,rgba(2,6,23,0.36)_42%,rgba(2,6,23,0.88)_100%)]" />
-                        <div className="relative z-10 flex h-full flex-col gap-3 sm:gap-4">
+                        <div className="relative z-10 flex w-full flex-col gap-3 sm:gap-4">
                           <div className="flex items-start gap-2.5 sm:justify-between sm:gap-3">
                             <div className="flex min-w-0 items-start gap-2.5">
                               <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--app-radius-md)-4px)] bg-white/14 backdrop-blur-sm sm:h-10 sm:w-10">

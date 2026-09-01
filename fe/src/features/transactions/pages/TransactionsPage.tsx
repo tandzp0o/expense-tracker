@@ -27,6 +27,7 @@ import {
   toDateInputValue,
 } from "utils/formatters";
 import { useLocale } from "contexts/LocaleContext";
+import { useQuests } from "contexts/QuestContext";
 import { useToast } from "contexts/ToastContext";
 import { useDebounce } from "hooks/useDebounce";
 import { PageHeader } from "components/app/page-header";
@@ -100,6 +101,7 @@ const TransactionsPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { language, isVietnamese, timezoneOffsetMinutes } = useLocale();
+  const { stats: questStats, refresh: refreshQuestStats } = useQuests();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -142,8 +144,8 @@ const TransactionsPage: React.FC = () => {
         pageDescription:
           "Bộ lọc phía server dùng đúng các tham số note, category và wallet từ transactions API.",
         newTransaction: "Thêm giao dịch",
-        pageIncome: "Thu trong trang",
-        pageExpense: "Chi trong trang",
+        pageIncome: "Thu tháng này",
+        pageExpense: "Chi tháng này",
         searchByNote: "Tìm theo ghi chú...",
         allCategories: "Tất cả danh mục",
         allWallets: "Tất cả ví",
@@ -207,8 +209,8 @@ const TransactionsPage: React.FC = () => {
         pageDescription:
           "Server-side filters use note, category and wallet params from the transactions API.",
         newTransaction: "New transaction",
-        pageIncome: "Page income",
-        pageExpense: "Page expense",
+        pageIncome: "Income this month",
+        pageExpense: "Expense this month",
         searchByNote: "Search by note...",
         allCategories: "All categories",
         allWallets: "All wallets",
@@ -957,6 +959,7 @@ const TransactionsPage: React.FC = () => {
       setModalOpen(false);
       setAmountInput("");
       await fetchAll();
+      await refreshQuestStats();
     } catch (error: any) {
       toast({
         title: copy.saveFailed,
@@ -989,6 +992,7 @@ const TransactionsPage: React.FC = () => {
       });
       setPendingDelete(null);
       await fetchAll();
+      await refreshQuestStats();
     } catch (error: any) {
       toast({
         title: copy.deleteFailed,
@@ -1000,27 +1004,15 @@ const TransactionsPage: React.FC = () => {
     }
   };
 
-  const totals = useMemo(() => {
-    return transactions.reduce(
-      (result, transaction) => {
-        if (
-          isTransferTransaction(transaction) ||
-          !isLedgerTransaction(transaction)
-        ) {
-          return result;
-        }
-
-        const amount = parseAmount(transaction.amount);
-        if (transaction.type === "INCOME") {
-          result.income += amount;
-        } else if (transaction.type === "EXPENSE") {
-          result.expense += amount;
-        }
-        return result;
-      },
-      { income: 0, expense: 0 },
-    );
-  }, [transactions]);
+  // Totals cover the whole current month, not just the rows on this page, so
+  // they come from the server-side monthly aggregate rather than the page data.
+  const totals = useMemo(
+    () => ({
+      income: questStats.monthlyIncome,
+      expense: questStats.monthlyExpense,
+    }),
+    [questStats.monthlyExpense, questStats.monthlyIncome],
+  );
 
   const totalPages = Math.max(1, Math.ceil(totalTransactions / pageSize));
 
