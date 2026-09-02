@@ -32,7 +32,7 @@ interface FeatureGuideDialogProps {
 }
 
 const guideStorageKey = (uid: string, feature: string) =>
-    `fintrack-guide:${uid}:${feature}`;
+    `tonfin-guide:${uid}:${feature}`;
 
 /**
  * First-visit guide state for one feature screen. The dialog opens once per

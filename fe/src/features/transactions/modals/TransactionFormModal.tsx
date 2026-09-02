@@ -218,8 +218,8 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
       <DialogSection
         description={
           isVietnamese
-            ? "Khoản chi sẽ đi theo ngân sách của ví, còn khoản thu sẽ dùng nhóm thu nhập."
-            : "Expenses follow wallet budgets while income uses dedicated income groups."
+            ? "Ví là nơi tiền đi ra, ngân sách là hạn mức của nhóm chi tiêu. Khoản thu dùng nhóm thu nhập riêng."
+            : "The wallet is where the money leaves from; the budget is the category cap. Income uses its own groups."
         }
         title={
           isVietnamese ? "Nguồn tiền và phân loại" : "Source and classification"

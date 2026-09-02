@@ -188,7 +188,7 @@ export const sendTestNotification = async (req: any, res: Response) => {
         const response = await admin.messaging().sendEachForMulticast({
             tokens,
             notification: {
-                title: "FinTrack: thử thông báo",
+                title: "TonFin: thử thông báo",
                 body: "Nếu bạn thấy thông báo này thì phần nhắc nhở đã hoạt động.",
             },
             webpush: { fcmOptions: { link: "/transactions" } },

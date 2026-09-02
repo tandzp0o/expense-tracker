@@ -143,13 +143,15 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
       <DialogSection
         description={
           isVietnamese
-            ? "Gắn ngân sách vào đúng ví để theo dõi reserve và chi tiêu chính xác."
-            : "Attach this budget to the right wallet so reserve tracking stays accurate."
+            ? "Ngân sách là hạn mức cho một nhóm chi tiêu trong tháng, không phụ thuộc bạn trả bằng ví nào."
+            : "A budget caps one spending category for the month, no matter which wallet pays."
         }
         title={isVietnamese ? "Phạm vi áp dụng" : "Scope"}
       >
-        <div>
-          <label className="mb-2 block text-sm font-medium">{copy.wallet}</label>
+        <div className="min-w-0">
+          <label className="mb-2 block text-sm font-medium">
+            {isVietnamese ? "Áp dụng cho ví" : "Applies to wallet"}
+          </label>
           <Select
             onChange={(event) =>
               onFormDataChange((current) => ({
@@ -159,13 +161,26 @@ export const BudgetFormModal: React.FC<BudgetFormModalProps> = ({
             }
             value={formData.walletId}
           >
-            <option value="">{copy.wallet}</option>
+            {/* The empty value is the default on purpose: most people want one
+                cap per category, whichever wallet they happen to pay from. */}
+            <option value="">
+              {isVietnamese ? "Tất cả ví" : "All wallets"}
+            </option>
             {wallets.map((wallet) => (
               <option key={wallet._id} value={wallet._id}>
                 {wallet.name}
               </option>
             ))}
           </Select>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {formData.walletId
+              ? isVietnamese
+                ? "Chỉ giao dịch trả từ ví này mới trừ vào ngân sách."
+                : "Only spending from this wallet counts against the budget."
+              : isVietnamese
+                ? "Mọi giao dịch thuộc nhóm này đều trừ vào ngân sách, trả bằng ví nào cũng được."
+                : "Any spending in this category counts, from any wallet."}
+          </p>
         </div>
 
         <div className="min-w-0">

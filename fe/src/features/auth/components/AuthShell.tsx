@@ -121,7 +121,7 @@ const AuthShell: React.FC<AuthShellProps> = ({
                                     className="text-3xl font-bold tracking-[-0.04em] sm:text-[2rem]"
                                     style={{ color: appearance.primaryColor }}
                                 >
-                                    FinTrack
+                                    TonFin
                                 </h1>
                                 <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.2em] text-slate-400">
                                     {tagline}

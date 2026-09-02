@@ -20,7 +20,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-    const title = payload.notification?.title || "FinTrack";
+    const title = payload.notification?.title || "TonFin";
     const options = {
         body: payload.notification?.body || "",
         icon: "/logo192.png",

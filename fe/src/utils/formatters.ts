@@ -1,4 +1,4 @@
-const MONEY_DISPLAY_STORAGE_KEY = "fintrack-money-display";
+const MONEY_DISPLAY_STORAGE_KEY = "tonfin-money-display";
 
 const getActiveLanguage = () => {
     if (typeof document === "undefined") {

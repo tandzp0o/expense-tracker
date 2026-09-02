@@ -384,7 +384,17 @@ export const transactionApi = {
     getDashboardStats: async (month: number, year: number, token?: string) => {
         try {
             const startDate = new Date(year, month - 1, 1).toISOString();
-            const endDate = new Date(year, month, 0).toISOString();
+            // Last day of the month at its final millisecond: `new Date(y, m, 0)`
+            // alone is that day at midnight, which excludes the whole day.
+            const endDate = new Date(
+                year,
+                month,
+                0,
+                23,
+                59,
+                59,
+                999,
+            ).toISOString();
 
             const apiClient = createApiClient(token);
             const response = await apiClient.get("/transactions", {
@@ -464,7 +474,17 @@ export const transactionApi = {
     ) => {
         try {
             const startDate = new Date(year, month - 1, 1).toISOString();
-            const endDate = new Date(year, month, 0).toISOString();
+            // Last day of the month at its final millisecond: `new Date(y, m, 0)`
+            // alone is that day at midnight, which excludes the whole day.
+            const endDate = new Date(
+                year,
+                month,
+                0,
+                23,
+                59,
+                59,
+                999,
+            ).toISOString();
 
             const apiClient = createApiClient(token);
             const response = await apiClient.get("/transactions", {

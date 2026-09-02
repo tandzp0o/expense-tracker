@@ -98,7 +98,7 @@ const Profile: React.FC = () => {
                 displayName:
                     profileData.displayName ||
                     user.displayName ||
-                    (isVietnamese ? "Thành viên FinTrack" : "FinTrack member"),
+                    (isVietnamese ? "Thành viên TonFin" : "TonFin member"),
                 email: profileData.email || user.email || "",
                 phone: profileData.phone || "",
                 bio: profileData.bio || "",

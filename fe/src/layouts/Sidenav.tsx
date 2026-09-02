@@ -45,13 +45,13 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                 >
                     <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[var(--app-radius-md)] shadow-sm">
                         <img
-                            alt="FinTrack logo"
+                            alt="TonFin logo"
                             className="h-full w-full object-contain"
                             src={`${process.env.PUBLIC_URL}/logo.png`}
                         />
                     </div>
                     <div className="text-left">
-                        <p className="text-base font-semibold">FinTrack</p>
+                        <p className="text-base font-semibold">TonFin</p>
                         <p className="text-sm text-muted-foreground">
                             {isVietnamese
                                 ? "Không gian quản lý tài chính"
@@ -138,7 +138,7 @@ const Sidenav: React.FC<SidenavProps> = ({ onCloseMenu }) => {
                     <span className="font-medium text-foreground">
                         {navigationItems.find(
                             (item) => item.to === location.pathname,
-                        )?.label || "FinTrack"}
+                        )?.label || "TonFin"}
                     </span>
                 </p>
             </div>

@@ -192,17 +192,18 @@ const revertTransactionLedgerEffects = ({
 };
 
 const syncGoalStatus = (goal: any) => {
-    const deadline = goal.deadline ? new Date(goal.deadline) : null;
-
-    if (deadline && new Date() > deadline) {
-        goal.status = "expired";
+    // Mirrors goal.controller: hitting the target wins over the deadline, and
+    // the deadline covers the whole of its day.
+    if (Number(goal.currentAmount) >= Number(goal.targetAmount)) {
+        goal.status = "completed";
         return;
     }
 
-    goal.status =
-        Number(goal.currentAmount) >= Number(goal.targetAmount)
-            ? "completed"
-            : "active";
+    const deadlineEnd = goal.deadline
+        ? new Date(new Date(goal.deadline).setHours(23, 59, 59, 999))
+        : null;
+
+    goal.status = deadlineEnd && new Date() > deadlineEnd ? "expired" : "active";
 };
 
 const loadWalletForUser = async (
@@ -257,7 +258,10 @@ const resolveBudgetCategoryForWallet = ({
     walletId: unknown;
     providedCategory?: string;
 }) => {
-    if (String(budget.walletId) !== String(walletId)) {
+    // A budget without a wallet is a plain monthly cap for its category, so any
+    // wallet may pay into it. Only a budget deliberately pinned to one wallet
+    // is restricted.
+    if (budget.walletId && String(budget.walletId) !== String(walletId)) {
         throw new TransactionRuleError(
             400,
             "Selected budget does not belong to the chosen wallet",

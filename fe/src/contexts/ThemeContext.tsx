@@ -28,7 +28,7 @@ interface ThemeContextValue {
     resetAppearance: () => void;
 }
 
-const STORAGE_KEY = "fintrack-appearance";
+const STORAGE_KEY = "tonfin-appearance";
 
 const DEFAULT_APPEARANCE: AppearanceSettings = {
     mode: "light",

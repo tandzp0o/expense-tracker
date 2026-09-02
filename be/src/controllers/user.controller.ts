@@ -210,10 +210,17 @@ export const getProfileStats = async (req: any, res: Response) => {
             now.getMonth(),
             1,
         );
+        // Day 0 of the next month is the last day of this one, but at 00:00.
+        // Querying with $lte against that dropped everything logged on the last
+        // day of the month, so the end of that day has to be spelled out.
         const endOfCurrentMonth = new Date(
             now.getFullYear(),
             now.getMonth() + 1,
             0,
+            23,
+            59,
+            59,
+            999,
         );
 
         const startOfLastMonth = new Date(
@@ -221,7 +228,15 @@ export const getProfileStats = async (req: any, res: Response) => {
             now.getMonth() - 1,
             1,
         );
-        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        const endOfLastMonth = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            0,
+            23,
+            59,
+            59,
+            999,
+        );
 
         const monthlyTransactions = await Transaction.find({
             userId,
@@ -296,7 +311,15 @@ export const getProfileStats = async (req: any, res: Response) => {
         for (let i = 5; i >= 0; i--) {
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const start = new Date(d.getFullYear(), d.getMonth(), 1);
-            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+            const end = new Date(
+                d.getFullYear(),
+                d.getMonth() + 1,
+                0,
+                23,
+                59,
+                59,
+                999,
+            );
 
             const trans = await Transaction.find({
                 userId,

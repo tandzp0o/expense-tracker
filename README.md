@@ -1,4 +1,4 @@
-# expense-tracker
+# TonFin
 
 Frontend dùng React, backend dùng Express và xác thực bằng Firebase.
 

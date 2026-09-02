@@ -42,7 +42,7 @@ const setupInstallListener = () => {
         return;
     }
 
-    const setupKey = "__fintrackPWAInstallListenerReady";
+    const setupKey = "__tonfinPWAInstallListenerReady";
     if ((window as unknown as Record<string, boolean>)[setupKey]) {
         return;
     }

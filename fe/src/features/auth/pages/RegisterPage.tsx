@@ -28,7 +28,7 @@ const Register: React.FC = () => {
         () =>
             isVietnamese
                 ? {
-                      tagline: "Digital Atelier of Wealth",
+                      tagline: "Hiểu rõ dòng tiền của bạn",
                       title: "Tạo tài khoản mới",
                       description:
                           "Đăng ký bằng email và mật khẩu. Hệ thống sẽ tự tạo username nội bộ từ email của bạn.",
@@ -49,7 +49,7 @@ const Register: React.FC = () => {
                           "Nếu muốn, bạn vẫn có thể bắt đầu nhanh bằng Google.",
                       bottomNote: "Đã có tài khoản?",
                       bottomAction: "Đăng nhập",
-                      footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
+                      footerRights: `© ${new Date().getFullYear()} TonFin. All rights reserved.`,
                       footerLinks: [
                           "Chính sách",
                           "Điều khoản",
@@ -67,7 +67,7 @@ const Register: React.FC = () => {
                           "Mục này chưa có hành động riêng trong giao diện hiện tại.",
                   }
                 : {
-                      tagline: "Digital Atelier of Wealth",
+                      tagline: "Know where your money goes",
                       title: "Create a new account",
                       description:
                           "Sign up with your email and password. The app will generate an internal username from your email automatically.",
@@ -88,7 +88,7 @@ const Register: React.FC = () => {
                           "You can still start with Google if that is easier for you.",
                       bottomNote: "Already have an account?",
                       bottomAction: "Login",
-                      footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
+                      footerRights: `© ${new Date().getFullYear()} TonFin. All rights reserved.`,
                       footerLinks: [
                           "Privacy",
                           "Terms",

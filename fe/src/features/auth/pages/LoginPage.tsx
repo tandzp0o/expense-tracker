@@ -57,8 +57,8 @@ const Login: React.FC = () => {
         () =>
             isVietnamese
                 ? {
-                      tagline: "Digital Atelier of Wealth",
-                      title: "Đăng nhập vào FinTrack",
+                      tagline: "Hiểu rõ dòng tiền của bạn",
+                      title: "Đăng nhập vào TonFin",
                       description:
                           "Đăng nhập bằng email và mật khẩu, hoặc tiếp tục với Google nếu bạn đã quen thuộc.",
                       email: "Email đăng nhập",
@@ -76,7 +76,7 @@ const Login: React.FC = () => {
                           "Tài khoản Google vẫn được hỗ trợ song song trong phiên bản này.",
                       bottomNote: "Chưa có tài khoản?",
                       bottomAction: "Đăng ký",
-                      footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
+                      footerRights: `© ${new Date().getFullYear()} TonFin. All rights reserved.`,
                       footerLinks: [
                           "Chính sách",
                           "Điều khoản",
@@ -107,8 +107,8 @@ const Login: React.FC = () => {
                           "Mục này chưa có hành động riêng trong giao diện hiện tại.",
                   }
                 : {
-                      tagline: "Digital Atelier of Wealth",
-                      title: "Sign in to FinTrack",
+                      tagline: "Know where your money goes",
+                      title: "Sign in to TonFin",
                       description:
                           "Sign in with your email and password, or continue with Google if you already use it.",
                       email: "Sign-in email",
@@ -126,7 +126,7 @@ const Login: React.FC = () => {
                           "Google accounts still work alongside password-based accounts.",
                       bottomNote: "Need an account?",
                       bottomAction: "Register",
-                      footerRights: `© ${new Date().getFullYear()} FinTrack Digital Atelier. All rights reserved.`,
+                      footerRights: `© ${new Date().getFullYear()} TonFin. All rights reserved.`,
                       footerLinks: [
                           "Privacy",
                           "Terms",

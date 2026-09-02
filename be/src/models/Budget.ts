@@ -2,7 +2,8 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IBudget extends Document {
     userId: string;
-    walletId: string;
+    /** Empty means the budget applies to every wallet. */
+    walletId?: string | null;
     category: string;
     categoryType?: "standard" | "custom";
     customCategoryName?: string;
@@ -28,7 +29,19 @@ export interface IBudget extends Document {
 
 const BudgetSchema: Schema = new Schema({
     userId: { type: String, required: true, index: true },
-    walletId: { type: Schema.Types.ObjectId, ref: "Wallet", required: true, index: true },
+    /**
+     * A budget is a monthly cap for a spending category; which wallet paid is a
+     * separate concern. Leaving this empty means "any wallet", which is the
+     * common case. It stays optional rather than being removed so anyone who
+     * genuinely wants a per-wallet cap can still set one.
+     */
+    walletId: {
+        type: Schema.Types.ObjectId,
+        ref: "Wallet",
+        required: false,
+        default: null,
+        index: true,
+    },
     category: { type: String, required: true },
     categoryType: {
         type: String,

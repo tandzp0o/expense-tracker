@@ -456,13 +456,13 @@ const Wallets: React.FC = () => {
 
   const onboardingStorageKey = useMemo(
     () =>
-      currentUser?.uid ? `fintrack-wallet-onboarding:${currentUser.uid}` : "",
+      currentUser?.uid ? `tonfin-wallet-onboarding:${currentUser.uid}` : "",
     [currentUser?.uid],
   );
   const onboardingSessionSkipKey = useMemo(
     () =>
       currentUser?.uid
-        ? `fintrack-wallet-onboarding-session:${currentUser.uid}`
+        ? `tonfin-wallet-onboarding-session:${currentUser.uid}`
         : "",
     [currentUser?.uid],
   );

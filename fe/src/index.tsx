@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { migrateLegacyBrandStorage } from './utils/brand-storage-migration';
+
+// Must run before any context reads its stored preferences.
+migrateLegacyBrandStorage();
 
 // ✅ Production: register SW để enable PWA install prompt
 // ✅ Development: unregister SW để tránh conflict với HMR

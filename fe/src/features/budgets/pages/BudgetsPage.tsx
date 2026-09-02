@@ -90,6 +90,7 @@ const BudgetsPage: React.FC = () => {
         edit: "Chỉnh sửa",
         noBudgets: "Chưa có ngân sách",
         noBudgetsDesc: "Chưa có ngân sách nào cho tháng hiện tại.",
+        allWallets: "Tất cả ví",
         createBudget: "Tạo ngân sách",
         formDescription:
           "Biểu mẫu gửi category, amount, month và year đúng như budget API yêu cầu.",
@@ -98,8 +99,6 @@ const BudgetsPage: React.FC = () => {
         wallet: "Ví",
         category: "Danh mục",
         amount: "Số tiền",
-        walletRequired: "Cần chọn ví",
-        walletRequiredDesc: "Hãy chọn ví áp dụng cho ngân sách này.",
         categoryPlaceholder: "Ví dụ: Ăn uống, Tiền nhà, Du lịch",
         cancel: "Hủy",
         saving: "Đang lưu...",
@@ -140,6 +139,7 @@ const BudgetsPage: React.FC = () => {
         edit: "Edit",
         noBudgets: "No budgets yet",
         noBudgetsDesc: "No budget exists for the current month yet.",
+        allWallets: "All wallets",
         createBudget: "Create budget",
         formDescription:
           "The form posts category, amount, month and year exactly as expected by the budget API.",
@@ -148,8 +148,6 @@ const BudgetsPage: React.FC = () => {
         wallet: "Wallet",
         category: "Category",
         amount: "Amount",
-        walletRequired: "Wallet required",
-        walletRequiredDesc: "Select the wallet for this budget.",
         categoryPlaceholder: "Example: Food, Rent, Travel",
         cancel: "Cancel",
         saving: "Saving...",
@@ -221,16 +219,16 @@ const BudgetsPage: React.FC = () => {
       setTotalBudget(response?.totalBudget || 0);
       setTotalSpent(response?.totalSpent || 0);
       setGrowth(response?.growth || 0);
-      setFormData((current) => ({
-        ...current,
-        walletId:
-          current.walletId &&
-          walletList.some(
-            (wallet: WalletItem) => wallet._id === current.walletId,
-          )
-            ? current.walletId
-            : walletList[0]?._id || "",
-      }));
+      // An empty walletId means "all wallets" and is the default, so only drop
+      // a wallet that no longer exists rather than substituting the first one.
+      setFormData((current) =>
+        current.walletId &&
+        !walletList.some(
+          (wallet: WalletItem) => wallet._id === current.walletId,
+        )
+          ? { ...current, walletId: "" }
+          : current,
+      );
     } catch (error: any) {
       toast({
         title: loadFailedTitle,
@@ -260,7 +258,7 @@ const BudgetsPage: React.FC = () => {
   const openCreate = () => {
     setEditing(null);
     setFormData({
-      walletId: wallets[0]?._id || "",
+      walletId: "",
       category: "",
       categoryType: "standard",
       customCategoryName: "",
@@ -277,7 +275,7 @@ const BudgetsPage: React.FC = () => {
   const openEdit = (budget: BudgetSummaryItem) => {
     setEditing(budget);
     setFormData({
-      walletId: budget.walletId,
+      walletId: budget.walletId || "",
       category: budget.category,
       categoryType: budget.categoryType || "standard",
       customCategoryName: budget.customCategoryName || "",
@@ -300,15 +298,6 @@ const BudgetsPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.walletId) {
-      toast({
-        title: copy.walletRequired,
-        description: copy.walletRequiredDesc,
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!formData.category.trim()) {
       toast({
         title: copy.categoryRequired,
@@ -335,7 +324,7 @@ const BudgetsPage: React.FC = () => {
       }
 
       const payload = {
-        walletId: formData.walletId,
+        walletId: formData.walletId || null,
         category: formData.category.trim(),
         categoryType: formData.categoryType,
         customCategoryName: formData.customCategoryName.trim() || undefined,
@@ -494,6 +483,7 @@ const BudgetsPage: React.FC = () => {
           <BudgetCards
             budgets={budgets}
             copy={{
+              allWallets: copy.allWallets,
               createBudget: copy.createBudget,
               edit: copy.edit,
               monthlyCategories: copy.monthlyCategories,

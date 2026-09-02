@@ -89,7 +89,7 @@ export const listenForForegroundMessages = async () => {
         const messaging = getMessaging(firebaseApp);
 
         return onMessage(messaging, (payload) => {
-            const title = payload.notification?.title || "FinTrack";
+            const title = payload.notification?.title || "TonFin";
             const body = payload.notification?.body || "";
 
             if (Notification.permission !== "granted") {

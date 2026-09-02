@@ -33,7 +33,7 @@ const getSlides = (isVietnamese: boolean): OnboardingSlide[] =>
     ? [
         {
           icon: Sparkles,
-          title: "Chào mừng bạn đến với FinTrack",
+          title: "Chào mừng bạn đến với TonFin",
           description:
             "Chỉ mất khoảng một phút để bắt đầu. Trước tiên, hãy tạo một chiếc ví — nơi tiền của bạn thực sự đang nằm.",
           bullets: [
@@ -67,7 +67,7 @@ const getSlides = (isVietnamese: boolean): OnboardingSlide[] =>
     : [
         {
           icon: Sparkles,
-          title: "Welcome to FinTrack",
+          title: "Welcome to TonFin",
           description:
             "This takes about a minute. First, create a wallet — the place your money actually lives.",
           bullets: [

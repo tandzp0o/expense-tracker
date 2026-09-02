@@ -135,7 +135,11 @@ const buildBudgetFilter = ({
     }
 
     if (walletId) {
-        filter.walletId = walletId;
+        // A budget with no wallet applies everywhere, so filtering by wallet
+        // must still return those; otherwise a cash payment could not be
+        // charged to the "Food" budget created without a wallet.
+        // `null` also matches documents where the field is absent.
+        filter.$or = [{ walletId }, { walletId: null }];
     }
 
     return filter;
@@ -169,9 +173,6 @@ const buildBudgetSummaryPayload = async ({
                 ...buildCompletedStatusQuery(),
                 date: { $gte: start, $lte: end },
                 budgetId: { $exists: true, $ne: null },
-                ...(walletId
-                    ? { walletId: new Types.ObjectId(String(walletId)) }
-                    : {}),
             },
         },
         {
@@ -320,9 +321,6 @@ export const createBudget = async (req: any, res: Response) => {
         const yearNum = toNumber(year, new Date().getFullYear());
         const amountNum = toNumber(amount, 0);
 
-        if (!walletId) {
-            return res.status(400).json({ message: "Thiếu ví áp dụng ngân sách" });
-        }
         if (!normalizedCategory) {
             return res.status(400).json({
                 message:
@@ -336,14 +334,16 @@ export const createBudget = async (req: any, res: Response) => {
             return res.status(400).json({ message: "Tháng không hợp lệ" });
         }
 
-        const wallet = await loadWalletForBudget(String(walletId), userId);
-        if (!wallet) {
+        const wallet = walletId
+            ? await loadWalletForBudget(String(walletId), userId)
+            : null;
+        if (walletId && !wallet) {
             return res.status(404).json({ message: "Không tìm thấy ví áp dụng ngân sách" });
         }
 
         const exists = await Budget.findOne({
             userId,
-            walletId: wallet._id,
+            walletId: wallet ? wallet._id : null,
             category: normalizedCategory,
             month: monthNum,
             year: yearNum,
@@ -357,7 +357,7 @@ export const createBudget = async (req: any, res: Response) => {
 
         const budget = await Budget.create({
             userId,
-            walletId: wallet._id,
+            walletId: wallet ? wallet._id : null,
             category: normalizedCategory,
             categoryType:
                 String(categoryType || "standard").trim() === "custom"
@@ -461,8 +461,14 @@ export const updateBudget = async (req: any, res: Response) => {
             return res.status(404).json({ message: "Không tìm thấy ngân sách" });
         }
 
+        // An empty string or null clears the wallet, turning the budget into an
+        // any-wallet one; `undefined` leaves the current value alone.
         const nextWalletId =
-            walletId !== undefined ? String(walletId) : String(budget.walletId);
+            walletId !== undefined
+                ? String(walletId || "").trim() || null
+                : budget.walletId
+                  ? String(budget.walletId)
+                  : null;
         const nextCategoryRaw =
             category !== undefined ? String(category || "").trim() : budget.category;
         const nextCategory =
@@ -487,8 +493,10 @@ export const updateBudget = async (req: any, res: Response) => {
             return res.status(400).json({ message: "Tháng không hợp lệ" });
         }
 
-        const wallet = await loadWalletForBudget(nextWalletId, userId);
-        if (!wallet) {
+        const wallet = nextWalletId
+            ? await loadWalletForBudget(nextWalletId, userId)
+            : null;
+        if (nextWalletId && !wallet) {
             return res.status(404).json({ message: "Không tìm thấy ví áp dụng ngân sách" });
         }
 
@@ -497,10 +505,16 @@ export const updateBudget = async (req: any, res: Response) => {
             budgetId: budget._id,
         });
 
-        if (
-            hasLinkedTransactions > 0 &&
-            String(budget.walletId) !== nextWalletId
-        ) {
+        const currentWalletId = budget.walletId
+            ? String(budget.walletId)
+            : null;
+
+        // Widening a budget to every wallet keeps existing links valid, so only
+        // moving it to a *different* wallet would orphan them.
+        const movesToAnotherWallet =
+            Boolean(nextWalletId) && currentWalletId !== nextWalletId;
+
+        if (hasLinkedTransactions > 0 && movesToAnotherWallet) {
             return res.status(400).json({
                 message:
                     "Không thể đổi ví của ngân sách đã có giao dịch liên kết.",

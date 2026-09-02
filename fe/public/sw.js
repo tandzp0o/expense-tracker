@@ -1,6 +1,6 @@
-// public/sw.js - Ton Finance PWA Service Worker
+// public/sw.js - TonFin PWA Service Worker
 // ✅ Tăng version khi muốn force refresh cache cho user
-const CACHE_NAME = "ton-finance-cache-v6";
+const CACHE_NAME = "tonfin-cache-v7";
 
 const ASSETS_TO_CACHE = [
     "/",
@@ -29,7 +29,7 @@ const shouldSkip = (request) => {
 
 // ─── Install ──────────────────────────────────────────────
 self.addEventListener("install", (event) => {
-    console.log("[SW] Installing - ton-finance");
+    console.log("[SW] Installing - tonfin");
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             console.log("[SW] Caching app shell assets");
@@ -91,7 +91,7 @@ self.addEventListener("push", (event) => {
     try {
         payload = event.data.json();
     } catch (error) {
-        payload = { title: "FinTrack", body: event.data.text() };
+        payload = { title: "TonFin", body: event.data.text() };
     }
 
     // FCM nests the content under `notification`, while our own pushes put it
@@ -99,7 +99,7 @@ self.addEventListener("push", (event) => {
     // an empty notification, which the browser then drops silently.
     const content = payload.notification || payload;
     const data = {
-        title: content.title || "FinTrack",
+        title: content.title || "TonFin",
         body: content.body || "",
         tag: content.tag || payload.tag,
         data: {

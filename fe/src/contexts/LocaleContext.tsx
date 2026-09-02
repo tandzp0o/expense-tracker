@@ -50,10 +50,10 @@ interface LocaleContextValue {
     isVietnamese: boolean;
 }
 
-const STORAGE_KEY = "fintrack-language";
-const MONEY_DISPLAY_STORAGE_KEY = "fintrack-money-display";
-const CURRENCY_STORAGE_KEY = "fintrack-currency";
-const TIMEZONE_STORAGE_KEY = "fintrack-timezone";
+const STORAGE_KEY = "tonfin-language";
+const MONEY_DISPLAY_STORAGE_KEY = "tonfin-money-display";
+const CURRENCY_STORAGE_KEY = "tonfin-currency";
+const TIMEZONE_STORAGE_KEY = "tonfin-timezone";
 
 const LocaleContext = createContext<LocaleContextValue | undefined>(undefined);
 

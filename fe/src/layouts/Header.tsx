@@ -44,25 +44,25 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               label: "Tải xuống",
               installedTitle: "Ứng dụng đã sẵn sàng",
               installedDesc:
-                  "FinTrack đã được cài hoặc đang chạy ở chế độ ứng dụng.",
+                  "TonFin đã được cài hoặc đang chạy ở chế độ ứng dụng.",
               unavailableTitle: "Chưa thể tải trực tiếp",
               unavailableDesc:
                   "Trình duyệt chưa cấp luồng cài đặt trực tiếp. Hãy mở bằng Chrome/Edge hoặc dùng Chia sẻ > Thêm vào màn hình chính trên Safari.",
               dismissedTitle: "Đã huỷ tải xuống",
               dismissedDesc: "Bạn có thể bấm lại nút tải xuống bất cứ lúc nào.",
-              acceptedTitle: "Đang tải FinTrack",
+              acceptedTitle: "Đang tải TonFin",
               acceptedDesc: "Trình duyệt đang hoàn tất cài đặt ứng dụng.",
           }
         : {
               label: "Download",
               installedTitle: "App is ready",
-              installedDesc: "FinTrack is already installed or running as an app.",
+              installedDesc: "TonFin is already installed or running as an app.",
               unavailableTitle: "Direct download is not ready",
               unavailableDesc:
                   "The browser has not exposed the direct install flow yet. Open in Chrome/Edge, or use Share > Add to Home Screen on Safari.",
               dismissedTitle: "Download cancelled",
               dismissedDesc: "You can tap the download button again anytime.",
-              acceptedTitle: "Installing FinTrack",
+              acceptedTitle: "Installing TonFin",
               acceptedDesc: "The browser is finishing app installation.",
           };
 
@@ -154,7 +154,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     const currentPage = useMemo(
         () =>
             navigationItems.find((item) => item.to === location.pathname) || {
-                label: "FinTrack",
+                label: "TonFin",
             },
         [location.pathname, navigationItems],
     );
@@ -223,8 +223,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                                 <p className="text-sm font-medium text-foreground">
                                     {currentUser?.displayName ||
                                         (isVietnamese
-                                            ? "Người dùng FinTrack"
-                                            : "FinTrack user")}
+                                            ? "Người dùng TonFin"
+                                            : "TonFin user")}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     {currentUser?.email ||

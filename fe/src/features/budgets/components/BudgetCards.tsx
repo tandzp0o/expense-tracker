@@ -7,8 +7,9 @@ import { EmptyState } from "components/app/empty-state";
 
 export interface BudgetSummaryItem {
   _id: string;
-  walletId: string;
-  walletName: string;
+  /** Empty when the budget is not pinned to a single wallet. */
+  walletId?: string | null;
+  walletName?: string;
   category: string;
   amount: number;
   spent: number;
@@ -37,6 +38,7 @@ interface BudgetCardsCopy {
   noBudgets: string;
   noBudgetsDesc: string;
   createBudget: string;
+  allWallets: string;
 }
 
 interface BudgetCardsProps {
@@ -91,7 +93,7 @@ export const BudgetCards: React.FC<BudgetCardsProps> = ({
                     {getCategoryLabel(budget)}
                   </p>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {budget.walletName}
+                    {budget.walletName || copy.allWallets}
                   </p>
                 </div>
                 <Button onClick={() => onDelete(budget)} size="icon" variant="ghost">

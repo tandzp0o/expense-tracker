@@ -316,8 +316,8 @@ const TransactionsPage: React.FC = () => {
       ? "Chọn ngân sách nếu bạn muốn khoản chi này được trừ vào hạn mức tháng. Bỏ trống cũng được, khoản chi vẫn được ghi nhận vào mục Chi tiêu tự do."
       : "Pick a budget if you want this expense counted against a monthly limit. Leaving it empty is fine, the expense is recorded under Free spending.",
     budgetEmpty: isVietnamese
-      ? "Ví này chưa có ngân sách trong tháng đã chọn, nên khoản chi sẽ vào mục Chi tiêu tự do. Chỉ cần lập ngân sách khi bạn muốn đặt hạn mức cho một nhóm chi."
-      : "This wallet has no budget for the selected month, so the expense goes to Free spending. Create a budget only when you want a spending limit for a category.",
+      ? "Tháng đã chọn chưa có ngân sách nào áp dụng được, nên khoản chi sẽ vào mục Chi tiêu tự do. Chỉ cần lập ngân sách khi bạn muốn đặt hạn mức cho một nhóm chi."
+      : "No budget applies to the selected month, so the expense goes to Free spending. Create a budget only when you want a spending limit for a category.",
     incomeCategoryRequiredDesc: isVietnamese
       ? "H\u00e3y ch\u1ecdn m\u1ed9t nh\u00f3m thu nh\u1eadp ph\u00f9 h\u1ee3p."
       : "Choose an income category.",

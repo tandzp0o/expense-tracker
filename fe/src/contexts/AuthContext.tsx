@@ -119,7 +119,7 @@ const clearWalletGuideSessionFlags = () => {
 
     for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
         const key = window.sessionStorage.key(index);
-        if (key?.startsWith("fintrack-wallet-onboarding-session:")) {
+        if (key?.startsWith("tonfin-wallet-onboarding-session:")) {
             window.sessionStorage.removeItem(key);
         }
     }

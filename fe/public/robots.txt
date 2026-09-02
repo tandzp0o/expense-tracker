@@ -3,7 +3,7 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://ton-finance.com/sitemap.xml
+Sitemap: https://tonfin.ton.id.vn/sitemap.xml
 
 # Crawl-delay for respectful crawling
 Crawl-delay: 1

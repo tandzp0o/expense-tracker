@@ -162,13 +162,21 @@ export const updateGoal = [
             if (category !== undefined) goal.category = category;
             if (deadline !== undefined)
                 goal.deadline = deadline ? new Date(deadline) : undefined;
-            if (status !== undefined) goal.status = status;
+            // Status is derived from progress and deadline below, so a client
+            // supplied value is ignored on purpose.
 
-            // Auto-update status based on progress
-            if (goal.deadline && new Date() > goal.deadline) {
-                goal.status = "expired";
-            } else if (goal.currentAmount >= goal.targetAmount) {
+            // Reaching the target wins over the deadline: a goal you funded in
+            // time stays completed once its deadline rolls past, instead of
+            // flipping to expired. The deadline itself is a whole day, so it
+            // only expires after that day has ended.
+            const deadlineEnd = goal.deadline
+                ? new Date(new Date(goal.deadline).setHours(23, 59, 59, 999))
+                : null;
+
+            if (goal.currentAmount >= goal.targetAmount) {
                 goal.status = "completed";
+            } else if (deadlineEnd && new Date() > deadlineEnd) {
+                goal.status = "expired";
             } else {
                 goal.status = "active";
             }

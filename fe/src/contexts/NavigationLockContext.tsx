@@ -13,7 +13,7 @@ import { useLocale } from "./LocaleContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogFooter } from "../components/ui/dialog";
 
-export const NAVIGATION_LOCK_REDIRECT_KEY = "fintrack-navigation-lock-redirect";
+export const NAVIGATION_LOCK_REDIRECT_KEY = "tonfin-navigation-lock-redirect";
 
 interface NavigationLockValue {
     navigationLocked: boolean;
