@@ -1,0 +1,8 @@
+# Old Netlify domain -> the TonFin domain. `:splat` carries the rest of the
+# path, and `!` forces the rule even though a page exists at that address.
+https://ton-tracker.netlify.app/*  https://tonfin.ton.id.vn/:splat  301!
+http://ton-tracker.netlify.app/*   https://tonfin.ton.id.vn/:splat  301!
+
+# Single-page app fallback. It has to stay last: every rule above is matched
+# first, and this one would otherwise swallow them.
+/*  /index.html  200

@@ -8,7 +8,6 @@
   DISABLE_ESLINT_PLUGIN = "true"
   CI                    = "false"
 
-[[redirects]]
-  from   = "/*"
-  to     = "/index.html"
-  status = 200
+# Redirects live in fe/public/_redirects, not here. Rules in netlify.toml win
+# over that file, so a catch-all here would shadow the domain redirect and it
+# would silently never fire.
