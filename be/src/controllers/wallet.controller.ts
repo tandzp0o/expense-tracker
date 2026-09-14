@@ -189,21 +189,6 @@ export const updateWallet = [
                     .json({ message: "Không tìm thấy ví để cập nhật" });
             }
 
-            // Handle image upload
-            if (req.file) {
-                const result = await new Promise<any>((resolve, reject) => {
-                    const stream = cloudinary.uploader.upload_stream(
-                        { folder: "wallets" },
-                        (error, result) => {
-                            if (error) reject(error);
-                            else resolve(result);
-                        },
-                    );
-                    stream.end(req.file.buffer);
-                });
-                wallet.imageUrl = result.secure_url;
-            }
-
             // RULE 1: Display fields - luôn cho phép
             if (name) wallet.name = name;
             if (accountNumber !== undefined)
@@ -213,9 +198,22 @@ export const updateWallet = [
             if (color !== undefined) wallet.color = color;
 
             // RULE 2: initialBalance
+            // The form is multipart, so every field arrives as a string: "500000"
+            // never strictly equals the stored 500000. Comparing them raw made any
+            // edit to a wallet with transactions (even just a new image) look like
+            // a balance change and get rejected.
+            const hasInitialBalance =
+                initialBalance !== undefined && initialBalance !== "";
+            const nextInitialBalance = Number(initialBalance);
+            if (hasInitialBalance && !Number.isFinite(nextInitialBalance)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Số dư ban đầu không hợp lệ.",
+                });
+            }
             if (
-                initialBalance !== undefined &&
-                initialBalance !== wallet.initialBalance
+                hasInitialBalance &&
+                nextInitialBalance !== Number(wallet.initialBalance ?? 0)
             ) {
                 if (wallet.hasTransactions) {
                     return res.status(400).json({
@@ -225,12 +223,12 @@ export const updateWallet = [
                         requiresAdjustment: true,
                         walletId: wallet._id,
                         currentBalance: wallet.balance,
-                        targetBalance: Number(initialBalance),
+                        targetBalance: nextInitialBalance,
                     });
                 }
-                const diff = Number(initialBalance) - wallet.initialBalance;
+                const diff = nextInitialBalance - Number(wallet.initialBalance ?? 0);
                 wallet.balance += diff;
-                wallet.initialBalance = Number(initialBalance);
+                wallet.initialBalance = nextInitialBalance;
             }
 
             // RULE 3: type
@@ -274,6 +272,23 @@ export const updateWallet = [
                     currentBalance: wallet.balance,
                     targetBalance: Number(balance),
                 });
+            }
+
+            // Upload only once every rule has passed. Uploading first left an
+            // orphaned image on Cloudinary for each rejected request, and the
+            // type-change confirmation round trip uploaded the same file twice.
+            if (req.file) {
+                const result = await new Promise<any>((resolve, reject) => {
+                    const stream = cloudinary.uploader.upload_stream(
+                        { folder: "wallets" },
+                        (error, result) => {
+                            if (error) reject(error);
+                            else resolve(result);
+                        },
+                    );
+                    stream.end(req.file.buffer);
+                });
+                wallet.imageUrl = result.secure_url;
             }
 
             await wallet.save();

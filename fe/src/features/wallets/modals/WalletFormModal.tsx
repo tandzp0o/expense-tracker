@@ -100,6 +100,8 @@ export interface WalletFormModalProps {
   initialBalanceInput: string;
   imagePreview: string;
   submitting: boolean;
+  /** Wallets with transactions cannot change their opening balance. */
+  balanceLocked?: boolean;
   onClose: () => void;
   onSubmit: () => void;
   onFormValuesChange: React.Dispatch<React.SetStateAction<WalletFormValues>>;
@@ -117,6 +119,7 @@ export const WalletFormModal: React.FC<WalletFormModalProps> = ({
   initialBalanceInput,
   imagePreview,
   submitting,
+  balanceLocked = false,
   onClose,
   onSubmit,
   onFormValuesChange,
@@ -315,18 +318,32 @@ export const WalletFormModal: React.FC<WalletFormModalProps> = ({
 
       <DialogSection
         description={
-          isVietnamese
-            ? "Số dư ban đầu là mốc theo dõi, chưa phải là giao dịch."
-            : "The starting balance is your tracking baseline, not a new transaction."
+          balanceLocked
+            ? isVietnamese
+              ? "Ví đã có giao dịch nên số dư ban đầu được giữ nguyên. Muốn đổi số dư, hãy ghi thêm một khoản thu hoặc chi."
+              : "This wallet already has transactions, so its opening balance is fixed. Record an income or expense to change the balance."
+            : isVietnamese
+              ? "Số dư ban đầu là mốc theo dõi, chưa phải là giao dịch."
+              : "The starting balance is your tracking baseline, not a new transaction."
         }
         title={isVietnamese ? "Số dư khởi tạo" : "Opening balance"}
       >
-        <MoneyField
-          label={copy.startingBalance}
-          onChange={onInitialBalanceChange}
-          placeholder={copy.startingBalancePlaceholder}
-          value={initialBalanceInput}
-        />
+        {balanceLocked ? (
+          // Shown read-only instead of as an input that the server would reject.
+          <div>
+            <p className="mb-2 block text-sm font-medium">{copy.startingBalance}</p>
+            <p className="rounded-[var(--app-radius-md)] border border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+              {initialBalanceInput || "0"}
+            </p>
+          </div>
+        ) : (
+          <MoneyField
+            label={copy.startingBalance}
+            onChange={onInitialBalanceChange}
+            placeholder={copy.startingBalancePlaceholder}
+            value={initialBalanceInput}
+          />
+        )}
       </DialogSection>
 
       <DialogFooter>

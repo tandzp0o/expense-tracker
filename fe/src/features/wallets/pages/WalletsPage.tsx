@@ -778,7 +778,17 @@ const Wallets: React.FC = () => {
 
       const formData = new FormData();
       formData.append("name", formValues.name);
-      formData.append("initialBalance", String(formValues.initialBalance));
+      // Only send the opening balance when it is new or actually changed. The
+      // server refuses any opening-balance change once a wallet has
+      // transactions, so echoing the unchanged value back could trip that guard
+      // on an edit that only touched the image or the name.
+      const initialBalanceChanged =
+        !editing ||
+        formValues.initialBalance !==
+          Number(editing.initialBalance ?? editing.balance);
+      if (initialBalanceChanged) {
+        formData.append("initialBalance", String(formValues.initialBalance));
+      }
       formData.append("type", formValues.type);
       formData.append("currency", formValues.currency);
       if (formValues.accountNumber) {
@@ -1472,6 +1482,7 @@ const Wallets: React.FC = () => {
       )}
 
       <WalletFormModal
+        balanceLocked={Boolean(editing?.hasTransactions)}
         copy={copy}
         editing={editing}
         formValues={formValues}
