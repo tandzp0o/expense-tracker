@@ -15,7 +15,7 @@ import {
     Sparkles,
 } from "lucide-react";
 import { auth } from "lib/firebase/config";
-import { transactionApi } from "services/api";
+import { isCashflowTransaction, transactionApi } from "services/api";
 import { formatCurrency } from "utils/formatters";
 import { useLocale } from "contexts/LocaleContext";
 import { useToast } from "contexts/ToastContext";
@@ -45,10 +45,12 @@ dayjs.locale("vi");
 interface Transaction {
     _id: string;
     type: "INCOME" | "EXPENSE";
+    status?: "SCHEDULED" | "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
     amount: number | string;
     category: string;
     date: string;
     note?: string;
+    transferGroupId?: string;
 }
 
 const parseAmount = (raw: unknown) => {
@@ -105,7 +107,9 @@ const Analytics: React.FC = () => {
               insightDesc: (start: string, end: string) =>
                   `Khoảng hiện tại từ ${start} đến ${end}. Tỷ lệ tiết kiệm được tính bằng chênh lệch ròng trên thu nhập trong giai đoạn này.`,
               savingRate: "Tỷ lệ tiết kiệm",
-              projectedYearlyNet: "Dự phóng chênh lệch ròng năm",
+              projectedYearlyNet: "Ước tính chênh lệch ròng cả năm",
+              projectedYearlyNetHint: (days: number) =>
+                  `Ước tính, suy ra từ ${days} ngày trong khoảng đang xem.`,
               incomeSeriesLabel: "Thu nhập",
               expenseSeriesLabel: "Chi tiêu",
           }
@@ -142,7 +146,9 @@ const Analytics: React.FC = () => {
               insightDesc: (start: string, end: string) =>
                   `Current selection spans ${start} to ${end}. Saving rate is based on net over income for this window.`,
               savingRate: "Saving rate",
-              projectedYearlyNet: "Projected yearly net",
+              projectedYearlyNet: "Estimated yearly net",
+              projectedYearlyNetHint: (days: number) =>
+                  `Estimate, extrapolated from the ${days} days in view.`,
               incomeSeriesLabel: "Income",
               expenseSeriesLabel: "Expense",
           };
@@ -217,15 +223,22 @@ const Analytics: React.FC = () => {
                 const chartStart = dayjs()
                     .subtract(5, "month")
                     .startOf("month");
+                const chartEnd = dayjs().endOf("month");
                 const currentRange = getDateRange();
                 const fetchStart = chartStart.isBefore(currentRange.start)
                     ? chartStart
                     : currentRange.start;
+                // The six month chart always runs to the current month, so a
+                // shorter selection such as "last month" must not cut the fetch
+                // short or the chart would draw the newest months as zero.
+                const fetchEnd = chartEnd.isAfter(currentRange.end)
+                    ? chartEnd
+                    : currentRange.end;
 
                 const response = await transactionApi.getTransactions(
                     {
                         startDate: fetchStart.toISOString(),
-                        endDate: currentRange.end.toISOString(),
+                        endDate: fetchEnd.toISOString(),
                         limit: 2000,
                         page: 1,
                     },
@@ -249,9 +262,17 @@ const Analytics: React.FC = () => {
 
     const currentRange = getDateRange();
 
+    // Internal transfers are stored as a matching expense + income pair and
+    // scheduled rows have not happened yet, so both have to go before anything
+    // is summed. Shared with the dashboard so the two screens cannot drift.
+    const cashflowTransactions = useMemo(
+        () => transactions.filter(isCashflowTransaction),
+        [transactions],
+    );
+
     const filteredTransactions = useMemo(
         () =>
-            transactions.filter((transaction) => {
+            cashflowTransactions.filter((transaction) => {
                 const date = dayjs(transaction.date);
                 return (
                     (date.isAfter(currentRange.start) ||
@@ -260,7 +281,7 @@ const Analytics: React.FC = () => {
                         date.isSame(currentRange.end, "day"))
                 );
             }),
-        [currentRange.end, currentRange.start, transactions],
+        [cashflowTransactions, currentRange.end, currentRange.start],
     );
 
     const stats = useMemo(() => {
@@ -320,7 +341,7 @@ const Analytics: React.FC = () => {
                 {
                     label: copy.incomeSeriesLabel,
                     data: months.map((month) =>
-                        transactions
+                        cashflowTransactions
                             .filter(
                                 (transaction) =>
                                     transaction.type === "INCOME" &&
@@ -343,7 +364,7 @@ const Analytics: React.FC = () => {
                 {
                     label: copy.expenseSeriesLabel,
                     data: months.map((month) =>
-                        transactions
+                        cashflowTransactions
                             .filter(
                                 (transaction) =>
                                     transaction.type === "EXPENSE" &&
@@ -367,13 +388,21 @@ const Analytics: React.FC = () => {
         };
     }, [
         appearance.primaryColor,
+        cashflowTransactions,
         copy.expenseSeriesLabel,
         copy.incomeSeriesLabel,
         isVietnamese,
-        transactions,
     ]);
 
     const savingRate = stats.income > 0 ? (stats.net / stats.income) * 100 : 0;
+    // The selected window is not always a month, so multiplying the net by 12
+    // turned "last 6 months" into six years. Annualise by the days the window
+    // actually covers instead.
+    const selectedRangeDays = Math.max(
+        currentRange.end.diff(currentRange.start, "day", true),
+        1,
+    );
+    const projectedYearlyNet = (stats.net / selectedRangeDays) * 365;
     const insightParagraphs = useMemo(() => {
         const expenseTransactions = filteredTransactions.filter(
             (transaction) => transaction.type === "EXPENSE",
@@ -757,7 +786,12 @@ const Analytics: React.FC = () => {
                         </p>
                         <p className="mt-3 text-sm text-muted-foreground">
                             {copy.projectedYearlyNet}:{" "}
-                            {formatCurrency(stats.net * 12)}
+                            {formatCurrency(projectedYearlyNet)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {copy.projectedYearlyNetHint(
+                                Math.round(selectedRangeDays),
+                            )}
                         </p>
                     </div>
                 </CardContent>

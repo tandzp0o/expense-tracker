@@ -1,6 +1,5 @@
 import {
     BarChart3,
-    BrainCircuit,
     CreditCard,
     Goal,
     LayoutDashboard,
@@ -90,11 +89,8 @@ export const buildNavigationItems = (language: Language) => {
             label: copy.settings,
             icon: Settings,
         },
-        {
-            to: "/ai-model",
-            label: copy.aiModel,
-            icon: BrainCircuit,
-        },
+        // The AI model screen is an operator tool guarded by a server-side admin
+        // allow-list, so it is reachable by URL but no longer offered to everyone.
     ] as const;
 };
 

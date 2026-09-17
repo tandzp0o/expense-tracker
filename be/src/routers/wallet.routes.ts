@@ -1,11 +1,12 @@
 import express from 'express';
 import { verifyFirebaseToken } from '../middleware/auth';
-import { 
-  createWallet, 
-  getWallets, 
-  getWalletById, 
-  updateWallet, 
-  deleteWallet 
+import {
+  createWallet,
+  getWallets,
+  getWalletById,
+  updateWallet,
+  reconcileWallet,
+  deleteWallet
 } from '../controllers/wallet.controller';
 
 const router = express.Router();
@@ -37,6 +38,13 @@ router.get('/:id', verifyFirebaseToken, getWalletById);
  * @access  Private
  */
 router.put('/:id', verifyFirebaseToken, updateWallet);
+
+/**
+ * @route   POST /api/wallets/:id/reconcile
+ * @desc    Cân đối số dư ví về đúng số tiền thực tế, ghi lại phần chênh lệch
+ * @access  Private
+ */
+router.post('/:id/reconcile', verifyFirebaseToken, reconcileWallet);
 
 /**
  * @route   DELETE /api/wallets/:id

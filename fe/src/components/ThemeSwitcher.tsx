@@ -6,6 +6,7 @@ import {
     FontScale,
     RadiusPreset,
     ThemeMode,
+    UiVersion,
     getAppearanceGradientColors,
     useTheme,
 } from "../contexts/ThemeContext";
@@ -92,6 +93,46 @@ const ThemePanel: React.FC<{
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
+                    <div className="rounded-[var(--app-radius-lg)] border border-border/80 bg-muted/30 p-3">
+                        <p className="mb-2 text-sm font-medium">
+                            {isVietnamese
+                                ? "Phiên bản giao diện"
+                                : "Interface version"}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(["v1", "v2"] as UiVersion[]).map((version) => (
+                                <Button
+                                    key={version}
+                                    className="justify-between"
+                                    onClick={() => onApply({ uiVersion: version })}
+                                    variant={
+                                        appearance.uiVersion === version
+                                            ? "default"
+                                            : "outline"
+                                    }
+                                >
+                                    <span>
+                                        {version === "v1"
+                                            ? isVietnamese
+                                                ? "Bản hiện tại (v1)"
+                                                : "Current (v1)"
+                                            : isVietnamese
+                                              ? "Bản mới (v2)"
+                                              : "New (v2)"}
+                                    </span>
+                                    {appearance.uiVersion === version ? (
+                                        <Check className="h-4 w-4" />
+                                    ) : null}
+                                </Button>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                            {isVietnamese
+                                ? "Bản mới bỏ hiệu ứng kính mờ, dùng nền phẳng, thẻ bo góc rộng hơn và số tiền canh thẳng cột."
+                                : "The new version drops the frosted glass for flat surfaces, wider card corners and column-aligned amounts."}
+                        </p>
+                    </div>
+
                     <div>
                         <p className="mb-2 text-sm font-medium">
                             {isVietnamese ? "Chế độ" : "Mode"}

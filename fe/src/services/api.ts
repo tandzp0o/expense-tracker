@@ -18,6 +18,65 @@ export class ApiError extends Error {
 const TRANSACTION_CACHE_PREFIX = "expense-tracker:transactions:";
 const TRANSACTION_CACHE_TTL_MS = 60_000;
 
+/**
+ * Anything that can be judged as cashflow. Kept structural so every screen can
+ * pass its own transaction type without converting first.
+ */
+export interface CashflowTransactionLike {
+    type?: string;
+    status?: string | null;
+    category?: string;
+    transferGroupId?: string | null;
+}
+
+/**
+ * An internal transfer is stored as a matching expense + income pair, so
+ * counting either leg would inflate both sides of every report.
+ */
+export const isTransferTransaction = (
+    transaction: CashflowTransactionLike,
+) =>
+    transaction.category === "Transfer" ||
+    Boolean(transaction.transferGroupId);
+
+/**
+ * The one definition of "real money that already moved". Dashboard, Analytics
+ * and the report helpers below all import this so the same month can never
+ * total differently depending on which screen the user is looking at.
+ */
+export const isCashflowTransaction = (transaction: CashflowTransactionLike) =>
+    (transaction.type === "INCOME" || transaction.type === "EXPENSE") &&
+    // Rows written before the status field existed are money that already
+    // moved; anything scheduled, pending or cancelled has not happened yet.
+    (transaction.status || "COMPLETED") === "COMPLETED" &&
+    !isTransferTransaction(transaction);
+
+/**
+ * First and last instant of a calendar month as seen from the timezone chosen
+ * in Settings (getTimezoneOffset convention, so UTC+7 is -420). `new Date(y, m,
+ * 1)` would anchor the range to whatever zone the browser happens to sit in,
+ * which drops or adds up to a day of transactions for anyone whose configured
+ * timezone differs from their device.
+ */
+export const getMonthRangeIso = (
+    month: number,
+    year: number,
+    timezoneOffsetMinutes = 0,
+) => {
+    const offsetMs = timezoneOffsetMinutes * 60 * 1000;
+
+    return {
+        startDate: new Date(
+            Date.UTC(year, month - 1, 1) + offsetMs,
+        ).toISOString(),
+        // Last day of the month at its final millisecond: `Date.UTC(y, m, 0)`
+        // alone is that day at midnight, which excludes the whole day.
+        endDate: new Date(
+            Date.UTC(year, month, 0, 23, 59, 59, 999) + offsetMs,
+        ).toISOString(),
+    };
+};
+
 const decodeBase64Url = (value: string) => {
     const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized.padEnd(
@@ -235,11 +294,18 @@ export const budgetApi = {
 
 // --- Wallet API ---
 export const walletApi = {
-    // Get all wallets with total balance
-    getWallets: async (token?: string) => {
+    // Get all wallets with total balance. Archived wallets are hidden by default
+    // so every existing caller keeps its active-only list; only the wallets page
+    // opts in so it can offer a way back from an accidental archive.
+    getWallets: async (
+        token?: string,
+        params?: { includeArchived?: boolean },
+    ) => {
         try {
             const apiClient = createApiClient(token);
-            const response = await apiClient.get("/wallets");
+            const response = await apiClient.get("/wallets", {
+                params: params?.includeArchived ? { includeArchived: true } : undefined,
+            });
             return response.data;
         } catch (error) {
             return handleApiError(error);
@@ -381,20 +447,18 @@ export const transactionApi = {
     },
 
     // Get dashboard statistics
-    getDashboardStats: async (month: number, year: number, token?: string) => {
+    getDashboardStats: async (
+        month: number,
+        year: number,
+        token?: string,
+        timezoneOffsetMinutes = 0,
+    ) => {
         try {
-            const startDate = new Date(year, month - 1, 1).toISOString();
-            // Last day of the month at its final millisecond: `new Date(y, m, 0)`
-            // alone is that day at midnight, which excludes the whole day.
-            const endDate = new Date(
-                year,
+            const { startDate, endDate } = getMonthRangeIso(
                 month,
-                0,
-                23,
-                59,
-                59,
-                999,
-            ).toISOString();
+                year,
+                timezoneOffsetMinutes,
+            );
 
             const apiClient = createApiClient(token);
             const response = await apiClient.get("/transactions", {
@@ -408,11 +472,8 @@ export const transactionApi = {
             const transactions = response.data?.data?.transactions || [];
 
             // Định nghĩa interface cho giao dịch
-            interface Transaction {
-                type: string;
-                status?: string;
+            interface Transaction extends CashflowTransactionLike {
                 amount: number | string;
-                category?: string;
             }
 
             // Định nghĩa interface cho kết quả thống kê
@@ -424,11 +485,7 @@ export const transactionApi = {
             // Tính tổng thu nhập và chi tiêu
             const { totalIncome, totalExpense } = transactions.reduce(
                 (acc: TransactionStats, transaction: Transaction) => {
-                    if (
-                        transaction.category === "Transfer" ||
-                        (transaction.status &&
-                            transaction.status !== "COMPLETED")
-                    ) {
+                    if (!isCashflowTransaction(transaction)) {
                         return acc;
                     }
 
@@ -471,20 +528,14 @@ export const transactionApi = {
         month: number,
         year: number,
         token?: string,
+        timezoneOffsetMinutes = 0,
     ) => {
         try {
-            const startDate = new Date(year, month - 1, 1).toISOString();
-            // Last day of the month at its final millisecond: `new Date(y, m, 0)`
-            // alone is that day at midnight, which excludes the whole day.
-            const endDate = new Date(
-                year,
+            const { startDate, endDate } = getMonthRangeIso(
                 month,
-                0,
-                23,
-                59,
-                59,
-                999,
-            ).toISOString();
+                year,
+                timezoneOffsetMinutes,
+            );
 
             const apiClient = createApiClient(token);
             const response = await apiClient.get("/transactions", {
@@ -495,17 +546,18 @@ export const transactionApi = {
                 },
             });
 
-            // Group by category
-            const categories = (response.data?.data?.transactions || []).reduce(
-                (acc: any, t: any) => {
+            // Group by category. `amount` arrives as a string for some rows, so
+            // it has to be coerced before adding or the totals silently become
+            // concatenated text ("0" + "1000" = "01000").
+            const categories = (response.data?.data?.transactions || [])
+                .filter(isCashflowTransaction)
+                .reduce((acc: Record<string, number>, t: any) => {
                     if (!acc[t.category]) {
                         acc[t.category] = 0;
                     }
-                    acc[t.category] += t.amount;
+                    acc[t.category] += Number(t.amount) || 0;
                     return acc;
-                },
-                {},
-            );
+                }, {});
 
             return {
                 data: Object.entries(categories).map(([name, total]) => ({

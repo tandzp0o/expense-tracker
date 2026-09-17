@@ -1,19 +1,17 @@
+import { STANDARD_EXPENSE_CATEGORY_OPTIONS } from "constants/categories";
 import type { TransactionStatus } from "./components/TransactionList";
 
-export const categoryOptions = [
-  { value: "An uong", vi: "Ăn uống", en: "Food" },
-  { value: "Di chuyen", vi: "Di chuyển", en: "Transport" },
-  { value: "Mua sam", vi: "Mua sắm", en: "Shopping" },
-  { value: "Giai tri", vi: "Giải trí", en: "Entertainment" },
-  { value: "Suc khoe", vi: "Sức khỏe", en: "Health" },
-  { value: "Giao duc", vi: "Giáo dục", en: "Education" },
-  { value: "Hoa don", vi: "Hóa đơn", en: "Bills" },
-  { value: "Khac", vi: "Khác", en: "Other" },
-  { value: "Chi tieu tu do", vi: "Chi tiêu tự do", en: "Free spending" },
-] as const;
+// Budgets, reports and the backend all store the accented category strings.
+// This list used to hold unaccented copies of the same names, so the very same
+// category existed twice and never matched; it now reuses the shared source.
+export const categoryOptions = STANDARD_EXPENSE_CATEGORY_OPTIONS;
 
-// Expenses do not require a budget. When none is picked the transaction is
-// still categorised so reports and the backend category rule stay satisfied.
+// An expense the user has not classified still needs a truthful category, and
+// "Khác" already exists in the shared taxonomy.
+export const DEFAULT_EXPENSE_CATEGORY = "Khác";
+
+// Legacy value: expenses without a budget used to be filed here. Nothing writes
+// it any more, but rows created before that still carry it.
 export const FREE_SPENDING_CATEGORY = "Chi tieu tu do";
 
 export const incomeCategoryOptions = [

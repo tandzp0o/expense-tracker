@@ -10,8 +10,10 @@ import Transaction, {
 import Wallet from "../models/Wallet";
 import { touchTransactionCacheState } from "../utils/transaction-cache";
 import {
+    assertLedgerValueInSafeRange,
     assertNonNegativeLedgerValue,
-    ensureTransactionDateAllowed,
+    normalizeToCalendarDate,
+    resolveTransactionTiming,
     parseTimezoneOffset,
     ensureTransferCategoryNotUsed,
     getGoalDeltaForTransaction,
@@ -110,13 +112,15 @@ const normalizeOptionalNote = (value: unknown) => {
     return note || undefined;
 };
 
-const applyWalletDelta = (
-    wallet: any,
-    delta: number,
-    insufficientMessage: string,
-) => {
+/**
+ * A wallet balance records what actually happened, so it is allowed to go
+ * negative: people spend cash they forgot to log, and refusing the entry only
+ * pushed the error out of the book and into their head. The caller reports the
+ * negative balance back to the user instead, who can reconcile the wallet.
+ */
+const applyWalletDelta = (wallet: any, delta: number) => {
     const nextBalance = Number(wallet.balance) + delta;
-    assertNonNegativeLedgerValue(nextBalance, insufficientMessage);
+    assertLedgerValueInSafeRange(nextBalance);
     wallet.balance = nextBalance;
 };
 
@@ -150,11 +154,7 @@ const applyTransactionLedgerEffects = ({
         return;
     }
 
-    applyWalletDelta(
-        wallet,
-        getWalletDeltaForTransaction(transactionType, amount),
-        "Insufficient wallet balance",
-    );
+    applyWalletDelta(wallet, getWalletDeltaForTransaction(transactionType, amount));
 
     const goalDelta = getGoalDeltaForTransaction(transactionType, amount);
     if (goal && goalDelta !== 0) {
@@ -182,7 +182,6 @@ const revertTransactionLedgerEffects = ({
     applyWalletDelta(
         wallet,
         -getWalletDeltaForTransaction(transactionType, amount),
-        "Wallet does not have enough balance to reverse this transaction",
     );
 
     const goalDelta = getGoalDeltaForTransaction(transactionType, amount);
@@ -249,118 +248,247 @@ const loadBudgetForUser = async (
     return budget;
 };
 
-const resolveBudgetCategoryForWallet = ({
+type TransactionWarning = {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+};
+
+/**
+ * Decides which budget an expense belongs to and returns the category to store.
+ *
+ * Every mismatch used to be a 400, which meant a stray combination the user
+ * could not even see (a budget pinned to another wallet, a budget from another
+ * month) threw their entry away. Now the transaction is always accepted: the
+ * link is simply dropped or the category realigned, and the caller tells the
+ * user what it did.
+ */
+const resolveBudgetLink = ({
     budget,
     walletId,
     providedCategory,
+    transactionDate,
+    timezoneOffsetMinutes,
 }: {
     budget: any;
     walletId: unknown;
     providedCategory?: string;
-}) => {
-    // A budget without a wallet is a plain monthly cap for its category, so any
-    // wallet may pay into it. Only a budget deliberately pinned to one wallet
-    // is restricted.
+    transactionDate: Date;
+    timezoneOffsetMinutes: number;
+}): {
+    keepLink: boolean;
+    category: string;
+    warnings: TransactionWarning[];
+} => {
+    const warnings: TransactionWarning[] = [];
+    const budgetCategory = String(budget.category || "").trim();
+    const fallbackCategory = providedCategory || budgetCategory;
+
     if (budget.walletId && String(budget.walletId) !== String(walletId)) {
-        throw new TransactionRuleError(
-            400,
-            "Selected budget does not belong to the chosen wallet",
-        );
+        warnings.push({
+            code: "BUDGET_UNLINKED_WALLET",
+            message:
+                "Ngân sách này chỉ áp dụng cho một ví khác nên giao dịch được ghi mà không trừ vào ngân sách đó.",
+            details: { budgetId: String(budget._id), category: budgetCategory },
+        });
+        return { keepLink: false, category: fallbackCategory, warnings };
     }
 
-    const budgetCategory = String(budget.category || "").trim();
     if (!budgetCategory) {
-        throw new TransactionRuleError(
-            400,
-            "Selected budget is missing a valid category",
-        );
+        return { keepLink: false, category: fallbackCategory, warnings };
+    }
+
+    const { month, year } = getCalendarMonth(
+        transactionDate,
+        timezoneOffsetMinutes,
+    );
+    if (budget.month !== month || budget.year !== year) {
+        warnings.push({
+            code: "BUDGET_UNLINKED_MONTH",
+            message:
+                "Ngân sách được chọn thuộc tháng khác nên giao dịch được ghi vào đúng ngày bạn chọn, không trừ vào ngân sách đó.",
+            details: {
+                budgetId: String(budget._id),
+                budgetMonth: budget.month,
+                budgetYear: budget.year,
+            },
+        });
+        return { keepLink: false, category: budgetCategory, warnings };
     }
 
     if (providedCategory && providedCategory !== budgetCategory) {
-        throw new TransactionRuleError(
-            400,
-            "Selected category does not match the chosen budget",
-        );
+        // The budget decides the category rather than refusing the save; the two
+        // can only disagree because of how the form was filled in.
+        warnings.push({
+            code: "CATEGORY_ALIGNED_TO_BUDGET",
+            message: `Giao dịch được xếp vào nhóm "${budgetCategory}" theo ngân sách bạn chọn.`,
+            details: { from: providedCategory, to: budgetCategory },
+        });
     }
 
-    return budgetCategory;
+    return { keepLink: true, category: budgetCategory, warnings };
 };
 
-const assertBudgetMatchesTransactionDate = ({
+/** Calendar month of an instant as the user sees it, not as the server does. */
+const getCalendarMonth = (value: Date, timezoneOffsetMinutes: number) => {
+    const calendarDate = normalizeToCalendarDate(value, timezoneOffsetMinutes);
+    return {
+        month: calendarDate.getUTCMonth() + 1,
+        year: calendarDate.getUTCFullYear(),
+    };
+};
+
+/**
+ * Reports how far an expense pushes its budget, without ever refusing it.
+ *
+ * A budget is a plan the user set for themselves, not a credit limit the app
+ * enforces: blocking the entry did not stop the money leaving their pocket, it
+ * only stopped the app from knowing about it.
+ */
+const evaluateBudgetUsage = async ({
     budget,
-    transactionDate,
-}: {
-    budget: any;
-    transactionDate: Date;
-}) => {
-    const month = transactionDate.getMonth() + 1;
-    const year = transactionDate.getFullYear();
-
-    if (budget.month !== month || budget.year !== year) {
-        throw new TransactionRuleError(
-            400,
-            "Budget does not belong to the selected transaction month",
-        );
-    }
-};
-
-const assertBudgetCapacity = async ({
-    budgetId,
     userId,
     amount,
-    transactionDate,
+    timezoneOffsetMinutes,
     excludedTransactionId,
     session,
 }: {
-    budgetId: unknown;
+    budget: any;
     userId: string;
     amount: number;
-    transactionDate: Date;
+    timezoneOffsetMinutes: number;
     excludedTransactionId?: Types.ObjectId;
     session: ClientSession;
-}) => {
-    const budget = await loadBudgetForUser(budgetId, userId, session);
-    const month = transactionDate.getMonth() + 1;
-    const year = transactionDate.getFullYear();
+}): Promise<TransactionWarning[]> => {
+    const monthStart = getMonthStart(budget.month, budget.year, timezoneOffsetMinutes);
+    const monthEnd = getMonthStart(
+        budget.month === 12 ? 1 : budget.month + 1,
+        budget.month === 12 ? budget.year + 1 : budget.year,
+        timezoneOffsetMinutes,
+    );
 
-    if (budget.month !== month || budget.year !== year) {
-        throw new TransactionRuleError(
-            400,
-            "Budget does not belong to the selected transaction month",
-        );
-    }
-
+    // Spending counts by category, not by an explicit budgetId link. Someone who
+    // records "Ăn uống 85.000" expects it to come off their food budget whether
+    // or not they remembered to pick the budget from a dropdown.
     const spent = await Transaction.aggregate([
         {
             $match: {
                 userId,
-                budgetId: new Types.ObjectId(String(budgetId)),
+                category: budget.category,
                 type: TransactionType.EXPENSE,
                 ...buildCompletedStatusQuery(),
+                ...(budget.walletId
+                    ? { walletId: new Types.ObjectId(String(budget.walletId)) }
+                    : {}),
                 ...(excludedTransactionId
                     ? { _id: { $ne: excludedTransactionId } }
                     : {}),
-                date: {
-                    $gte: new Date(year, month - 1, 1),
-                    $lt: new Date(year, month, 1),
-                },
+                date: { $gte: monthStart, $lt: monthEnd },
             },
         },
         { $group: { _id: null, total: { $sum: "$amount" } } },
     ]).session(session);
 
-    const totalSpent = spent[0]?.total || 0;
-    if (totalSpent + amount > budget.amount) {
-        throw new TransactionRuleError(
-            400,
-            "Budget limit would be exceeded by this expense",
-            {
-                budgetAmount: budget.amount,
-                currentSpent: totalSpent,
-                requestedAmount: amount,
-            },
-        );
+    const totalSpent = (spent[0]?.total || 0) + amount;
+    const overspent = totalSpent - Number(budget.amount || 0);
+
+    if (overspent <= 0) {
+        return [];
     }
+
+    return [
+        {
+            code: "BUDGET_EXCEEDED",
+            message: `Bạn đã vượt ngân sách "${budget.category}" ${formatVndAmount(
+                overspent,
+            )}. Giao dịch vẫn được ghi nhận bình thường.`,
+            details: {
+                budgetId: String(budget._id),
+                category: budget.category,
+                budgetAmount: Number(budget.amount || 0),
+                spent: totalSpent,
+                overspent,
+            },
+        },
+    ];
+};
+
+/** First instant of a month on the user's calendar, expressed in UTC. */
+const getMonthStart = (
+    month: number,
+    year: number,
+    timezoneOffsetMinutes: number,
+) =>
+    new Date(
+        Date.UTC(year, month - 1, 1) + timezoneOffsetMinutes * 60 * 1000,
+    );
+
+const formatVndAmount = (value: number) =>
+    `${Math.abs(Math.round(value)).toLocaleString("vi-VN")} ₫`;
+
+/**
+ * The budget an expense falls under when the user did not pick one. A budget
+ * pinned to the paying wallet wins over an any-wallet budget for the same
+ * category, since the pinned one is the more specific intent.
+ */
+const findBudgetForCategory = async ({
+    userId,
+    category,
+    walletId,
+    transactionDate,
+    timezoneOffsetMinutes,
+    session,
+}: {
+    userId: string;
+    category: string;
+    walletId: unknown;
+    transactionDate: Date;
+    timezoneOffsetMinutes: number;
+    session: ClientSession;
+}) => {
+    if (!category) {
+        return null;
+    }
+
+    const { month, year } = getCalendarMonth(
+        transactionDate,
+        timezoneOffsetMinutes,
+    );
+
+    const candidates = await Budget.find({
+        userId,
+        category,
+        month,
+        year,
+        $or: [{ walletId: new Types.ObjectId(String(walletId)) }, { walletId: null }],
+    }).session(session);
+
+    return (
+        candidates.find((candidate) => candidate.walletId) ||
+        candidates[0] ||
+        null
+    );
+};
+
+/** Told about a wallet that went negative, so the user can reconcile it. */
+const buildNegativeWalletWarning = (wallet: any): TransactionWarning[] => {
+    if (Number(wallet.balance) >= 0) {
+        return [];
+    }
+
+    return [
+        {
+            code: "WALLET_NEGATIVE",
+            message: `Ví "${wallet.name}" đang âm ${formatVndAmount(
+                Number(wallet.balance),
+            )}. Có thể bạn quên ghi một khoản thu vào ví này.`,
+            details: {
+                walletId: String(wallet._id),
+                walletName: wallet.name,
+                balance: Number(wallet.balance),
+            },
+        },
+    ];
 };
 
 const syncWalletTransactionFlag = async (
@@ -444,14 +572,25 @@ export const createTransaction = async (req: any, res: Response) => {
             status !== undefined
                 ? normalizeTransactionStatus(status)
                 : TransactionStatus.COMPLETED;
-        const normalizedDate = ensureTransactionDateAllowed(
+        const timing = resolveTransactionTiming(
             parseTransactionDateInput(date),
             normalizedStatus,
             Boolean(isSystemGenerated),
             timezoneOffsetMinutes,
         );
+        const normalizedDate = timing.date;
+        const effectiveStatus = timing.status;
         const providedCategory = parseOptionalCategory(category);
         const normalizedNote = normalizeOptionalNote(note);
+        const warnings: TransactionWarning[] = [];
+
+        if (effectiveStatus !== normalizedStatus) {
+            warnings.push({
+                code: "STATUS_SCHEDULED_AUTOMATICALLY",
+                message:
+                    "Ngày bạn chọn ở tương lai nên khoản này được lưu ở trạng thái Đã lên lịch và chưa trừ vào số dư.",
+            });
+        }
 
         if (normalizedType === TransactionType.ADJUSTMENT) {
             throw new TransactionRuleError(
@@ -484,34 +623,54 @@ export const createTransaction = async (req: any, res: Response) => {
         let goal: any = null;
 
         if (budgetId) {
-            budget = await loadBudgetForUser(budgetId, userId, session);
-            normalizedCategory = resolveBudgetCategoryForWallet({
-                budget,
+            const selectedBudget = await loadBudgetForUser(
+                budgetId,
+                userId,
+                session,
+            );
+            const link = resolveBudgetLink({
+                budget: selectedBudget,
                 walletId: wallet._id,
                 providedCategory,
-            });
-            assertBudgetMatchesTransactionDate({
-                budget,
                 transactionDate: normalizedDate,
+                timezoneOffsetMinutes,
             });
+            normalizedCategory = link.category;
+            warnings.push(...link.warnings);
+            budget = link.keepLink ? selectedBudget : null;
         } else {
             normalizedCategory = parseCategory(providedCategory);
         }
 
         ensureTransferCategoryNotUsed(normalizedCategory);
 
-        if (
-            normalizedType === TransactionType.EXPENSE &&
-            budgetId &&
-            transactionTouchesLedger(normalizedStatus)
-        ) {
-            await assertBudgetCapacity({
-                budgetId,
+        if (!budget && normalizedType === TransactionType.EXPENSE) {
+            // Nobody should have to remember to attach a budget by hand: the
+            // category the user picked already says which one this belongs to.
+            budget = await findBudgetForCategory({
                 userId,
-                amount: normalizedAmount,
+                category: normalizedCategory,
+                walletId: wallet._id,
                 transactionDate: normalizedDate,
+                timezoneOffsetMinutes,
                 session,
             });
+        }
+
+        if (
+            normalizedType === TransactionType.EXPENSE &&
+            budget &&
+            transactionTouchesLedger(effectiveStatus)
+        ) {
+            warnings.push(
+                ...(await evaluateBudgetUsage({
+                    budget,
+                    userId,
+                    amount: normalizedAmount,
+                    timezoneOffsetMinutes,
+                    session,
+                })),
+            );
         }
 
         if (
@@ -530,7 +689,7 @@ export const createTransaction = async (req: any, res: Response) => {
 
         if (
             normalizedType === TransactionType.GOAL_WITHDRAW &&
-            transactionTouchesLedger(normalizedStatus) &&
+            transactionTouchesLedger(effectiveStatus) &&
             Number(goal.currentAmount || 0) < normalizedAmount
         ) {
             throw new TransactionRuleError(
@@ -541,24 +700,25 @@ export const createTransaction = async (req: any, res: Response) => {
 
         applyTransactionLedgerEffects({
             transactionType: normalizedType,
-            transactionStatus: normalizedStatus,
+            transactionStatus: effectiveStatus,
             amount: normalizedAmount,
             wallet,
             goal,
         });
 
+        warnings.push(...buildNegativeWalletWarning(wallet));
         wallet.hasTransactions = true;
 
         const transaction = new Transaction({
             userId,
             walletId,
             type: normalizedType,
-            status: normalizedStatus,
+            status: effectiveStatus,
             amount: normalizedAmount,
             category: normalizedCategory,
             date: normalizedDate,
             note: normalizedNote,
-            budgetId: budgetId || undefined,
+            budgetId: budget ? budget._id : undefined,
             goalId: goalId || undefined,
             isSystemGenerated: Boolean(isSystemGenerated),
             isDeletable: isDeletable !== undefined ? Boolean(isDeletable) : true,
@@ -572,7 +732,7 @@ export const createTransaction = async (req: any, res: Response) => {
         await touchTransactionCacheState(userId, req.user, session);
         await session.commitTransaction();
 
-        return res.status(201).json(transaction);
+        return res.status(201).json({ ...transaction.toObject(), warnings });
     } catch (error) {
         await session.abortTransaction();
         return handleControllerError(res, error, "Failed to create transaction");
@@ -611,12 +771,12 @@ export const createInternalTransfer = async (req: any, res: Response) => {
         }
 
         const normalizedAmount = parseWholeMoneyAmount(amount);
-        const normalizedDate = ensureTransactionDateAllowed(
+        const normalizedDate = resolveTransactionTiming(
             parseTransactionDateInput(date),
             TransactionStatus.COMPLETED,
             false,
             parseTimezoneOffset(req.body.timezoneOffset),
-        );
+        ).date;
         const fromWallet = await loadWalletForUser(fromWalletId, userId, session);
         const toWallet = await loadWalletForUser(toWalletId, userId, session);
 
@@ -627,12 +787,8 @@ export const createInternalTransfer = async (req: any, res: Response) => {
             );
         }
 
-        applyWalletDelta(
-            fromWallet,
-            -normalizedAmount,
-            "Insufficient wallet balance",
-        );
-        applyWalletDelta(toWallet, normalizedAmount, "Wallet balance overflow");
+        applyWalletDelta(fromWallet, -normalizedAmount);
+        applyWalletDelta(toWallet, normalizedAmount);
 
         fromWallet.hasTransactions = true;
         toWallet.hasTransactions = true;
@@ -995,14 +1151,28 @@ export const updateTransaction = async (req: any, res: Response) => {
             req.body.status !== undefined
                 ? normalizeTransactionStatus(req.body.status)
                 : currentStatus;
-        const nextDate = ensureTransactionDateAllowed(
+        const timezoneOffsetMinutes = parseTimezoneOffset(
+            req.body.timezoneOffset,
+        );
+        const timing = resolveTransactionTiming(
             req.body.date !== undefined
                 ? parseTransactionDateInput(req.body.date)
                 : new Date(currentTransaction.date),
             nextStatus,
             Boolean(currentTransaction.isSystemGenerated),
-            parseTimezoneOffset(req.body.timezoneOffset),
+            timezoneOffsetMinutes,
         );
+        const nextDate = timing.date;
+        const effectiveStatus = timing.status;
+        const warnings: TransactionWarning[] = [];
+
+        if (effectiveStatus !== nextStatus) {
+            warnings.push({
+                code: "STATUS_SCHEDULED_AUTOMATICALLY",
+                message:
+                    "Ngày bạn chọn ở tương lai nên khoản này chuyển sang trạng thái Đã lên lịch và chưa trừ vào số dư.",
+            });
+        }
         const providedNextCategory =
             req.body.category !== undefined
                 ? parseOptionalCategory(req.body.category)
@@ -1036,26 +1206,40 @@ export const updateTransaction = async (req: any, res: Response) => {
         const walletChanged = String(oldWallet._id) !== String(nextWallet._id);
         let nextCategory = providedNextCategory;
 
+        let linkedBudget: any = null;
+
         if (nextBudgetId) {
-            const nextBudget = await loadBudgetForUser(
+            const selectedBudget = await loadBudgetForUser(
                 nextBudgetId,
                 userId,
                 session,
             );
-            nextCategory = resolveBudgetCategoryForWallet({
-                budget: nextBudget,
+            const link = resolveBudgetLink({
+                budget: selectedBudget,
                 walletId: nextWallet._id,
                 providedCategory: providedNextCategory,
-            });
-            assertBudgetMatchesTransactionDate({
-                budget: nextBudget,
                 transactionDate: nextDate,
+                timezoneOffsetMinutes,
             });
+            nextCategory = link.category;
+            warnings.push(...link.warnings);
+            linkedBudget = link.keepLink ? selectedBudget : null;
         } else {
             nextCategory = parseCategory(providedNextCategory);
         }
 
         ensureTransferCategoryNotUsed(nextCategory);
+
+        if (!linkedBudget && nextType === TransactionType.EXPENSE) {
+            linkedBudget = await findBudgetForCategory({
+                userId,
+                category: nextCategory,
+                walletId: nextWallet._id,
+                transactionDate: nextDate,
+                timezoneOffsetMinutes,
+                session,
+            });
+        }
 
         revertTransactionLedgerEffects({
             transactionType: currentTransaction.type,
@@ -1066,34 +1250,42 @@ export const updateTransaction = async (req: any, res: Response) => {
 
         if (
             nextType === TransactionType.EXPENSE &&
-            nextBudgetId &&
-            transactionTouchesLedger(nextStatus)
+            linkedBudget &&
+            transactionTouchesLedger(effectiveStatus)
         ) {
-            await assertBudgetCapacity({
-                budgetId: nextBudgetId,
-                userId,
-                amount: nextAmount,
-                transactionDate: nextDate,
-                excludedTransactionId: new Types.ObjectId(String(currentTransaction._id)),
-                session,
-            });
+            warnings.push(
+                ...(await evaluateBudgetUsage({
+                    budget: linkedBudget,
+                    userId,
+                    amount: nextAmount,
+                    timezoneOffsetMinutes,
+                    excludedTransactionId: new Types.ObjectId(
+                        String(currentTransaction._id),
+                    ),
+                    session,
+                })),
+            );
         }
 
         applyTransactionLedgerEffects({
             transactionType: nextType,
-            transactionStatus: nextStatus,
+            transactionStatus: effectiveStatus,
             amount: nextAmount,
             wallet: nextWallet,
         });
 
+        warnings.push(...buildNegativeWalletWarning(nextWallet));
+
         currentTransaction.walletId = nextWallet._id as any;
         currentTransaction.type = nextType;
-        currentTransaction.status = nextStatus;
+        currentTransaction.status = effectiveStatus;
         currentTransaction.amount = nextAmount;
         currentTransaction.category = nextCategory;
         currentTransaction.date = nextDate;
         currentTransaction.note = nextNote;
-        currentTransaction.budgetId = nextBudgetId as any;
+        currentTransaction.budgetId = (linkedBudget
+            ? linkedBudget._id
+            : undefined) as any;
 
         nextWallet.hasTransactions = true;
 
@@ -1113,6 +1305,7 @@ export const updateTransaction = async (req: any, res: Response) => {
         return res.json({
             success: true,
             data: currentTransaction,
+            warnings,
             message: "Transaction updated successfully",
         });
     } catch (error) {
@@ -1178,7 +1371,6 @@ export const deleteTransaction = async (req: any, res: Response) => {
             applyWalletDelta(
                 wallet,
                 -getWalletDeltaForTransaction(entry.type, Number(entry.amount)),
-                "Wallet does not have enough balance to reverse this transaction",
             );
 
             if (

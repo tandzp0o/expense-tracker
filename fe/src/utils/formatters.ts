@@ -117,7 +117,7 @@ export const formatCurrency = (
     options?: { displayMode?: "full" | "compact" },
 ): string => {
     if (amount == null) {
-        return getActiveLanguage() === "en" ? "N/A" : "Kh\u00f4ng c\u00f3 gi\u00e1";
+        return getActiveLanguage() === "en" ? "N/A" : "Không có giá";
     }
 
     const language = getActiveLanguage();

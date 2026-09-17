@@ -16,7 +16,6 @@ type Props = {
   copy: any;
   goalSummary: any;
   walletCards: any[];
-  walletBudgetSummaryMap: Map<string, any>;
   navigate: (path: string) => void;
   formatDate: (date: string) => string;
   formatCurrency: (
@@ -37,7 +36,6 @@ const RightSidebar = forwardRef<HTMLDivElement, Props>(
       copy,
       goalSummary,
       walletCards,
-      walletBudgetSummaryMap,
       navigate,
       formatDate,
       formatCurrency,
@@ -171,12 +169,7 @@ const RightSidebar = forwardRef<HTMLDivElement, Props>(
                         ? copy.walletTypes.cash
                         : copy.walletTypes.other;
 
-                  const walletBudgetSummary = walletBudgetSummaryMap.get(
-                    wallet._id,
-                  );
-                  const reserveItems = (
-                    walletBudgetSummary?.items || []
-                  ).filter(
+                  const reserveItems = (wallet.reserveItems || []).filter(
                     (item: any) =>
                       Number(item.remaining || 0) > 0 ||
                       Number(item.spent || 0) > 0,
@@ -329,7 +322,9 @@ const RightSidebar = forwardRef<HTMLDivElement, Props>(
                                         color: getBudgetColor(item, index),
                                       }}
                                     >
-                                      {item.category}
+                                      {item.appliesToAllWallets
+                                        ? `${item.category} · ${copy.allWalletsBudget}`
+                                        : item.category}
                                     </span>
                                   ))
                               ) : (

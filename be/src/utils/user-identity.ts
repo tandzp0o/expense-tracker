@@ -142,10 +142,16 @@ export const syncUserIdentity = async ({
     const resolvedDisplayName = deriveDisplayName(resolvedEmail, displayName);
 
     let user = await User.findOne({ uid });
-    const fallbackUsername = await generateUniqueUsername(
-        [username, resolvedDisplayName, resolvedEmail, uid],
-        uid,
-    );
+    // Generating a username walks candidate names one query at a time, and this
+    // runs on every token verify. Only new accounts and accounts that somehow
+    // lost their username need it.
+    const fallbackUsername =
+        !user || !user.username
+            ? await generateUniqueUsername(
+                  [username, resolvedDisplayName, resolvedEmail, uid],
+                  uid,
+              )
+            : "";
 
     if (!user) {
         user = await User.create({
@@ -161,7 +167,19 @@ export const syncUserIdentity = async ({
         return user;
     }
 
-    user.email = resolvedEmail || user.email;
+    // Email is unique in the schema, and this runs on every verify: if another
+    // account already holds the address, overwriting it made save() throw a
+    // duplicate-key error, turned verify into a 500 and locked the user out of
+    // the app entirely. Keeping the stored address degrades instead.
+    if (resolvedEmail && resolvedEmail !== user.email) {
+        const emailOwner = await User.findOne({ email: resolvedEmail }).select(
+            "uid",
+        );
+
+        if (!emailOwner || emailOwner.uid === uid) {
+            user.email = resolvedEmail;
+        }
+    }
     user.displayName = user.displayName || resolvedDisplayName;
     user.username = user.username || fallbackUsername;
     user.avatar = user.avatar || picture || "";

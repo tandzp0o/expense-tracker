@@ -9,10 +9,19 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import "dayjs/locale/vi";
 import { Briefcase, Car, HeartPulse, Home, ShoppingBag } from "lucide-react";
 import { auth } from "lib/firebase/config";
-import { budgetApi, goalApi, transactionApi, walletApi } from "services/api";
+import {
+  budgetApi,
+  goalApi,
+  isCashflowTransaction,
+  transactionApi,
+  walletApi,
+} from "services/api";
+import { buildWalletReserveItems } from "features/wallets/services/walletBudgetAllocation";
+import type { WalletReserveItem } from "features/wallets/services/walletBudgetAllocation";
 import { formatCurrency, formatDate } from "utils/formatters";
 import { useAuth } from "contexts/AuthContext";
 import { useLocale } from "contexts/LocaleContext";
@@ -32,6 +41,10 @@ const RightSidebar = lazy(() => import("../components/RightSidebar"));
 const DashboardOverview = lazy(
   () => import("../components/DashboardOverview"),
 );
+
+// Needed for `utcOffset()`, which is how every range below is pinned to the
+// timezone chosen in Settings instead of the browser's.
+dayjs.extend(utc);
 
 interface Transaction {
   _id: string;
@@ -64,7 +77,8 @@ interface WalletItem {
 
 interface WalletBudgetItem {
   _id: string;
-  walletId: string;
+  /** Empty when the budget applies to every wallet instead of one. */
+  walletId?: string | null;
   walletName: string;
   category: string;
   amount: number;
@@ -74,7 +88,7 @@ interface WalletBudgetItem {
 }
 
 interface WalletBudgetSummaryItem {
-  walletId: string;
+  walletId?: string | null;
   totalBudget: number;
   totalSpent: number;
   totalRemaining: number;
@@ -177,18 +191,9 @@ const getWalletId = (walletId: Transaction["walletId"]) => {
   return walletId?._id || "";
 };
 
+/** Rows saved before the status field existed are already-settled money. */
 const getTransactionStatus = (transaction: Pick<Transaction, "status">) =>
   transaction.status || "COMPLETED";
-
-const isTransferTransaction = (
-  transaction: Pick<Transaction, "category" | "transferGroupId">,
-) =>
-  transaction.category === "Transfer" || Boolean(transaction.transferGroupId);
-
-const isCashflowTransaction = (transaction: Transaction) =>
-  (transaction.type === "INCOME" || transaction.type === "EXPENSE") &&
-  getTransactionStatus(transaction) === "COMPLETED" &&
-  !isTransferTransaction(transaction);
 
 const sumByType = (transactions: Transaction[], type: "INCOME" | "EXPENSE") =>
   transactions
@@ -317,11 +322,19 @@ const getCategoryChartColor = (category: string, index: number) => {
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const { isVietnamese } = useLocale();
+  const { isVietnamese, timezoneOffsetMinutes } = useLocale();
   const { toast } = useToast();
   const { appearance } = useTheme();
   const locale = isVietnamese ? "vi-VN" : "en-US";
   const dayjsLocale = isVietnamese ? "vi" : "en";
+  // Every month/week boundary and every bucketing comparison below goes through
+  // this, so "today" and "this month" mean the same thing here as they do on
+  // the transaction form, which already writes dates in the configured zone.
+  // `utcOffset` takes the opposite sign convention to `getTimezoneOffset`.
+  const toZoned = useCallback(
+    (value?: dayjs.ConfigType) => dayjs(value).utcOffset(-timezoneOffsetMinutes),
+    [timezoneOffsetMinutes],
+  );
   const [wallets, setWallets] = useState<WalletItem[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<GoalItem[]>([]);
@@ -405,6 +418,7 @@ const Dashboard: React.FC = () => {
         freeToSpend: "Có thể chi",
         budgetReserved: "Giữ cho ngân sách",
         noBudgetReserve: "Chưa gắn ngân sách tháng này",
+        allWalletsBudget: "Áp dụng mọi ví",
         share: "Tỷ trọng",
         active: "Đang chọn",
         noWallets: "Chưa có ví nào để hiển thị.",
@@ -504,6 +518,7 @@ const Dashboard: React.FC = () => {
         freeToSpend: "Free to spend",
         budgetReserved: "Reserved",
         noBudgetReserve: "No budgets linked this month",
+        allWalletsBudget: "All wallets",
         share: "Share",
         active: "Active",
         noWallets: "No wallet available to display.",
@@ -600,11 +615,11 @@ const Dashboard: React.FC = () => {
       }
 
       const token = await firebaseUser.getIdToken();
-      const startDate = dayjs()
+      const startDate = toZoned()
         .subtract(23, "month")
         .startOf("month")
         .toISOString();
-      const endDate = dayjs().endOf("month").toISOString();
+      const endDate = toZoned().endOf("month").toISOString();
 
       const [walletsRes, transactionRes, goalsRes, budgetSummaryRes] =
         await Promise.all([
@@ -621,8 +636,8 @@ const Dashboard: React.FC = () => {
           goalApi.getGoals(token),
           budgetApi.getBudgetSummary(
             {
-              month: dayjs().month() + 1,
-              year: dayjs().year(),
+              month: toZoned().month() + 1,
+              year: toZoned().year(),
             },
             token,
           ),
@@ -651,7 +666,7 @@ const Dashboard: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [copy.loadFailed, copy.loadFailedDesc, currentUser?.uid, toast]);
+  }, [copy.loadFailed, copy.loadFailedDesc, currentUser?.uid, toZoned, toast]);
 
   useEffect(() => {
     dayjs.locale(dayjsLocale);
@@ -820,11 +835,11 @@ const Dashboard: React.FC = () => {
   );
 
   const currentRange = useMemo(() => {
-    const end = dayjs().endOf("month");
+    const end = toZoned().endOf("month");
     const start = end.startOf("month").subtract(periodMonths - 1, "month");
 
     return { start, end };
-  }, [periodMonths]);
+  }, [periodMonths, toZoned]);
 
   const previousRange = useMemo(() => {
     const end = currentRange.start.subtract(1, "day").endOf("day");
@@ -883,9 +898,9 @@ const Dashboard: React.FC = () => {
   );
 
   const currentWeekStart = useMemo(() => {
-    const today = dayjs().startOf("day");
+    const today = toZoned().startOf("day");
     return today.subtract((today.day() + 6) % 7, "day");
-  }, []);
+  }, [toZoned]);
 
   const weeklyExpenseBuckets = useMemo(
     () =>
@@ -895,7 +910,7 @@ const Dashboard: React.FC = () => {
           .filter(
             (transaction) =>
               transaction.type === "EXPENSE" &&
-              dayjs(transaction.date).isSame(day, "day"),
+              toZoned(transaction.date).isSame(day, "day"),
           )
           .reduce(
             (total, transaction) => total + parseAmount(transaction.amount),
@@ -909,7 +924,7 @@ const Dashboard: React.FC = () => {
           value,
         };
       }),
-    [currentWeekStart, isVietnamese, walletScopedCashflowTransactions],
+    [currentWeekStart, isVietnamese, toZoned, walletScopedCashflowTransactions],
   );
 
   const currentWeekExpense = useMemo(
@@ -938,12 +953,12 @@ const Dashboard: React.FC = () => {
 
   const monthExpenseSparkline = useMemo(() => {
     const buckets = Array.from({ length: 5 }, () => 0);
-    const monthStart = dayjs().startOf("month");
-    const monthEnd = dayjs().endOf("month");
+    const monthStart = toZoned().startOf("month");
+    const monthEnd = toZoned().endOf("month");
 
     walletScopedCashflowTransactions
       .filter((transaction) => {
-        const date = dayjs(transaction.date);
+        const date = toZoned(transaction.date);
         return (
           transaction.type === "EXPENSE" &&
           date.valueOf() >= monthStart.valueOf() &&
@@ -951,13 +966,13 @@ const Dashboard: React.FC = () => {
         );
       })
       .forEach((transaction) => {
-        const date = dayjs(transaction.date);
+        const date = toZoned(transaction.date);
         const bucketIndex = Math.min(Math.floor((date.date() - 1) / 7), 4);
         buckets[bucketIndex] += parseAmount(transaction.amount);
       });
 
     return buckets;
-  }, [walletScopedCashflowTransactions]);
+  }, [toZoned, walletScopedCashflowTransactions]);
 
   const mobileWeekMaxExpense = Math.max(
     ...weeklyExpenseBuckets.map((item) => item.value),
@@ -1022,7 +1037,7 @@ const Dashboard: React.FC = () => {
               .filter(
                 (transaction) =>
                   transaction.type === "INCOME" &&
-                  dayjs(transaction.date).isSame(month, "month"),
+                  toZoned(transaction.date).isSame(month, "month"),
               )
               .reduce(
                 (total, transaction) => total + parseAmount(transaction.amount),
@@ -1043,6 +1058,7 @@ const Dashboard: React.FC = () => {
       copy.income,
       currentCashflowTransactions,
       monthBuckets,
+      toZoned,
     ],
   );
 
@@ -1057,7 +1073,7 @@ const Dashboard: React.FC = () => {
               .filter(
                 (transaction) =>
                   transaction.type === "EXPENSE" &&
-                  dayjs(transaction.date).isSame(month, "month"),
+                  toZoned(transaction.date).isSame(month, "month"),
               )
               .reduce(
                 (total, transaction) => total + parseAmount(transaction.amount),
@@ -1071,7 +1087,13 @@ const Dashboard: React.FC = () => {
         },
       ],
     }),
-    [chartRadius, copy.monthExpense, currentCashflowTransactions, monthBuckets],
+    [
+      chartRadius,
+      copy.monthExpense,
+      currentCashflowTransactions,
+      monthBuckets,
+      toZoned,
+    ],
   );
 
   const expenseCategories = useMemo(() => {
@@ -1194,12 +1216,22 @@ const Dashboard: React.FC = () => {
 
   const walletCards = useMemo(
     () =>
-      wallets.map((wallet, index) => ({
+      wallets.map((wallet) => ({
         ...wallet,
         share:
           allWalletBalance > 0
             ? (parseAmount(wallet.balance) / allWalletBalance) * 100
             : 0,
+        // Budgets that are not pinned to a wallet arrive grouped under an empty
+        // walletId, so they have to be folded in here or the card reports
+        // nothing reserved at all.
+        reserveItems: buildWalletReserveItems({
+          walletId: wallet._id,
+          walletBalance: parseAmount(wallet.balance),
+          walletCount: wallets.length,
+          totalWalletBalance: allWalletBalance,
+          walletSummaries: budgetSummary?.walletSummaries,
+        }),
         background: wallet.imageUrl
           ? `linear-gradient(180deg, rgba(2, 6, 23, 0.14) 0%, rgba(2, 6, 23, 0.62) 72%, rgba(2, 6, 23, 0.88) 100%), url("${wallet.imageUrl}")`
           : wallet.color && wallet.color.startsWith("#")
@@ -1215,22 +1247,17 @@ const Dashboard: React.FC = () => {
                 0.9,
               )} 58%, rgba(2, 6, 23, 0.94) 100%)`,
       })),
-    [allWalletBalance, themeColors.primary, themeColors.secondary, wallets],
-  );
-
-  const walletBudgetSummaryMap = useMemo(
-    () =>
-      new Map(
-        (budgetSummary?.walletSummaries || []).map((summary) => [
-          summary.walletId,
-          summary,
-        ]),
-      ),
-    [budgetSummary],
+    [
+      allWalletBalance,
+      budgetSummary?.walletSummaries,
+      themeColors.primary,
+      themeColors.secondary,
+      wallets,
+    ],
   );
 
   const getBudgetColor = useCallback(
-    (budget: WalletBudgetItem, index: number) =>
+    (budget: WalletReserveItem, index: number) =>
       budget.color ||
       BUDGET_SEGMENT_COLORS[index % BUDGET_SEGMENT_COLORS.length],
     [],
@@ -1366,7 +1393,6 @@ const Dashboard: React.FC = () => {
             copy={copy}
             goalSummary={goalSummary}
             walletCards={walletCards}
-            walletBudgetSummaryMap={walletBudgetSummaryMap}
             navigate={navigate}
             formatDate={formatDate}
             formatCurrency={formatCurrency}

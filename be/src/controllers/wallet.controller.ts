@@ -1,7 +1,12 @@
 import { Request, Response } from "express";
 import Wallet, { IWallet } from "../models/Wallet";
-import Transaction, { TransactionType } from "../models/Transaction";
+import Transaction, {
+    TransactionStatus,
+    TransactionType,
+} from "../models/Transaction";
+import { BALANCE_ADJUSTMENT_CATEGORY } from "../constants/categories";
 import User from "../models/User";
+import Budget from "../models/Budget";
 import { ensureUserConfig } from "./config.controller";
 import { Types } from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
@@ -111,12 +116,17 @@ export const createWallet = [
 
 export const getWallets = async (req: any, res: Response) => {
     try {
+        // Archived wallets stay hidden by default but have to be reachable:
+        // without any way to list them, archiving a wallet put it and its
+        // balance permanently out of reach. They never count towards the total.
+        const includeArchived =
+            String(req.query?.includeArchived || "").toLowerCase() === "true";
         const wallets = await Wallet.find({
             userId: req.user.uid,
-            isArchived: { $ne: true },
+            ...(includeArchived ? {} : { isArchived: { $ne: true } }),
         });
         const totalBalance = wallets.reduce(
-            (sum, wallet) => sum + wallet.balance,
+            (sum, wallet) => sum + (wallet.isArchived ? 0 : wallet.balance),
             0,
         );
 
@@ -177,6 +187,7 @@ export const updateWallet = [
                 icon,
                 color,
                 confirmTypeChange,
+                isArchived,
             } = req.body;
 
             const wallet = await Wallet.findOne({
@@ -196,6 +207,13 @@ export const updateWallet = [
             if (description !== undefined) wallet.description = description;
             if (icon !== undefined) wallet.icon = icon;
             if (color !== undefined) wallet.color = color;
+            // Archiving used to be one-way: nothing in the codebase ever set this
+            // back to false, so one misclick on delete hid a wallet for good.
+            // The form is multipart, so the flag arrives as a string.
+            if (isArchived !== undefined) {
+                wallet.isArchived =
+                    String(isArchived).toLowerCase() === "true";
+            }
 
             // RULE 2: initialBalance
             // The form is multipart, so every field arrives as a string: "500000"
@@ -322,57 +340,184 @@ export const updateWallet = [
 ];
 
 /**
+ * Đặt số dư ví về đúng số tiền người dùng đang thực có.
+ *
+ * Cash gets spent without being written down, so a wallet drifts away from
+ * reality and nothing in the app could fix it: the balance was read-only and the
+ * "create an adjustment transaction" the error message suggested did not exist.
+ * The difference is recorded as an ordinary transaction rather than silently
+ * overwriting the balance, so the history still explains every number.
+ */
+export const reconcileWallet = async (req: any, res: Response) => {
+    const session = await Wallet.startSession();
+    session.startTransaction();
+
+    try {
+        const { id } = req.params;
+        const userId = req.user.uid;
+        const wallet = await Wallet.findOne({ _id: id, userId }).session(
+            session,
+        );
+
+        if (!wallet) {
+            await session.abortTransaction();
+            return res.status(404).json({
+                success: false,
+                message: "Không tìm thấy ví để cân đối",
+            });
+        }
+
+        const actualBalance = Number(req.body?.actualBalance);
+        if (!Number.isFinite(actualBalance) || !Number.isSafeInteger(actualBalance)) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                success: false,
+                message: "Số dư thực tế không hợp lệ",
+            });
+        }
+
+        const difference = actualBalance - Number(wallet.balance || 0);
+        if (difference === 0) {
+            await session.abortTransaction();
+            return res.json({
+                success: true,
+                data: { wallet, difference: 0 },
+                message: "Số dư đã khớp, không cần điều chỉnh",
+            });
+        }
+
+        const transaction = new Transaction({
+            userId,
+            walletId: wallet._id,
+            type:
+                difference > 0
+                    ? TransactionType.INCOME
+                    : TransactionType.EXPENSE,
+            status: TransactionStatus.COMPLETED,
+            amount: Math.abs(difference),
+            category: BALANCE_ADJUSTMENT_CATEGORY,
+            date: new Date(),
+            note:
+                String(req.body?.note || "").trim() ||
+                "Cân đối lại số dư ví theo số tiền thực tế",
+            isSystemGenerated: true,
+            isDeletable: true,
+        });
+
+        wallet.balance = actualBalance;
+        wallet.hasTransactions = true;
+
+        await transaction.save({ session });
+        await wallet.save({ session });
+        await touchTransactionCacheState(userId, req.user, session);
+        await session.commitTransaction();
+
+        return res.json({
+            success: true,
+            data: { wallet, transaction, difference },
+            message:
+                difference > 0
+                    ? "Đã ghi thêm một khoản thu để khớp với số dư thực tế"
+                    : "Đã ghi thêm một khoản chi để khớp với số dư thực tế",
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Đã xảy ra lỗi không xác định";
+        return res.status(500).json({
+            success: false,
+            message: "Lỗi khi cân đối số dư ví",
+            error: errorMessage,
+        });
+    } finally {
+        session.endSession();
+    }
+};
+
+/**
  * Xóa hoặc lưu trữ một ví (RULE 5)
  */
 export const deleteWallet = async (req: any, res: Response) => {
+    const session = await Wallet.startSession();
+    session.startTransaction();
+
     try {
         const { id } = req.params;
+        const userId = req.user.uid;
 
-        // Kiểm tra xem ví có tồn tại và thuộc về người dùng không
-        const wallet = await Wallet.findOne({
-            _id: id,
-            userId: req.user.uid,
-        });
+        const wallet = await Wallet.findOne({ _id: id, userId }).session(
+            session,
+        );
 
         if (!wallet) {
+            await session.abortTransaction();
             return res.status(404).json({
                 success: false,
                 message: "Không tìm thấy ví để xóa",
             });
         }
 
-        // RULE 5: Nếu có giao dịch, chỉ archive, không hard delete
-        if (wallet.hasTransactions) {
+        // Counted now instead of trusting the cached hasTransactions flag. A
+        // stale flag meant the wallet was hard-deleted while its transactions
+        // survived: those rows could then never be deleted (every attempt
+        // answered "wallet not found") yet still counted in every total.
+        const transactionCount = await Transaction.countDocuments({
+            userId,
+            walletId: wallet._id,
+        }).session(session);
+
+        // RULE 5: giữ lịch sử thì chỉ lưu trữ, không xoá cứng.
+        if (transactionCount > 0) {
+            // Budgets keep pointing at the wallet here: it still exists and can
+            // be restored, so dropping the pin would quietly widen those budgets
+            // to every wallet and never give it back.
             wallet.isArchived = true;
-            await wallet.save();
-            await touchTransactionCacheState(req.user.uid, req.user);
+            wallet.hasTransactions = true;
+            await wallet.save({ session });
+            await touchTransactionCacheState(userId, req.user, session);
+            await session.commitTransaction();
+
             return res.json({
                 success: true,
-                message: "Ví đã được lưu trữ (đã có giao dịch)",
+                message:
+                    "Ví đã được lưu trữ vì còn giao dịch. Bạn có thể khôi phục lại bất cứ lúc nào.",
                 data: { id: wallet._id, archived: true },
             });
         }
 
-        // Nếu không có giao dịch, hard delete
-        await Wallet.findOneAndDelete({
-            _id: id,
-            userId: req.user.uid,
-        });
+        // Only a wallet that is really going away releases its budgets, which
+        // would otherwise point at something that no longer exists.
+        const unlinkedBudgets = await Budget.updateMany(
+            { userId, walletId: wallet._id },
+            { walletId: null },
+        ).session(session);
 
-        res.json({
+        await Wallet.deleteOne({ _id: wallet._id, userId }).session(session);
+        await touchTransactionCacheState(userId, req.user, session);
+        await session.commitTransaction();
+
+        return res.json({
             success: true,
             message: "Xóa ví thành công",
-            data: { id: wallet._id },
+            data: {
+                id: wallet._id,
+                unlinkedBudgets: unlinkedBudgets.modifiedCount || 0,
+            },
         });
     } catch (error) {
+        await session.abortTransaction();
         const errorMessage =
             error instanceof Error
                 ? error.message
                 : "Đã xảy ra lỗi không xác định";
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Lỗi khi xóa ví",
             error: errorMessage,
         });
+    } finally {
+        session.endSession();
     }
 };

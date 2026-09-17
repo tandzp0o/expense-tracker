@@ -1,7 +1,11 @@
 export { default as WalletsPage } from "./pages/WalletsPage";
 export { default as WalletOnboardingDialog } from "./components/WalletOnboardingDialog";
+export { ArchivedWalletsSection } from "./components/ArchivedWalletsSection";
+export type { ArchivedWalletItem } from "./components/ArchivedWalletsSection";
 export { WalletFormModal } from "./modals/WalletFormModal";
 export type { WalletFormValues } from "./modals/WalletFormModal";
 export { DeleteWalletModal } from "./modals/DeleteWalletModal";
 export { ConfirmWalletTypeChangeModal } from "./modals/ConfirmWalletTypeChangeModal";
 export { colorOptions, iconOptions, walletTypeText } from "./constants";
+export { buildWalletReserveItems } from "./services/walletBudgetAllocation";
+export type { WalletReserveItem } from "./services/walletBudgetAllocation";

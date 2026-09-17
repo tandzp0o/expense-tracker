@@ -11,6 +11,7 @@ export type ThemeMode = "light" | "dark";
 export type FontPreset = "sans" | "serif" | "mono" | "rounded";
 export type FontScale = "sm" | "md" | "lg";
 export type RadiusPreset = "compact" | "balanced" | "rounded";
+export type UiVersion = "v1" | "v2";
 
 export interface AppearanceSettings {
     mode: ThemeMode;
@@ -19,6 +20,7 @@ export interface AppearanceSettings {
     fontPreset: FontPreset;
     fontScale: FontScale;
     radiusPreset: RadiusPreset;
+    uiVersion: UiVersion;
 }
 
 interface ThemeContextValue {
@@ -36,6 +38,7 @@ const DEFAULT_APPEARANCE: AppearanceSettings = {
     fontPreset: "sans",
     fontScale: "md",
     radiusPreset: "balanced",
+    uiVersion: "v1",
 };
 
 const FONT_PRESETS: Record<FontPreset, string> = {
@@ -201,6 +204,9 @@ const applyAppearance = (appearance: AppearanceSettings) => {
               ].join(", ");
 
     root.dataset.theme = appearance.mode;
+    // The v2 look is a pure CSS skin over the same components, so the only
+    // thing the runtime has to do is stamp the attribute index.css scopes on.
+    root.dataset.uiVersion = appearance.uiVersion;
     root.style.setProperty("--app-primary", primary);
     root.style.setProperty("--app-secondary", secondary);
     root.style.setProperty(
@@ -301,6 +307,7 @@ const readInitialAppearance = (): AppearanceSettings => {
                 parsed.radiusPreset && parsed.radiusPreset in RADIUS_PRESETS
                     ? parsed.radiusPreset
                     : DEFAULT_APPEARANCE.radiusPreset,
+            uiVersion: parsed.uiVersion === "v2" ? "v2" : "v1",
         };
     } catch {
         return DEFAULT_APPEARANCE;
@@ -355,6 +362,11 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
                             updates.radiusPreset in RADIUS_PRESETS
                                 ? updates.radiusPreset
                                 : current.radiusPreset,
+                        uiVersion:
+                            updates.uiVersion === "v1" ||
+                            updates.uiVersion === "v2"
+                                ? updates.uiVersion
+                                : current.uiVersion,
                     };
                 }),
             resetAppearance: () => setAppearance(DEFAULT_APPEARANCE),

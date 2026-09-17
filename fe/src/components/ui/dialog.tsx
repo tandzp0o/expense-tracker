@@ -272,7 +272,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     const isEnglish =
         typeof document !== "undefined" &&
         document.documentElement.lang === "en";
-    const busyLabel = isEnglish ? "Working..." : "\u0110ang x\u1eed l\u00fd...";
+    const busyLabel = isEnglish ? "Working..." : "Đang xử lý...";
 
     return (
         <Dialog
@@ -281,10 +281,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 variant === "destructive"
                     ? isEnglish
                         ? "Sensitive action"
-                        : "Thao t\u00e1c nh\u1ea1y c\u1ea3m"
+                        : "Thao tác nhạy cảm"
                     : isEnglish
                       ? "Please review"
-                      : "Vui l\u00f2ng xem l\u1ea1i"
+                      : "Vui lòng xem lại"
             }
             icon={AlertTriangle}
             onClose={onClose}

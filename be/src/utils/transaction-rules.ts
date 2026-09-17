@@ -166,13 +166,17 @@ export const parseWholeMoneyAmount = (
     return parsed;
 };
 
+export const assertLedgerValueInSafeRange = (value: number) => {
+    if (!Number.isFinite(value) || !Number.isSafeInteger(value)) {
+        throw new TransactionRuleError(400, "Ledger value exceeds safe range");
+    }
+};
+
 export const assertNonNegativeLedgerValue = (
     value: number,
     message: string,
 ) => {
-    if (!Number.isFinite(value) || !Number.isSafeInteger(value)) {
-        throw new TransactionRuleError(400, "Ledger value exceeds safe range");
-    }
+    assertLedgerValueInSafeRange(value);
 
     if (value < 0) {
         throw new TransactionRuleError(400, message);
@@ -237,14 +241,14 @@ export const ensureTransactionStatusAllowed = ({
     timezoneOffsetMinutes?: number;
 }) => {
     if (isFutureCalendarDate(date, timezoneOffsetMinutes)) {
+        // A date in the future is a plan, not a typing mistake. Refusing the save
+        // threw away everything the user had entered; recording it as scheduled
+        // keeps the entry and still leaves the ledger untouched until it is due.
         if (
             status !== TransactionStatus.SCHEDULED &&
             status !== TransactionStatus.PENDING
         ) {
-            throw new TransactionRuleError(
-                400,
-                "Future transactions must use SCHEDULED or PENDING status",
-            );
+            return TransactionStatus.SCHEDULED;
         }
 
         return status;
@@ -282,6 +286,32 @@ export const ensureTransactionDateAllowed = (
     });
 
     return value;
+};
+
+/**
+ * Validates the date and returns the status the entry should actually be saved
+ * with. The status can differ from what was asked for: a future date is stored
+ * as scheduled rather than rejected, so the caller must use what comes back.
+ */
+export const resolveTransactionTiming = (
+    value: Date | null,
+    status: TransactionStatus = TransactionStatus.COMPLETED,
+    isSystemGenerated = false,
+    timezoneOffsetMinutes = DEFAULT_TIMEZONE_OFFSET_MINUTES,
+) => {
+    if (!value) {
+        throw new TransactionRuleError(400, "Invalid transaction date");
+    }
+
+    return {
+        date: value,
+        status: ensureTransactionStatusAllowed({
+            date: value,
+            status,
+            isSystemGenerated,
+            timezoneOffsetMinutes,
+        }),
+    };
 };
 
 export const ensureTransferCategoryNotUsed = (category: unknown) => {

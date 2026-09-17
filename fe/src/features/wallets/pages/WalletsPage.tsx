@@ -56,8 +56,11 @@ import { MoneyField } from "components/app/money-field";
 import { Select } from "components/ui/select";
 import { Spinner } from "components/ui/spinner";
 import WalletOnboardingDialog from "../components/WalletOnboardingDialog";
+import { ArchivedWalletsSection } from "../components/ArchivedWalletsSection";
 import LineChart from "components/charts/LineChart";
 import { colorOptions, walletTypeText } from "../constants";
+import { buildWalletReserveItems } from "../services/walletBudgetAllocation";
+import type { WalletReserveItem } from "../services/walletBudgetAllocation";
 import { ConfirmWalletTypeChangeModal } from "../modals/ConfirmWalletTypeChangeModal";
 import { DeleteWalletModal } from "../modals/DeleteWalletModal";
 import { WalletFormModal } from "../modals/WalletFormModal";
@@ -83,7 +86,8 @@ interface WalletItem {
 
 interface WalletBudgetItem {
   _id: string;
-  walletId: string;
+  /** Empty when the budget applies to every wallet instead of one. */
+  walletId?: string | null;
   walletName: string;
   category: string;
   amount: number;
@@ -94,7 +98,7 @@ interface WalletBudgetItem {
 }
 
 interface WalletBudgetSummaryItem {
-  walletId: string;
+  walletId?: string | null;
   walletName: string;
   walletCurrency: string;
   totalBudget: number;
@@ -387,26 +391,55 @@ const Wallets: React.FC = () => {
     formDescription: isVietnamese
       ? "Điền các thông tin cơ bản để tạo hoặc cập nhật ví."
       : "Fill in the key details to create or update a wallet.",
-    freeToSpend: isVietnamese ? "Ti\u1ec1n t\u1ef1 do" : "Free to spend",
+    freeToSpend: isVietnamese ? "Tiền tự do" : "Free to spend",
     budgetReserved: isVietnamese
-      ? "Gi\u1eef cho ng\u00e2n s\u00e1ch"
+      ? "Giữ cho ngân sách"
       : "Reserved for budgets",
     walletAllocation: isVietnamese
-      ? "Ph\u00e2n b\u1ed5 trong v\u00ed"
+      ? "Phân bổ trong ví"
       : "Wallet allocation",
     walletAllocationDetails: isVietnamese
-      ? "Chi ti\u1ebft ph\u00e2n b\u1ed5"
+      ? "Chi tiết phân bổ"
       : "Allocation details",
-    backToCard: isVietnamese ? "Quay l\u1ea1i" : "Back",
+    backToCard: isVietnamese ? "Quay lại" : "Back",
     walletAllocationDesc: isVietnamese
-      ? "Thanh d\u01b0\u1edbi \u0111\u00e2y cho bi\u1ebft s\u1ed1 d\u01b0 t\u1ef1 do v\u00e0 ph\u1ea7n c\u00f2n l\u1ea1i c\u1ee7a t\u1eebng ng\u00e2n s\u00e1ch trong v\u00ed."
+      ? "Thanh dưới đây cho biết số dư tự do và phần còn lại của từng ngân sách trong ví."
       : "The bar below splits free balance and remaining budget allocations inside this wallet.",
     noBudgetReserve: isVietnamese
-      ? "Ch\u01b0a c\u00f3 ng\u00e2n s\u00e1ch n\u00e0o g\u1eafn v\u1edbi v\u00ed n\u00e0y trong th\u00e1ng hi\u1ec7n t\u1ea1i."
+      ? "Chưa có ngân sách nào gắn với ví này trong tháng hiện tại."
       : "No budgets are linked to this wallet in the current month.",
+    allWalletsBudget: isVietnamese
+      ? "Áp dụng mọi ví"
+      : "All wallets",
     oversubscribedWallet: isVietnamese
-      ? "Ng\u00e2n s\u00e1ch c\u00f2n l\u1ea1i \u0111ang l\u1edbn h\u01a1n s\u1ed1 d\u01b0 v\u00ed, c\u1ea7n gi\u1ea3m reserve ho\u1eb7c n\u1ea1p th\u00eam ti\u1ec1n."
+      ? "Ngân sách còn lại đang lớn hơn số dư ví, cần giảm reserve hoặc nạp thêm tiền."
       : "Remaining budget reserves are larger than the wallet balance. Reduce allocations or top up the wallet.",
+    archivedWallets: isVietnamese ? "Ví đã lưu trữ" : "Archived wallets",
+    archivedWalletsDesc: isVietnamese
+      ? "Những ví này không được tính vào tổng số dư, chuyển tiền hay ngân sách. Khôi phục để dùng lại."
+      : "These wallets are excluded from totals, transfers and budgets. Restore one to use it again.",
+    archivedWalletsCount: (count: number) =>
+      isVietnamese ? `${count} ví` : `${count} wallet(s)`,
+    show: isVietnamese ? "Hiện" : "Show",
+    hide: isVietnamese ? "Ẩn" : "Hide",
+    restore: isVietnamese ? "Khôi phục" : "Restore",
+    restoring: isVietnamese ? "Đang khôi phục..." : "Restoring...",
+    walletRestored: isVietnamese ? "Đã khôi phục ví" : "Wallet restored",
+    walletRestoredDesc: isVietnamese
+      ? "Ví đã quay lại danh sách và được tính vào các tổng số dư."
+      : "The wallet is back in the list and counted in your totals again.",
+    restoreFailed: isVietnamese ? "Khôi phục thất bại" : "Restore failed",
+    restoreFailedDesc: isVietnamese
+      ? "Không thể khôi phục ví."
+      : "Wallet could not be restored.",
+    // The old copy promised a deletion that never happens. Say what the backend
+    // actually does, and point at the section that can undo it.
+    archiveWalletDesc: isVietnamese
+      ? "Ví này đã có giao dịch nên sẽ được lưu trữ chứ không bị xóa, lịch sử giao dịch vẫn được giữ nguyên. Ví sẽ biến mất khỏi danh sách và mọi tổng số dư, nhưng bạn có thể khôi phục bất cứ lúc nào ở mục “Ví đã lưu trữ” bên dưới."
+      : "This wallet has transactions, so it is archived rather than deleted and its history is kept. It leaves the list and every total, but you can restore it at any time from the “Archived wallets” section below.",
+    walletArchivedDesc: isVietnamese
+      ? "Bạn có thể khôi phục ví này ở mục “Ví đã lưu trữ” bên dưới danh sách ví."
+      : "You can bring it back from the “Archived wallets” section below the wallet list.",
   };
   const onboardingNoticeTitle = isVietnamese
     ? "Ví tiền: lần đầu bạn truy cập app, hãy tạo 1 ví đầu tiên"
@@ -422,7 +455,15 @@ const Wallets: React.FC = () => {
     walletTypeText[type][language];
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // `wallets` stays active-only so every total, the transfer picker and the
+  // budget allocation maths below keep working untouched; archived wallets are
+  // held apart and only ever rendered by the restore section.
   const [wallets, setWallets] = useState<WalletItem[]>([]);
+  const [archivedWallets, setArchivedWallets] = useState<WalletItem[]>([]);
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const [restoringWalletId, setRestoringWalletId] = useState<string | null>(
+    null,
+  );
   const [stats, setStats] = useState<any>(null);
   const [budgetSummary, setBudgetSummary] =
     useState<WalletBudgetSummaryResponse | null>(null);
@@ -494,7 +535,9 @@ const Wallets: React.FC = () => {
       }
       const [walletResponse, statsResponse, budgetSummaryResponse] =
         await Promise.all([
-          walletApi.getWallets(token),
+          // Only this page asks for archived wallets; it is the one place that
+          // can hand them back to the user.
+          walletApi.getWallets(token, { includeArchived: true }),
           userApi.getProfileStats(token),
           budgetApi.getBudgetSummary(
             {
@@ -505,8 +548,10 @@ const Wallets: React.FC = () => {
           ),
         ]);
 
-      const walletList = walletResponse?.wallets || [];
+      const allWallets: WalletItem[] = walletResponse?.wallets || [];
+      const walletList = allWallets.filter((wallet) => !wallet.isArchived);
       setWallets(walletList);
+      setArchivedWallets(allWallets.filter((wallet) => wallet.isArchived));
       setStats(statsResponse?.data || statsResponse);
       setBudgetSummary(budgetSummaryResponse || null);
 
@@ -741,19 +786,9 @@ const Wallets: React.FC = () => {
       wallets.filter((wallet) => wallet._id !== transferValues.fromWalletId),
     [wallets, transferValues.fromWalletId],
   );
-  const walletBudgetSummaryMap = useMemo(
-    () =>
-      new Map(
-        (budgetSummary?.walletSummaries || []).map((summary) => [
-          summary.walletId,
-          summary,
-        ]),
-      ),
-    [budgetSummary],
-  );
 
   const getBudgetColor = useCallback(
-    (budget: WalletBudgetItem, index: number) =>
+    (budget: WalletReserveItem, index: number) =>
       budget.color || colorOptions[index % colorOptions.length],
     [],
   );
@@ -870,14 +905,18 @@ const Wallets: React.FC = () => {
         pendingDelete._id,
         token,
       );
+      const archived = Boolean(response?.data?.archived);
       toast({
-        title: response?.data?.archived
-          ? copy.walletArchived
-          : copy.walletDeleted,
-        description: response?.message,
+        title: archived ? copy.walletArchived : copy.walletDeleted,
+        // An archive is reversible, so the toast says where to reverse it
+        // instead of echoing the generic server message.
+        description: archived ? copy.walletArchivedDesc : response?.message,
         variant: "success",
       });
       setPendingDelete(null);
+      if (archived) {
+        setArchivedOpen(true);
+      }
       await fetchData();
     } catch (error: any) {
       toast({
@@ -887,6 +926,37 @@ const Wallets: React.FC = () => {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRestore = async (wallet: { _id: string }) => {
+    setRestoringWalletId(wallet._id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        return;
+      }
+      // The update endpoint is multipart, so the flag travels as a string field
+      // the same way confirmTypeChange does. Nothing else is sent: echoing the
+      // opening balance back would trip the server guard on wallets that have
+      // transactions, and an archived wallet always has some.
+      const formData = new FormData();
+      formData.append("isArchived", "false");
+      await walletApi.updateWallet(wallet._id, formData, token);
+      toast({
+        title: copy.walletRestored,
+        description: copy.walletRestoredDesc,
+        variant: "success",
+      });
+      await fetchData();
+    } catch (error: any) {
+      toast({
+        title: copy.restoreFailed,
+        description: error.message || copy.restoreFailedDesc,
+        variant: "destructive",
+      });
+    } finally {
+      setRestoringWalletId(null);
     }
   };
 
@@ -1122,10 +1192,17 @@ const Wallets: React.FC = () => {
                       : wallet.type === "ewallet"
                         ? Smartphone
                         : Wallet;
-                const walletBudgetSummary = walletBudgetSummaryMap.get(
-                  wallet._id,
-                );
-                const reserveItems = (walletBudgetSummary?.items || []).filter(
+                // Budgets that are not pinned to a wallet arrive grouped under
+                // an empty walletId, so they have to be folded in here or the
+                // card claims nothing is reserved and calls the whole balance
+                // free to spend.
+                const reserveItems = buildWalletReserveItems({
+                  walletId: wallet._id,
+                  walletBalance: Number(wallet.balance || 0),
+                  walletCount: wallets.length,
+                  totalWalletBalance: totalBalance,
+                  walletSummaries: budgetSummary?.walletSummaries,
+                }).filter(
                   (item) =>
                     Number(item.remaining || 0) > 0 ||
                     Number(item.spent || 0) > 0,
@@ -1358,7 +1435,9 @@ const Wallets: React.FC = () => {
                                   color: getBudgetColor(item, index),
                                 }}
                               >
-                                {item.category}
+                                {item.appliesToAllWallets
+                                  ? `${item.category} · ${copy.allWalletsBudget}`
+                                  : item.category}
                               </span>
                             ))}
                         </div>
@@ -1480,6 +1559,19 @@ const Wallets: React.FC = () => {
           title={copy.noWallets}
         />
       )}
+
+      {/* Rendered outside the active-wallet branch on purpose: archiving the
+          last wallet leaves an empty grid, and that is exactly when the user
+          most needs the way back. */}
+      <ArchivedWalletsSection
+        copy={copy}
+        language={language}
+        onRestore={handleRestore}
+        onToggle={() => setArchivedOpen((current) => !current)}
+        open={archivedOpen}
+        restoringWalletId={restoringWalletId}
+        wallets={archivedWallets}
+      />
 
       <WalletFormModal
         balanceLocked={Boolean(editing?.hasTransactions)}

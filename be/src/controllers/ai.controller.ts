@@ -213,8 +213,13 @@ export const listAiUsers = async (_req: Request, res: Response) => {
     });
 };
 
-export const runAiRecommendation = async (req: Request, res: Response) => {
-    const userId = String(req.body?.userId || "").trim();
+export const runAiRecommendation = async (req: any, res: Response) => {
+    // Only an admin may ask about someone else; for everyone else the subject is
+    // pinned to the caller, since the body used to be trusted as-is and any
+    // signed-in user could pull another person's recommendation.
+    const requestedUserId = String(req.body?.userId || "").trim();
+    const userId = req.isAdmin ? requestedUserId || req.user?.uid : req.user?.uid;
+
     if (!userId) {
         return res.status(400).json({
             success: false,

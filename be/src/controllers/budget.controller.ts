@@ -7,6 +7,18 @@ import Transaction, {
 } from "../models/Transaction";
 import Wallet from "../models/Wallet";
 import { normalizeStandardCategory } from "../constants/categories";
+import { DEFAULT_TIMEZONE_OFFSET_MINUTES } from "../utils/transaction-rules";
+
+/**
+ * First instant of a month on the user's calendar. Built from the app timezone
+ * rather than the server's, so a container running in UTC does not start
+ * September at 07:00 Vietnam time and misfile everything logged before then.
+ */
+const getMonthStart = (month: number, year: number) =>
+    new Date(
+        Date.UTC(year, month - 1, 1) +
+            DEFAULT_TIMEZONE_OFFSET_MINUTES * 60 * 1000,
+    );
 
 const toNumber = (value: unknown, fallback: number) => {
     const numericValue = Number(value);
@@ -162,35 +174,67 @@ const buildBudgetSummaryPayload = async ({
         .populate("walletId", "name currency color")
         .sort({ createdAt: -1 });
 
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0, 23, 59, 59, 999);
+    const start = getMonthStart(month, year);
+    const end = getMonthStart(
+        month === 12 ? 1 : month + 1,
+        month === 12 ? year + 1 : year,
+    );
 
-    const spentByBudgetAgg = await Transaction.aggregate([
+    // Spending is matched by category, not by an explicit budgetId link. Someone
+    // who records "Ăn uống 85.000" expects it to count against their food budget
+    // whether or not they remembered to attach that budget while entering it —
+    // and the old link-only rule left most budgets sitting at 0% while the money
+    // was quietly going out.
+    const spentAgg = await Transaction.aggregate([
         {
             $match: {
                 userId,
                 type: TransactionType.EXPENSE,
                 ...buildCompletedStatusQuery(),
-                date: { $gte: start, $lte: end },
-                budgetId: { $exists: true, $ne: null },
+                date: { $gte: start, $lt: end },
             },
         },
         {
             $group: {
-                _id: "$budgetId",
+                _id: { category: "$category", walletId: "$walletId" },
                 spent: { $sum: "$amount" },
             },
         },
     ]);
 
-    const spentByBudget = new Map<string, number>();
-    spentByBudgetAgg.forEach((entry: any) => {
-        spentByBudget.set(String(entry._id), Number(entry.spent || 0));
+    const spentByCategoryAndWallet = new Map<string, number>();
+    const spentByCategory = new Map<string, number>();
+    spentAgg.forEach((entry: any) => {
+        const category = String(entry._id?.category || "");
+        const entryWalletId = String(entry._id?.walletId || "");
+        const amount = Number(entry.spent || 0);
+
+        const scopedKey = `${category}::${entryWalletId}`;
+        spentByCategoryAndWallet.set(
+            scopedKey,
+            (spentByCategoryAndWallet.get(scopedKey) || 0) + amount,
+        );
+        spentByCategory.set(
+            category,
+            (spentByCategory.get(category) || 0) + amount,
+        );
     });
 
     const items: BudgetSummaryItem[] = (budgets as IBudget[]).map(
         (budget: IBudget) => {
-            const spent = spentByBudget.get(String(budget._id)) || 0;
+            const walletScope =
+                typeof budget.walletId === "object" && budget.walletId !== null
+                    ? String((budget.walletId as any)._id)
+                    : budget.walletId
+                      ? String(budget.walletId)
+                      : "";
+            // A budget pinned to one wallet only counts what that wallet paid;
+            // an any-wallet budget counts the category wherever it was paid from.
+            const spent = walletScope
+                ? spentByCategoryAndWallet.get(
+                      `${budget.category}::${walletScope}`,
+                  ) || 0
+                : spentByCategory.get(String(budget.category)) || 0;
             const remaining = Math.max(Number(budget.amount) - spent, 0);
             const overspent = Math.max(spent - Number(budget.amount), 0);
             const percent =
@@ -231,10 +275,10 @@ const buildBudgetSummaryPayload = async ({
 
     const totalBudget = items.reduce((sum, item) => sum + (item.amount || 0), 0);
     const totalSpent = items.reduce((sum, item) => sum + (item.spent || 0), 0);
-    const totalRemaining = items.reduce(
-        (sum, item) => sum + (item.remaining || 0),
-        0,
-    );
+    // Deliberately not the sum of the per-item remainders: those are clamped at
+    // zero for the progress bars, which made an overspent month still report
+    // money left over.
+    const totalRemaining = totalBudget - totalSpent;
 
     const prevMonth = month === 1 ? 12 : month - 1;
     const prevYear = month === 1 ? year - 1 : year;
@@ -469,10 +513,18 @@ export const updateBudget = async (req: any, res: Response) => {
                 : budget.walletId
                   ? String(budget.walletId)
                   : null;
-        const nextCategoryRaw =
-            category !== undefined ? String(category || "").trim() : budget.category;
+        // Only the value the client actually sent is re-validated. Checking the
+        // stored category locked every budget whose category is not one of the
+        // eight standard strings out of editing entirely — even renaming it or
+        // changing its amount came back as "danh mục không hợp lệ" — and a
+        // category the budget already carries stays acceptable.
+        const providedCategory =
+            category !== undefined ? String(category || "").trim() : "";
         const nextCategory =
-            normalizeStandardCategory(nextCategoryRaw) || "";
+            category === undefined
+                ? budget.category
+                : normalizeStandardCategory(providedCategory) ||
+                  (providedCategory === budget.category ? providedCategory : "");
         const nextAmount =
             amount !== undefined ? toNumber(amount, budget.amount) : budget.amount;
         const nextMonth =
@@ -498,27 +550,6 @@ export const updateBudget = async (req: any, res: Response) => {
             : null;
         if (nextWalletId && !wallet) {
             return res.status(404).json({ message: "Không tìm thấy ví áp dụng ngân sách" });
-        }
-
-        const hasLinkedTransactions = await Transaction.countDocuments({
-            userId,
-            budgetId: budget._id,
-        });
-
-        const currentWalletId = budget.walletId
-            ? String(budget.walletId)
-            : null;
-
-        // Widening a budget to every wallet keeps existing links valid, so only
-        // moving it to a *different* wallet would orphan them.
-        const movesToAnotherWallet =
-            Boolean(nextWalletId) && currentWalletId !== nextWalletId;
-
-        if (hasLinkedTransactions > 0 && movesToAnotherWallet) {
-            return res.status(400).json({
-                message:
-                    "Không thể đổi ví của ngân sách đã có giao dịch liên kết.",
-            });
         }
 
         const conflict = await Budget.findOne({
@@ -571,7 +602,33 @@ export const updateBudget = async (req: any, res: Response) => {
         }
 
         await budget.save();
-        return res.json(budget);
+
+        // Moving a budget to another month or another wallet leaves transactions
+        // pointing at a period they no longer belong to, which used to make the
+        // budget report 0 spent while the money was still gone. Spending is
+        // matched by category now, so dropping the stale pointer loses nothing.
+        const periodStart = getMonthStart(budget.month, budget.year);
+        const periodEnd = getMonthStart(
+            budget.month === 12 ? 1 : budget.month + 1,
+            budget.month === 12 ? budget.year + 1 : budget.year,
+        );
+        const staleConditions: Record<string, unknown>[] = [
+            { date: { $lt: periodStart } },
+            { date: { $gte: periodEnd } },
+        ];
+        if (budget.walletId) {
+            staleConditions.push({ walletId: { $ne: budget.walletId } });
+        }
+
+        const unlinked = await Transaction.updateMany(
+            { userId, budgetId: budget._id, $or: staleConditions },
+            { budgetId: null },
+        );
+
+        return res.json({
+            ...budget.toObject(),
+            unlinkedTransactions: unlinked.modifiedCount || 0,
+        });
     } catch (error) {
         console.error("Error updating budget:", error);
         return res.status(500).json({ message: "Lỗi cập nhật ngân sách" });
@@ -579,24 +636,38 @@ export const updateBudget = async (req: any, res: Response) => {
 };
 
 export const deleteBudget = async (req: any, res: Response) => {
+    // Delete and unlink share one session: if the process died between them,
+    // transactions kept pointing at a budget that no longer existed and every
+    // later edit of those rows failed with "không tìm thấy ngân sách".
+    const session = await Budget.startSession();
+    session.startTransaction();
+
     try {
         const userId = req.user.uid;
         const { id } = req.params;
 
-        const budget = await Budget.findOneAndDelete({ _id: id, userId });
+        const budget = await Budget.findOne({ _id: id, userId }).session(
+            session,
+        );
         if (!budget) {
+            await session.abortTransaction();
             return res.status(404).json({ message: "Không tìm thấy ngân sách" });
         }
 
         await Transaction.updateMany(
             { budgetId: new Types.ObjectId(id as string), userId },
             { budgetId: null },
-        );
+        ).session(session);
+        await Budget.deleteOne({ _id: budget._id, userId }).session(session);
+        await session.commitTransaction();
 
         return res.json({ message: "Xóa ngân sách thành công" });
     } catch (error) {
+        await session.abortTransaction();
         console.error("Error deleting budget:", error);
         return res.status(500).json({ message: "Lỗi xóa ngân sách" });
+    } finally {
+        session.endSession();
     }
 };
 

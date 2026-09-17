@@ -144,6 +144,8 @@ const Goals: React.FC = () => {
         delete: "Xóa",
         deleteGoal: "Xóa mục tiêu",
         deleteGoalDesc: (title: string) => `Xóa mục tiêu "${title}"?`,
+        refundNotice: (amount: number) =>
+          `${formatCurrency(amount)} đang tích luỹ sẽ được hoàn về ví của bạn.`,
         loadFailed: "Không thể tải mục tiêu",
         retry: "Vui lòng thử lại.",
         deposit: "Nạp tiền",
@@ -219,6 +221,8 @@ const Goals: React.FC = () => {
         delete: "Delete",
         deleteGoal: "Delete goal",
         deleteGoalDesc: (title: string) => `Delete goal "${title}"?`,
+        refundNotice: (amount: number) =>
+          `The ${formatCurrency(amount)} saved will be returned to your wallet.`,
         loadFailed: "Could not load goals",
         retry: "Please retry.",
         deposit: "Add money",
@@ -572,9 +576,13 @@ const Goals: React.FC = () => {
       if (!token) {
         return;
       }
-      await goalApi.deleteGoal(pendingDelete._id, token);
+      const response = await goalApi.deleteGoal(pendingDelete._id, token);
+      // Deleting a funded goal hands the money back to a wallet, so the server
+      // says where it went; staying silent would look like the savings vanished.
+      const refundedAmount = Number(response?.data?.refundedAmount || 0);
       toast({
         title: copy.goalDeleted,
+        description: refundedAmount > 0 ? response?.message : undefined,
         variant: "success",
       });
       setPendingDelete(null);
@@ -849,6 +857,7 @@ const Goals: React.FC = () => {
           delete: copy.delete,
           deleteGoal: copy.deleteGoal,
           deleteGoalDesc: copy.deleteGoalDesc,
+          refundNotice: copy.refundNotice,
           keep: copy.keep,
         }}
         goal={pendingDelete}

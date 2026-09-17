@@ -381,3 +381,186 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.05),
         0 10px 24px -18px rgba(2, 6, 23, 0.5);
 }
+
+/* ==========================================================================
+   Giao dien v2 - a flat skin layered over the very same components.
+   Every rule below is scoped to [data-ui-version="v2"], so switching back to
+   v1 restores the original look with nothing left behind.
+   ========================================================================== */
+
+/* The tokens are redeclared on <body> instead of :root on purpose:
+   applyAppearance writes --app-radius-* and --app-page-background as inline
+   styles on <html>, and an inline declaration outranks any stylesheet rule.
+   One level down the whole tree still inherits them, no !important needed. */
+:root[data-ui-version="v2"] body {
+    --app-background: #f4f5f7;
+    --app-card: #ffffff;
+    --app-muted: #f1f3f6;
+    --app-muted-foreground: #74809a;
+    --app-border: rgba(15, 23, 42, 0.1);
+    --app-input: #ffffff;
+    /* A plain canvas: v2 lets the content carry the colour, not the page. */
+    --app-page-background: #f4f5f7;
+    --app-radius-sm: 10px;
+    --app-radius-md: 12px;
+    --app-radius-lg: 20px;
+    --app-radius-xl: 24px;
+    /* Money only lines up in a column when every digit has one advance width. */
+    font-variant-numeric: tabular-nums;
+}
+
+:root[data-ui-version="v2"][data-theme="dark"] body {
+    --app-background: #0b0e14;
+    --app-card: #151a23;
+    --app-muted: #1b212c;
+    --app-muted-foreground: #8593ab;
+    --app-border: rgba(148, 163, 184, 0.16);
+    --app-input: #151a23;
+    --app-page-background: #0b0e14;
+}
+
+/* Hierarchy has to do the work the background used to do. Left unimportant so
+   headings that already ship a tracking utility keep their own value. */
+:root[data-ui-version="v2"] h1,
+:root[data-ui-version="v2"] h2,
+:root[data-ui-version="v2"] h3,
+:root[data-ui-version="v2"] h4 {
+    letter-spacing: -0.01em;
+}
+
+/* Card titles gain the extra step the flat surfaces need to stay readable.
+   Tailwind runs with `important: true`, so overriding a utility means
+   out-specifying it *and* matching its !important. */
+:root[data-ui-version="v2"] h3.text-lg {
+    font-size: 1.1875rem !important;
+    line-height: 1.65rem !important;
+}
+
+/* Opaque panels: without the blur the text sits on a stable surface instead
+   of a smeared copy of whatever scrolls behind it. */
+:root[data-ui-version="v2"] .glass-panel {
+    background: var(--app-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+:root[data-ui-version="v2"] .app-shell::before {
+    display: none;
+}
+
+:root[data-ui-version="v2"] .app-sidebar-panel {
+    border-color: var(--app-border);
+    background: var(--app-card);
+    box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* The content panel drops to the canvas tone so the white cards inside it
+   read as the foreground layer. */
+:root[data-ui-version="v2"] .app-content-panel {
+    border-color: var(--app-border);
+    background: var(--app-background);
+    box-shadow: none;
+}
+
+:root[data-ui-version="v2"] .app-main-surface {
+    border-top-color: var(--app-border);
+    background: transparent;
+    box-shadow: none;
+}
+
+/* One hairline plus a shadow that only lifts the card off the canvas,
+   replacing the deep v1 float. */
+:root[data-ui-version="v2"] .bg-card.shadow-sm {
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.04),
+        0 10px 24px -20px rgba(15, 23, 42, 0.35) !important;
+}
+
+:root[data-ui-version="v2"][data-theme="dark"] .bg-card.shadow-sm {
+    box-shadow:
+        0 1px 2px rgba(2, 6, 23, 0.5),
+        0 12px 28px -22px rgba(2, 6, 23, 0.9) !important;
+}
+
+/* A quarter rem of extra breathing room inside every card region. */
+:root[data-ui-version="v2"] .bg-card > .p-4 {
+    padding: 1.25rem !important;
+}
+
+:root[data-ui-version="v2"] .app-header-shell {
+    border-radius: var(--app-radius-xl);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+:root[data-ui-version="v2"] .app-header-shell::before {
+    display: none;
+}
+
+:root[data-ui-version="v2"] .app-header-shell.is-scrolled {
+    border-color: var(--app-border);
+    background: var(--app-card);
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.05),
+        0 12px 28px -24px rgba(15, 23, 42, 0.4);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+:root[data-ui-version="v2"][data-theme="dark"] .app-header-shell.is-scrolled {
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.04),
+        0 16px 34px -26px rgba(2, 6, 23, 0.9);
+}
+
+:root[data-ui-version="v2"] .mobile-bottom-nav {
+    border-color: var(--app-border);
+    background: var(--app-card);
+    box-shadow: 0 18px 40px -28px rgba(15, 23, 42, 0.55);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+:root[data-ui-version="v2"][data-theme="dark"] .mobile-bottom-nav {
+    box-shadow: 0 18px 40px -24px rgba(2, 6, 23, 0.95);
+}
+
+:root[data-ui-version="v2"] .mobile-bottom-nav-sheen {
+    display: none;
+}
+
+/* Active navigation becomes a soft-primary pill. A solid brand fill was the
+   loudest thing on screen once the background stopped competing. */
+:root[data-ui-version="v2"] nav a.bg-primary,
+:root[data-ui-version="v2"] .mobile-bottom-nav a.bg-white {
+    background-color: var(--app-primary-soft) !important;
+    color: var(--app-primary) !important;
+    box-shadow: none !important;
+}
+
+/* The trigger only carries the `md:` variant of this class, so the override
+   has to match the escaped utility and stay inside the same breakpoint. */
+@media (min-width: 768px) {
+    :root[data-ui-version="v2"] .md\:app-header-user-trigger,
+    :root[data-ui-version="v2"] .md\:app-header-user-trigger.is-scrolled {
+        border-color: var(--app-border);
+        background: var(--app-muted);
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    /* The flat background outranks the v1 hover tint, so restate the feedback. */
+    :root[data-ui-version="v2"] .md\:app-header-user-trigger:hover,
+    :root[data-ui-version="v2"] .md\:app-header-user-trigger.is-scrolled:hover {
+        background: var(--app-primary-soft);
+    }
+}
+
+@media (min-width: 640px) {
+    :root[data-ui-version="v2"] .bg-card > .p-4 {
+        padding: 1.5rem !important;
+    }
+}

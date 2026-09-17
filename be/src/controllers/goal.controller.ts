@@ -1,5 +1,13 @@
 import { Request, Response } from "express";
+import { ClientSession } from "mongoose";
 import Goal from "../models/Goal";
+import Transaction, {
+    TransactionStatus,
+    TransactionType,
+} from "../models/Transaction";
+import Wallet from "../models/Wallet";
+import { GOAL_REFUND_CATEGORY } from "../constants/categories";
+import { touchTransactionCacheState } from "../utils/transaction-cache";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 
@@ -190,28 +198,130 @@ export const updateGoal = [
     },
 ];
 
+/**
+ * Ví nhận lại tiền khi xoá một mục tiêu đang có số dư: ưu tiên chính ví đã nạp
+ * vào mục tiêu gần nhất, vì đó là nơi người dùng mong tiền quay về.
+ */
+const findWalletForGoalRefund = async (
+    goalId: unknown,
+    userId: string,
+    session: ClientSession,
+) => {
+    const lastDeposit = await Transaction.findOne({
+        userId,
+        goalId,
+        type: TransactionType.GOAL_DEPOSIT,
+    })
+        .sort({ date: -1, createdAt: -1 })
+        .session(session);
+
+    if (lastDeposit) {
+        const depositWallet = await Wallet.findOne({
+            _id: lastDeposit.walletId,
+            userId,
+        }).session(session);
+
+        if (depositWallet) {
+            return depositWallet;
+        }
+    }
+
+    return Wallet.findOne({ userId, isArchived: { $ne: true } }).session(
+        session,
+    );
+};
+
 export const deleteGoal = async (req: any, res: Response) => {
+    const session = await Goal.startSession();
+    session.startTransaction();
+
     try {
         const { id } = req.params;
         const userId = req.user.uid;
 
-        const goal = await Goal.findOneAndDelete({ _id: id, userId });
+        const goal = await Goal.findOne({ _id: id, userId }).session(session);
         if (!goal) {
+            await session.abortTransaction();
             return res.status(404).json({ message: "Không tìm thấy mục tiêu" });
         }
 
-        // Nullify goal reference in transactions
-        const { Types } = await import("mongoose");
-        const Transaction = (await import("../models/Transaction")).default;
-        await Transaction.updateMany(
-            { goalId: new Types.ObjectId(id as string), userId },
-            { goalId: null },
-        );
+        const savedAmount = Math.max(Number(goal.currentAmount || 0), 0);
+        let refundWallet: any = null;
 
-        res.json({ message: "Xóa mục tiêu thành công" });
+        if (savedAmount > 0) {
+            // The money sitting in a goal was really taken out of a wallet. The
+            // old delete removed the goal and left that money in no wallet, no
+            // goal and no total: it simply disappeared from the user's books.
+            const requestedWalletId = String(
+                req.body?.refundWalletId || "",
+            ).trim();
+
+            refundWallet = requestedWalletId
+                ? await Wallet.findOne({
+                      _id: requestedWalletId,
+                      userId,
+                  }).session(session)
+                : await findWalletForGoalRefund(goal._id, userId, session);
+
+            if (!refundWallet) {
+                await session.abortTransaction();
+                return res.status(400).json({
+                    message:
+                        "Hãy chọn ví để nhận lại số tiền đã tích luỹ trong mục tiêu này.",
+                    requiresRefundWallet: true,
+                    savedAmount,
+                });
+            }
+
+            const refund = new Transaction({
+                userId,
+                walletId: refundWallet._id,
+                type: TransactionType.GOAL_WITHDRAW,
+                status: TransactionStatus.COMPLETED,
+                amount: savedAmount,
+                category: GOAL_REFUND_CATEGORY,
+                date: new Date(),
+                note: `Hoàn tiền khi xoá mục tiêu "${goal.title}"`,
+                isSystemGenerated: true,
+                isDeletable: true,
+            });
+
+            refundWallet.balance =
+                Number(refundWallet.balance || 0) + savedAmount;
+            refundWallet.hasTransactions = true;
+
+            await refund.save({ session });
+            await refundWallet.save({ session });
+        }
+
+        // Both writes share the session: unlinking without deleting, or the
+        // reverse, would leave transactions pointing at a goal that is gone.
+        await Transaction.updateMany(
+            { goalId: goal._id, userId },
+            { goalId: null },
+        ).session(session);
+        await Goal.deleteOne({ _id: goal._id, userId }).session(session);
+        await touchTransactionCacheState(userId, req.user, session);
+        await session.commitTransaction();
+
+        return res.json({
+            message:
+                savedAmount > 0
+                    ? `Đã xoá mục tiêu và hoàn ${savedAmount.toLocaleString(
+                          "vi-VN",
+                      )} ₫ về ví "${refundWallet.name}"`
+                    : "Xóa mục tiêu thành công",
+            data: {
+                refundedAmount: savedAmount,
+                refundWalletId: refundWallet ? refundWallet._id : null,
+            },
+        });
     } catch (error) {
+        await session.abortTransaction();
         console.error("Error deleting goal:", error);
-        res.status(500).json({ message: "Lỗi xóa mục tiêu" });
+        return res.status(500).json({ message: "Lỗi xóa mục tiêu" });
+    } finally {
+        session.endSession();
     }
 };
 

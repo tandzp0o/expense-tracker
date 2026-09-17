@@ -43,7 +43,7 @@ import {
   categoryOptions,
   incomeCategoryOptions,
   transactionStatusText,
-  FREE_SPENDING_CATEGORY,
+  DEFAULT_EXPENSE_CATEGORY,
 } from "../constants";
 import { budgetApi, transactionApi, walletApi } from "../services/transactionApi";
 import { TransactionFilters } from "../components/TransactionFilters";
@@ -68,6 +68,21 @@ interface BudgetOption {
   remaining: number;
 }
 
+interface TransactionWarning {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+// The server records what actually happened instead of refusing it, and reports
+// what it had to bend (a wallet going negative, a budget over its cap, a future
+// date turned into a schedule) as warnings to read after the fact.
+const extractWarnings = (response: any): TransactionWarning[] => {
+  const warnings = response?.warnings ?? response?.data?.warnings;
+
+  return Array.isArray(warnings) ? warnings : [];
+};
+
 const transactionTypeText = {
   INCOME: { vi: "Thu nhập", en: "Income" },
   EXPENSE: { vi: "Chi tiêu", en: "Expense" },
@@ -75,14 +90,55 @@ const transactionTypeText = {
   GOAL_WITHDRAW: { vi: "Rút mục tiêu", en: "Goal withdrawal" },
 } as const;
 
+// vi-VN groups thousands with dots, so "1.000.000" is a million rather than a
+// one with decimals. Only a single comma can be the decimal mark, or a lone dot
+// that cannot be a group of three; every other separator is grouping.
+const findDecimalSeparatorIndex = (value: string) => {
+  const lastComma = value.lastIndexOf(",");
+  const lastDot = value.lastIndexOf(".");
+
+  if ((value.match(/,/g) || []).length === 1 && lastComma > lastDot) {
+    return lastComma;
+  }
+
+  if (
+    lastComma < 0 &&
+    (value.match(/\./g) || []).length === 1 &&
+    value.length - lastDot - 1 !== 3
+  ) {
+    return lastDot;
+  }
+
+  return -1;
+};
+
 const parseAmount = (raw: unknown) => {
   if (typeof raw === "number") {
     return raw;
   }
-  if (typeof raw === "string") {
-    return parseFloat(raw.replace(/[^0-9.-]/g, "")) || 0;
+
+  if (typeof raw !== "string") {
+    return 0;
   }
-  return 0;
+
+  const cleaned = raw.replace(/[^0-9.,-]/g, "");
+  if (!cleaned) {
+    return 0;
+  }
+
+  const sign = cleaned.startsWith("-") ? -1 : 1;
+  const body = cleaned.replace(/-/g, "");
+  const decimalIndex = findDecimalSeparatorIndex(body);
+  const whole = (
+    decimalIndex < 0 ? body : body.slice(0, decimalIndex)
+  ).replace(/[^0-9]/g, "");
+  const fraction =
+    decimalIndex < 0
+      ? ""
+      : body.slice(decimalIndex + 1).replace(/[^0-9]/g, "");
+  const parsed = Number(`${whole || "0"}.${fraction || "0"}`);
+
+  return Number.isFinite(parsed) ? sign * parsed : 0;
 };
 
 const isTransferTransaction = (
@@ -288,8 +344,8 @@ const TransactionsPage: React.FC = () => {
     allStatuses: isVietnamese ? "Tất cả trạng thái" : "All statuses",
     selectStatus: isVietnamese ? "Chọn trạng thái" : "Select status",
     statusHelp: isVietnamese
-      ? "Khoản tương lai phải để ở trạng thái đã lên lịch hoặc đang chờ."
-      : "Future items must stay in scheduled or pending status.",
+      ? "Cứ chọn đúng ngày khoản tiền thực sự xảy ra, kể cả khi bạn ghi lại muộn."
+      : "Pick the day this actually happened, even when you are logging it late.",
     plannedDeleteWarning: (label: string) =>
       isVietnamese
         ? `Xóa "${label}"? Đây là khoản kế hoạch nên số dư sẽ không thay đổi.`
@@ -297,43 +353,43 @@ const TransactionsPage: React.FC = () => {
     plannedDeleteSuccess: isVietnamese
       ? "Khoản kế hoạch đã được gỡ khỏi danh sách."
       : "The planned item has been removed.",
-    futureCompletedTitle: isVietnamese
-      ? "Khoản tương lai phải lên lịch"
-      : "Future transactions must be planned",
-    futureCompletedDesc: isVietnamese
-      ? "Nếu ngày lớn hơn hôm nay, hãy chuyển trạng thái sang Đã lên lịch."
-      : "If the date is in the future, switch the status to Scheduled.",
+    futureDateHint: isVietnamese
+      ? "Ngày này ở tương lai nên khoản sẽ được lưu ở trạng thái Đã lên lịch."
+      : "This date is in the future, so it will be saved as Scheduled.",
     expenseBudget: isVietnamese
-      ? "Ng\u00e2n s\u00e1ch chi ti\u00eau"
+      ? "Ngân sách chi tiêu"
       : "Expense budget",
     incomeCategory: isVietnamese
-      ? "Nh\u00f3m thu nh\u1eadp"
+      ? "Nhóm thu nhập"
       : "Income category",
-    selectBudget: isVietnamese
-      ? "Không dùng ngân sách (chi tiêu tự do)"
-      : "No budget (free spending)",
+    expenseCategoryHint: isVietnamese
+      ? "Danh mục quyết định khoản chi này nằm ở đâu trong báo cáo. Ngân sách chỉ thêm hạn mức cho danh mục đó."
+      : "The category decides where this expense appears in reports. A budget only adds a limit on top of it.",
+    noteOptional: isVietnamese ? "Ghi chú (không bắt buộc)" : "Note (optional)",
+    selectBudget: isVietnamese ? "Không gắn ngân sách" : "No budget",
+    linkedBudgetMissing: isVietnamese
+      ? "Ngân sách đã gắn trước đó (không thuộc tháng này)"
+      : "Previously linked budget (outside this month)",
     budgetHint: isVietnamese
-      ? "Chọn ngân sách nếu bạn muốn khoản chi này được trừ vào hạn mức tháng. Bỏ trống cũng được, khoản chi vẫn được ghi nhận vào mục Chi tiêu tự do."
-      : "Pick a budget if you want this expense counted against a monthly limit. Leaving it empty is fine, the expense is recorded under Free spending.",
+      ? "Chọn ngân sách nếu bạn muốn khoản chi này được trừ vào hạn mức tháng. Bỏ trống cũng được, khoản chi vẫn được ghi theo danh mục bạn chọn."
+      : "Pick a budget if you want this expense counted against a monthly limit. Leaving it empty is fine, the expense keeps the category you chose.",
     budgetEmpty: isVietnamese
-      ? "Tháng đã chọn chưa có ngân sách nào áp dụng được, nên khoản chi sẽ vào mục Chi tiêu tự do. Chỉ cần lập ngân sách khi bạn muốn đặt hạn mức cho một nhóm chi."
-      : "No budget applies to the selected month, so the expense goes to Free spending. Create a budget only when you want a spending limit for a category.",
-    incomeCategoryRequiredDesc: isVietnamese
-      ? "H\u00e3y ch\u1ecdn m\u1ed9t nh\u00f3m thu nh\u1eadp ph\u00f9 h\u1ee3p."
-      : "Choose an income category.",
+      ? "Tháng đã chọn chưa có ngân sách nào, khoản chi vẫn được ghi theo danh mục bạn chọn. Chỉ cần lập ngân sách khi bạn muốn đặt hạn mức cho một nhóm chi."
+      : "No budget exists for the selected month; the expense still keeps the category you chose. Create a budget only when you want a spending limit.",
     otherIncomeNoteHint: isVietnamese
-      ? 'B\u1ea1n \u0111ang ch\u1ecdn "Kh\u00e1c", h\u00e3y ghi r\u00f5 ngu\u1ed3n thu \u1edf ph\u1ea7n ghi ch\u00fa \u0111\u1ec3 d\u00f2ng ti\u1ec1n kh\u00f4ng b\u1ecb m\u01a1 h\u1ed3.'
+      ? 'Bạn đang chọn "Khác", hãy ghi rõ nguồn thu ở phần ghi chú để dòng tiền không bị mơ hồ.'
       : 'You selected "Other". Add a clear note so this income source is not ambiguous.',
     otherIncomeNotePlaceholder: isVietnamese
-      ? "V\u00ed d\u1ee5: Ti\u1ec1n m\u1eebng, b\u00e1n \u0111\u1ed3 c\u0169, ho\u00e0n ti\u1ec1n..."
+      ? "Ví dụ: Tiền mừng, bán đồ cũ, hoàn tiền..."
       : "Example: Gift money, sold old item, reimbursement...",
     loadingBudgets: isVietnamese
-      ? "\u0110ang t\u1ea3i ng\u00e2n s\u00e1ch..."
+      ? "Đang tải ngân sách..."
       : "Loading budgets...",
   };
   const todayDate = toDateInputValue(new Date(), timezoneOffsetMinutes);
-  const futureDateErrorTitle = copy.futureCompletedTitle;
-  const futureDateErrorDesc = copy.futureCompletedDesc;
+  // A future date is never refused: the server stores it as SCHEDULED and the
+  // form only says so, so people can log what they already know is coming.
+  const isFutureDate = formValues.date > todayDate;
   const getCategoryLabel = (category: string) => {
     if (category === "Transfer") {
       return isVietnamese ? "Chuyển khoản" : "Transfer";
@@ -449,12 +505,6 @@ const TransactionsPage: React.FC = () => {
       year: selectedDate.year(),
     };
   }, [formValues.date]);
-  const selectedExpenseBudget = useMemo(
-    () =>
-      expenseBudgets.find((budget) => budget._id === formValues.budgetId) ||
-      null,
-    [expenseBudgets, formValues.budgetId],
-  );
   const incomeCategoryOptionsForForm = useMemo(() => {
     const hasCurrentCategory = incomeCategoryOptions.some(
       (item) => item.value === formValues.category,
@@ -474,6 +524,31 @@ const TransactionsPage: React.FC = () => {
         value: formValues.category,
         vi: formValues.category,
         en: formValues.category,
+      },
+    ];
+  }, [formValues.category, formValues.type]);
+  const expenseCategoryOptionsForForm = useMemo(() => {
+    const currentCategory = String(formValues.category || "").trim();
+    const hasCurrentCategory = categoryOptions.some(
+      (item) => item.value === currentCategory,
+    );
+
+    if (
+      formValues.type !== "EXPENSE" ||
+      !currentCategory ||
+      hasCurrentCategory
+    ) {
+      return categoryOptions;
+    }
+
+    // Older rows carry categories the taxonomy no longer offers; keeping the
+    // stored value in the list is what stops an edit from silently changing it.
+    return [
+      ...categoryOptions,
+      {
+        value: currentCategory,
+        vi: currentCategory,
+        en: currentCategory,
       },
     ];
   }, [formValues.category, formValues.type]);
@@ -550,7 +625,7 @@ const TransactionsPage: React.FC = () => {
   }, [filterCategories, selectedCategory, transactions]);
 
   useEffect(() => {
-    if (!modalOpen || formValues.type !== "EXPENSE" || !formValues.walletId) {
+    if (!modalOpen || formValues.type !== "EXPENSE") {
       setExpenseBudgets([]);
       setExpenseBudgetsLoading(false);
       return;
@@ -566,9 +641,10 @@ const TransactionsPage: React.FC = () => {
           return;
         }
 
+        // Most budgets apply to every wallet (walletId null); filtering by the
+        // picked wallet hid exactly those, so the month is the only filter.
         const summary = await budgetApi.getBudgetSummary(
           {
-            walletId: formValues.walletId,
             month: currentBudgetPeriod.month,
             year: currentBudgetPeriod.year,
           },
@@ -582,37 +658,27 @@ const TransactionsPage: React.FC = () => {
         const nextBudgets: BudgetOption[] = summary?.items || [];
         setExpenseBudgets(nextBudgets);
 
+        // An existing transaction keeps whatever it was saved with: its budget
+        // may belong to another month or have been deleted, and dropping the
+        // link here would quietly recategorise a row the user only came to fix.
+        if (editing) {
+          return;
+        }
+
         setFormValues((current) => {
-          if (current.type !== "EXPENSE") {
-            return current;
-          }
-
-          // Budgets are optional, so never auto-attach one the user did not
-          // choose: only keep a selection that is still valid for this wallet.
-          const matchedBudget =
-            nextBudgets.find((budget) => budget._id === current.budgetId) ||
-            nextBudgets.find(
-              (budget) =>
-                !current.budgetId &&
-                current.category &&
-                budget.category === current.category,
-            ) ||
-            null;
-
-          const nextBudgetId = matchedBudget?._id || "";
-          const nextCategory = matchedBudget?.category || "";
-
+          // Budgets are optional and never auto-attached, so the only thing to
+          // reconcile is a selection that is no longer offered for this month.
           if (
-            current.budgetId === nextBudgetId &&
-            current.category === nextCategory
+            current.type !== "EXPENSE" ||
+            !current.budgetId ||
+            nextBudgets.some((budget) => budget._id === current.budgetId)
           ) {
             return current;
           }
 
           return {
             ...current,
-            budgetId: nextBudgetId,
-            category: nextCategory,
+            budgetId: "",
           };
         });
       } catch (error: any) {
@@ -643,20 +709,25 @@ const TransactionsPage: React.FC = () => {
     copy.saveFailed,
     currentBudgetPeriod.month,
     currentBudgetPeriod.year,
+    editing,
     formValues.type,
-    formValues.walletId,
     modalOpen,
     toast,
   ]);
 
   useEffect(() => {
-    if (!modalOpen || formValues.type !== "INCOME" || formValues.category) {
+    if (!modalOpen || formValues.category) {
       return;
     }
 
+    // Both pickers are always visible, so an empty category would show the
+    // first option while saving something else.
     setFormValues((current) => ({
       ...current,
-      category: incomeCategoryOptions[0].value,
+      category:
+        current.type === "INCOME"
+          ? incomeCategoryOptions[0].value
+          : DEFAULT_EXPENSE_CATEGORY,
     }));
   }, [formValues.category, formValues.type, modalOpen]);
 
@@ -795,7 +866,7 @@ const TransactionsPage: React.FC = () => {
         status: "COMPLETED",
         amount: 0,
         note: "",
-        category: "",
+        category: DEFAULT_EXPENSE_CATEGORY,
         budgetId: "",
         walletId: wallets[0]?._id || "",
         date: toDateInputValue(new Date(), timezoneOffsetMinutes),
@@ -870,42 +941,9 @@ const TransactionsPage: React.FC = () => {
       return;
     }
 
-    if (
-      formValues.type === "INCOME" &&
-      !String(formValues.category || "").trim()
-    ) {
-      toast({
-        title: copy.incomeCategory,
-        description: copy.incomeCategoryRequiredDesc,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!String(formValues.note || "").trim()) {
-      toast({
-        title: isVietnamese ? "Cần nhập ghi chú" : "Note required",
-        description: isVietnamese
-          ? "Vui lòng nhập nội dung ghi chú để hệ thống AI phân loại chính xác hơn."
-          : "Please provide a note so AI categorization can be improved later.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (
-      formValues.date > todayDate &&
-      formValues.status !== "SCHEDULED" &&
-      formValues.status !== "PENDING"
-    ) {
-      toast({
-        title: futureDateErrorTitle,
-        description: futureDateErrorDesc,
-        variant: "destructive",
-      });
-      return;
-    }
-
+    // Nothing else blocks the save: the note is optional and a future date is
+    // stored as a scheduled item, because refusing an entry only means the
+    // spending never gets recorded at all.
     setSubmitting(true);
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -919,13 +957,17 @@ const TransactionsPage: React.FC = () => {
         amount: formValues.amount,
         note: formValues.note,
         walletId: formValues.walletId,
+        // The category is the user's own answer to "what was this?", not a
+        // side effect of the budget they happened to pick.
         category:
-          formValues.type === "EXPENSE"
-            ? selectedExpenseBudget?.category || FREE_SPENDING_CATEGORY
-            : String(formValues.category || "").trim(),
-        ...(formValues.type === "EXPENSE"
-          ? { budgetId: selectedExpenseBudget?._id }
-          : { budgetId: undefined }),
+          String(formValues.category || "").trim() ||
+          (formValues.type === "EXPENSE" ? DEFAULT_EXPENSE_CATEGORY : ""),
+        // JSON.stringify drops undefined, so clearing the budget has to travel
+        // as an explicit null or the server keeps the previous link.
+        budgetId:
+          formValues.type === "EXPENSE" && formValues.budgetId
+            ? formValues.budgetId
+            : null,
         // Midday of the picked day *in the selected timezone*, so the stored
         // instant lands on that calendar day no matter where it is read from.
         date: new Date(
@@ -942,19 +984,23 @@ const TransactionsPage: React.FC = () => {
         timezoneOffset: timezoneOffsetMinutes,
       };
 
-      if (editing) {
-        await transactionApi.updateTransaction(editing._id, payload, token);
+      const response = editing
+        ? await transactionApi.updateTransaction(editing._id, payload, token)
+        : await transactionApi.createTransaction(payload, token);
+
+      toast({
+        title: editing ? copy.transactionUpdated : copy.transactionCreated,
+        variant: "success",
+      });
+
+      // The save already s쳮ded, so anything the server adjusted is news to
+      // pass on, not an error to alarm the user with.
+      extractWarnings(response).forEach((warning) => {
         toast({
-          title: copy.transactionUpdated,
-          variant: "success",
+          title: warning.message,
+          variant: "default",
         });
-      } else {
-        await transactionApi.createTransaction(payload, token);
-        toast({
-          title: copy.transactionCreated,
-          variant: "success",
-        });
-      }
+      });
 
       setModalOpen(false);
       setAmountInput("");
@@ -1188,15 +1234,19 @@ const TransactionsPage: React.FC = () => {
           budgetEmpty: copy.budgetEmpty,
           budgetHint: copy.budgetHint,
           cancel: copy.cancel,
+          category: copy.category,
           createTransaction: copy.createTransaction,
           createTransactionTitle: copy.createTransactionTitle,
           date: copy.date,
           editTransaction: copy.editTransaction,
           expenseBudget: copy.expenseBudget,
+          expenseCategoryHint: copy.expenseCategoryHint,
           formDescription: copy.formDescription,
+          futureDateHint: copy.futureDateHint,
           incomeCategory: copy.incomeCategory,
+          linkedBudgetMissing: copy.linkedBudgetMissing,
           loadingBudgets: copy.loadingBudgets,
-          note: copy.note,
+          noteOptional: copy.noteOptional,
           otherIncomeNoteHint: copy.otherIncomeNoteHint,
           otherIncomeNotePlaceholder: copy.otherIncomeNotePlaceholder,
           saving: copy.saving,
@@ -1214,10 +1264,12 @@ const TransactionsPage: React.FC = () => {
         editing={editing}
         expenseBudgets={expenseBudgets}
         expenseBudgetsLoading={expenseBudgetsLoading}
+        expenseCategoryOptionsForForm={expenseCategoryOptionsForForm}
         formatCurrency={formatCurrency}
         formValues={formValues}
         getTransactionStatusLabel={getTransactionStatusLabel}
         incomeCategoryOptionsForForm={incomeCategoryOptionsForForm}
+        isFutureDate={isFutureDate}
         isVietnamese={isVietnamese}
         language={language}
         onAmountChange={handleAmountChange}

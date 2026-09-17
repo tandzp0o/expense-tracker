@@ -10,7 +10,10 @@ import {
 import { Input } from "components/ui/input";
 import { Select } from "components/ui/select";
 import { Textarea } from "components/ui/textarea";
-import { incomeCategoryOptions } from "../constants";
+import {
+  DEFAULT_EXPENSE_CATEGORY,
+  incomeCategoryOptions,
+} from "../constants";
 import type { Transaction, TransactionStatus } from "../components/TransactionList";
 import type { WalletItem } from "../components/TransactionFilters";
 
@@ -48,9 +51,12 @@ export interface TransactionFormModalCopy {
   amount: string;
   typeExpense: string;
   typeIncome: string;
+  category: string;
   expenseBudget: string;
+  expenseCategoryHint: string;
   incomeCategory: string;
   selectBudget: string;
+  linkedBudgetMissing: string;
   loadingBudgets: string;
   budgetHint: string;
   budgetEmpty: string;
@@ -58,7 +64,8 @@ export interface TransactionFormModalCopy {
   selectWallet: string;
   date: string;
   statusHelp: string;
-  note: string;
+  futureDateHint: string;
+  noteOptional: string;
   whatHappened: string;
   otherIncomeNotePlaceholder: string;
   otherIncomeNoteHint: string;
@@ -79,12 +86,18 @@ export interface TransactionFormModalProps {
   wallets: WalletItem[];
   expenseBudgets: ExpenseBudgetOption[];
   expenseBudgetsLoading: boolean;
+  expenseCategoryOptionsForForm: ReadonlyArray<{
+    value: string;
+    vi: string;
+    en: string;
+  }>;
   incomeCategoryOptionsForForm: ReadonlyArray<{
     value: string;
     vi: string;
     en: string;
   }>;
   composerModeCopy: ComposerModeBanner | null;
+  isFutureDate: boolean;
   shouldHighlightIncomeOtherNote: boolean;
   submitting: boolean;
   formatCurrency: (value: number) => string;
@@ -106,8 +119,10 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   wallets,
   expenseBudgets,
   expenseBudgetsLoading,
+  expenseCategoryOptionsForForm,
   incomeCategoryOptionsForForm,
   composerModeCopy,
+  isFutureDate,
   shouldHighlightIncomeOtherNote,
   submitting,
   formatCurrency,
@@ -171,7 +186,9 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                     ...current,
                     type: nextType,
                     category:
-                      nextType === "INCOME" ? incomeCategoryOptions[0].value : "",
+                      nextType === "INCOME"
+                        ? incomeCategoryOptions[0].value
+                        : DEFAULT_EXPENSE_CATEGORY,
                     budgetId: "",
                   };
                 })
@@ -226,6 +243,31 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
         }
       >
         <div className="grid gap-3 md:grid-cols-2">
+          {formValues.type === "EXPENSE" ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                {copy.category}
+              </label>
+              <Select
+                onChange={(event) =>
+                  onFormValuesChange((current) => ({
+                    ...current,
+                    category: event.target.value,
+                  }))
+                }
+                value={formValues.category}
+              >
+                {expenseCategoryOptionsForForm.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {language === "vi" ? category.vi : category.en}
+                  </option>
+                ))}
+              </Select>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {copy.expenseCategoryHint}
+              </p>
+            </div>
+          ) : null}
           <div>
             <label className="mb-2 block text-sm font-medium">
               {formValues.type === "EXPENSE" ? copy.expenseBudget : copy.incomeCategory}
@@ -240,12 +282,26 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                     onFormValuesChange((current) => ({
                       ...current,
                       budgetId: event.target.value,
-                      category: nextBudget?.category || "",
+                      // The server files the expense under the budget's own
+                      // category, so show that instead of a category that will
+                      // not survive the save.
+                      category: nextBudget?.category || current.category,
                     }));
                   }}
                   value={formValues.budgetId}
                 >
                   <option value="">{copy.selectBudget}</option>
+                  {formValues.budgetId &&
+                  !expenseBudgets.some(
+                    (budget) => budget._id === formValues.budgetId,
+                  ) ? (
+                    // The budget a saved transaction points at can belong to
+                    // another month or be gone; the picker has to admit the
+                    // link is still there instead of looking empty.
+                    <option value={formValues.budgetId}>
+                      {copy.linkedBudgetMissing}
+                    </option>
+                  ) : null}
                   {expenseBudgets.map((budget) => (
                     <option key={budget._id} value={budget._id}>
                       {`${budget.category} - ${formatCurrency(budget.remaining)} / ${formatCurrency(budget.amount)}`}
@@ -259,13 +315,6 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                       ? copy.budgetHint
                       : copy.budgetEmpty}
                 </p>
-                {!expenseBudgetsLoading && !formValues.budgetId ? (
-                  <p className="mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                    {isVietnamese
-                      ? "Khoản chi này sẽ được ghi vào mục Chi tiêu tự do."
-                      : "This expense will be recorded under Free spending."}
-                  </p>
-                ) : null}
               </>
             ) : (
               <Select
@@ -292,8 +341,9 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
               onChange={(event) =>
                 onFormValuesChange((current) => ({
                   ...current,
+                  // Budgets are listed per month, not per wallet, so switching
+                  // the wallet must not throw away the classification.
                   walletId: event.target.value,
-                  ...(current.type === "EXPENSE" ? { budgetId: "", category: "" } : {}),
                 }))
               }
               value={formValues.walletId}
@@ -330,6 +380,11 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             value={formValues.date}
           />
           <p className="mt-2 text-xs text-muted-foreground">{copy.statusHelp}</p>
+          {isFutureDate ? (
+            <p className="mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+              {copy.futureDateHint}
+            </p>
+          ) : null}
         </div>
         <div>
           <label
@@ -337,7 +392,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
               shouldHighlightIncomeOtherNote ? "text-amber-700" : ""
             }`}
           >
-            {copy.note}
+            {copy.noteOptional}
           </label>
           <Textarea
             className={

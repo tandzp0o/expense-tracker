@@ -55,7 +55,7 @@ export const getProfile = async (req: any, res: Response) => {
         };
 
         // Get wallet balance
-        const wallets = await Wallet.find({ userId });
+        const wallets = await Wallet.find({ userId, isArchived: { $ne: true } });
         const totalBalance = wallets.reduce(
             (sum, wallet) => sum + wallet.balance,
             0,
@@ -193,7 +193,7 @@ export const getProfileStats = async (req: any, res: Response) => {
             transaction.category !== TRANSFER_CATEGORY;
 
         // Get wallet statistics
-        const wallets = await Wallet.find({ userId });
+        const wallets = await Wallet.find({ userId, isArchived: { $ne: true } });
         const totalWallets = wallets.length;
         const totalBalance = wallets.reduce(
             (sum, wallet) => sum + wallet.balance,

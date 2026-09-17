@@ -3,6 +3,7 @@ import { ConfirmDialog } from "components/ui/dialog";
 
 export interface GoalSummary {
   title: string;
+  currentAmount?: number;
 }
 
 export interface DeleteGoalModalCopy {
@@ -10,6 +11,7 @@ export interface DeleteGoalModalCopy {
   delete: string;
   deleteGoal: string;
   deleteGoalDesc: (title: string) => string;
+  refundNotice: (amount: number) => string;
 }
 
 export interface DeleteGoalModalProps {
@@ -31,7 +33,20 @@ export const DeleteGoalModal: React.FC<DeleteGoalModalProps> = ({
     busy={saving}
     cancelLabel={copy.keep}
     confirmLabel={copy.delete}
-    description={goal ? copy.deleteGoalDesc(goal.title) : ""}
+    description={
+      goal
+        ? [
+            copy.deleteGoalDesc(goal.title),
+            // Say up front that the savings come back, so deleting a funded goal
+            // does not feel like throwing the money away.
+            Number(goal.currentAmount || 0) > 0
+              ? copy.refundNotice(Number(goal.currentAmount))
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" ")
+        : ""
+    }
     onClose={onClose}
     onConfirm={onConfirm}
     open={!!goal}

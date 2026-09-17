@@ -48,3 +48,17 @@ export const normalizeStandardCategory = (value: unknown) => {
     return alias || "";
 };
 
+
+/**
+ * Category used when a wallet is reconciled to the cash the user actually has.
+ * It is a real income or expense on purpose: the money genuinely arrived or
+ * left, it just was not written down at the time.
+ */
+export const BALANCE_ADJUSTMENT_CATEGORY = "Điều chỉnh số dư";
+
+/**
+ * Category used when a deleted goal gives its savings back to a wallet. It is a
+ * goal withdrawal rather than income, so it restores the balance without
+ * inflating the month's income figures.
+ */
+export const GOAL_REFUND_CATEGORY = "Hoàn tiền mục tiêu";
