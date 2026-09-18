@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "lib/utils";
 import { formatMoney } from "../lib/format";
+import { AccountMenu } from "./AccountMenu";
 import type { CategoryMeta } from "../lib/categories";
 
 /* ------------------------------------------------------------------ Money */
@@ -164,8 +165,11 @@ export const PageHeader: React.FC<{
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
 }> = ({ title, subtitle, actions }) => (
-  <header className="flex flex-col gap-4 pb-5 pt-6 sm:flex-row sm:items-end sm:justify-between lg:pb-6 lg:pt-8">
-    <div className="min-w-0">
+  // Phone: title | avatar, actions on their own row below.
+  // Tablet: title | actions | avatar on one row.
+  // Desktop: title | actions; the account lives in the side rail instead.
+  <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-4 pb-5 pt-6 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end lg:grid-cols-[minmax(0,1fr)_auto] lg:pb-6 lg:pt-8">
+    <div className="col-start-1 row-start-1 min-w-0">
       <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.02em] text-ledger-ink lg:text-[30px]">
         {title}
       </h1>
@@ -174,8 +178,11 @@ export const PageHeader: React.FC<{
       ) : null}
     </div>
     {actions ? (
-      <div className="flex flex-wrap items-center gap-2">{actions}</div>
+      <div className="col-span-2 row-start-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1">
+        {actions}
+      </div>
     ) : null}
+    <AccountMenu className="col-start-2 row-start-1 sm:col-start-3 lg:hidden" />
   </header>
 );
 
@@ -233,7 +240,12 @@ export const Card: React.FC<{
   </Tag>
 );
 
-/** A card's title row: icon, title, an optional count, and one action. */
+/**
+ * A card's title row: a bold title with its description underneath, an
+ * optional count, and one action. No icon: next to the rows' own, larger
+ * icons it read as a smaller duplicate and added nothing the title did not.
+ * `icon` and `tone` are still accepted so existing callers need no change.
+ */
 export const CardHeader: React.FC<{
   title: string;
   icon?: LucideIcon;
@@ -242,13 +254,12 @@ export const CardHeader: React.FC<{
   subtitle?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
-}> = ({ title, icon, tone, meta, subtitle, action, className }) => (
+}> = ({ title, meta, subtitle, action, className }) => (
   <div className={cn("mb-4 flex items-center justify-between gap-3", className)}>
     <div className="flex min-w-0 items-center gap-3">
-      {icon ? <IconBadge icon={icon} tone={tone} /> : null}
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
-          <h2 className="truncate text-[16px] font-semibold tracking-[-0.01em] text-ledger-ink">
+          <h2 className="truncate text-[17px] font-bold tracking-[-0.01em] text-ledger-ink">
             {title}
           </h2>
           {meta ? (

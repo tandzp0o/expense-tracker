@@ -2,34 +2,25 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
-  Banknote,
   Bell,
   BellRing,
-  CalendarCheck2,
   Check,
   ChevronDown,
-  CircleDollarSign,
   Clock,
   Coins,
   Globe2,
   Info,
-  Languages,
-  LayoutTemplate,
   LogOut,
   Monitor,
-  MonitorSmartphone,
   Moon,
   Palette,
-  PenLine,
   Pipette,
   Plus,
   RefreshCw,
   Send,
   Smartphone,
   Sun,
-  SunMoon,
   Trash2,
-  Type,
   UserRound,
 } from "lucide-react";
 import {
@@ -59,19 +50,17 @@ import {
 import { useToast } from "contexts/ToastContext";
 import { formatMoney } from "../lib/format";
 import { useIsDesktop } from "../hooks/useIsDesktop";
-import { Avatar } from "../layout/LedgerLayout";
+import { Avatar } from "../components/Avatar";
 import {
   Button,
   ButtonLink,
   Card,
   Chip,
   EmptyState,
-  IconBadge,
   Notice,
   PageHeader,
   Segmented,
   SkeletonRows,
-  type Tone,
 } from "../components/primitives";
 import { useT } from "../lib/i18n";
 import { getIdToken } from "../lib/session";
@@ -137,8 +126,6 @@ const errorMessage = (error: unknown) =>
  * row; anything wider goes underneath, at its natural width.
  */
 const SettingCard: React.FC<{
-  icon: LucideIcon;
-  tone?: Tone;
   title: string;
   description?: React.ReactNode;
   meta?: React.ReactNode;
@@ -148,13 +135,12 @@ const SettingCard: React.FC<{
   className?: string;
   /** Let the body grow to the card's height, for a card stretched by its row. */
   fill?: boolean;
-}> = ({ icon, tone = "accent", title, description, meta, action, hint, children, className, fill }) => (
+}> = ({ title, description, meta, action, hint, children, className, fill }) => (
   <Card className={cn("flex flex-col", className)}>
     <div className="flex items-start gap-3">
-      <IconBadge icon={icon} tone={tone} />
       <div className="min-w-0 flex-1">
         <div className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1">
-          <h2 className="text-[16px] font-semibold leading-snug tracking-[-0.01em] text-ledger-ink">
+          <h2 className="text-[17px] font-bold leading-snug tracking-[-0.01em] text-ledger-ink">
             {title}
           </h2>
           {meta ? (
@@ -433,7 +419,6 @@ const AppearanceTab: React.FC = () => {
             "Đổi lại bất cứ lúc nào, dữ liệu không thay đổi.",
             "Switch back any time; your data stays the same.",
           )}
-          icon={LayoutTemplate}
           title={t("Phiên bản giao diện", "Interface version")}
         >
           <div className="grid flex-1 gap-3 sm:grid-cols-2">
@@ -452,7 +437,6 @@ const AppearanceTab: React.FC = () => {
 
         <SettingCard
           description={t("Nền sáng hoặc tối cho toàn ứng dụng.", "A light or dark background everywhere.")}
-          icon={SunMoon}
           title={t("Chế độ", "Mode")}
         >
           <div className="grid max-w-[520px] grid-cols-2 gap-3">
@@ -492,7 +476,6 @@ const AppearanceTab: React.FC = () => {
             "Dùng cho nút bấm, liên kết và mục đang chọn trên toàn ứng dụng.",
             "Used for buttons, links and the selected item across the app.",
           )}
-          icon={Palette}
           meta={
             <span className="inline-flex items-center gap-1.5">
               <span
@@ -567,7 +550,6 @@ const AppearanceTab: React.FC = () => {
             "Phóng to hoặc thu nhỏ nội dung của mọi trang.",
             "Scales the content of every page up or down.",
           )}
-          icon={Type}
           title={t("Cỡ chữ", "Text size")}
         >
           <Segmented
@@ -637,7 +619,6 @@ const DisplayTab: React.FC = () => {
             "Chọn ngôn ngữ cho các nhãn và nội dung chính giữa tiếng Việt và tiếng Anh.",
             "Choose the language for the main labels and content.",
           )}
-          icon={Languages}
           title={t("Ngôn ngữ hiển thị", "Display language")}
         >
           <Segmented
@@ -656,7 +637,6 @@ const DisplayTab: React.FC = () => {
             "Chọn dạng đầy đủ hoặc rút gọn. Rút gọn giúp số lớn vừa màn hình điện thoại.",
             "Choose full or compact money labels. Compact keeps large figures on one line on a phone.",
           )}
-          icon={Banknote}
           title={t("Kiểu hiển thị số tiền", "Money display style")}
         >
           <div className="grid max-w-[520px] grid-cols-2 gap-3">
@@ -695,7 +675,6 @@ const DisplayTab: React.FC = () => {
             "Ở chế độ theo ngôn ngữ: tiếng Việt dùng VND, tiếng Anh dùng USD.",
             "In follow-language mode: Vietnamese uses VND, English uses USD.",
           )}
-          icon={CircleDollarSign}
           title={t("Tiền tệ mặc định", "Default currency")}
         >
           <SelectField
@@ -728,7 +707,6 @@ const DisplayTab: React.FC = () => {
               {formatOffset(timezoneOffsetMinutes)}
             </span>
           }
-          icon={Globe2}
           title={t("Múi giờ", "Timezone")}
         >
           <SelectField
@@ -1154,7 +1132,6 @@ const RemindersTab: React.FC = () => {
           "Tắt đi thì các mốc giờ vẫn được giữ lại cho lần bật sau.",
           "Turning this off keeps your times for the next time you enable it.",
         )}
-        icon={Bell}
         title={t("Nhắc ghi chép", "Logging reminders")}
       />
 
@@ -1171,7 +1148,6 @@ const RemindersTab: React.FC = () => {
             </span>
           </span>
         }
-        icon={Clock}
         meta={
           <span className="ledger-num">
             {config.reminderTimes.length}/{config.maxRemindersPerDay}
@@ -1304,7 +1280,6 @@ const RemindersTab: React.FC = () => {
           "Hôm nào bạn đã nhập giao dịch rồi thì không nhắc nữa cho đỡ phiền.",
           "No nudge on days where you already recorded a transaction.",
         )}
-        icon={CalendarCheck2}
         title={t("Bỏ qua nếu đã ghi hôm nay", "Skip when already logged")}
       />
 
@@ -1321,7 +1296,6 @@ const RemindersTab: React.FC = () => {
                 "No device yet. Use the button below to allow notifications in this browser.",
               )
         }
-        icon={MonitorSmartphone}
         meta={
           config.deviceCount > 0 ? (
             <span className="ledger-num">
@@ -1468,7 +1442,7 @@ const AccountTab: React.FC = () => {
     <TabGrid className="2xl:items-start">
       <SettingCard
         action={
-          <ButtonLink icon={PenLine} to="/profile">
+          <ButtonLink to="/profile">
             {t("Sửa hồ sơ", "Edit profile")}
           </ButtonLink>
         }
@@ -1476,7 +1450,6 @@ const AccountTab: React.FC = () => {
           "Đổi tên, ảnh đại diện hoặc mật khẩu trong trang hồ sơ.",
           "Change your name, photo or password on the profile page.",
         )}
-        icon={UserRound}
         title={t("Tài khoản", "Account")}
       >
         {/* The name and the address the account signs in with, each labelled,
@@ -1511,9 +1484,7 @@ const AccountTab: React.FC = () => {
           "Thoát khỏi TonFin trên trình duyệt này. Dữ liệu của bạn vẫn được giữ nguyên.",
           "Leave TonFin on this browser. Your data stays as it is.",
         )}
-        icon={LogOut}
         title={t("Đăng xuất", "Sign out")}
-        tone="out"
       >
         <Button
           disabled={signingOut}

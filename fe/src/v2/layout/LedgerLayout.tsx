@@ -16,28 +16,7 @@ import { LedgerProvider, useLedger } from "../LedgerContext";
 import { useT } from "../lib/i18n";
 import { LEDGER_NAV } from "./nav";
 import { SkeletonRows } from "../components/primitives";
-
-const Avatar: React.FC<{ src?: string | null; name: string; size?: number }> = ({
-  src,
-  name,
-  size = 32,
-}) =>
-  src ? (
-    <img
-      alt=""
-      className="shrink-0 rounded-full object-cover"
-      src={src}
-      style={{ height: size, width: size }}
-    />
-  ) : (
-    <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-ledger-accent-wash font-semibold text-ledger-accent"
-      // The initial scales with the circle instead of staying 13px.
-      style={{ fontSize: Math.round(size * 0.42), height: size, width: size }}
-    >
-      {(name || "?").trim().charAt(0).toUpperCase()}
-    </span>
-  );
+import { Avatar } from "../components/Avatar";
 
 const Rail: React.FC = () => {
   const t = useT();
@@ -235,7 +214,10 @@ export const LedgerLayout: React.FC<{ children: React.ReactNode }> = ({ children
     <LedgerProvider>
       <Rail />
       <main className="min-h-screen lg:pl-[232px]">
-        <div className="ledger-page mx-auto w-full max-w-[1720px] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+96px)] sm:px-6 lg:px-8 lg:pb-16 2xl:px-10">
+        {/* One source of side spacing on desktop: the padding grows to centre
+            a 1720px column on wide screens and never drops below 32px on a
+            laptop. mx-auto plus a fixed padding stacked both on wide screens. */}
+        <div className="ledger-page w-full px-4 pb-[calc(env(safe-area-inset-bottom,0px)+96px)] sm:px-6 lg:px-[max(2rem,calc((100%_-_1720px)/2))] lg:pb-16">
           {/* Pages load on first visit; the rail and tab bar stay put meanwhile. */}
           <React.Suspense
             fallback={

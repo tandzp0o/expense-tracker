@@ -7,7 +7,7 @@ import { useLocale } from "contexts/LocaleContext";
 import { useNavigationLock } from "contexts/NavigationLockContext";
 import { cn } from "lib/utils";
 import { Card, CardHeader, IconBadge, PageHeader, type Tone } from "../components/primitives";
-import { Avatar } from "../layout/LedgerLayout";
+import { Avatar } from "../components/Avatar";
 import { LEDGER_NAV } from "../layout/nav";
 import { useT } from "../lib/i18n";
 

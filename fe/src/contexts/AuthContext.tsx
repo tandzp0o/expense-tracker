@@ -64,6 +64,13 @@ type AuthContextType = {
     logout: () => Promise<void>;
     isAuthenticated: boolean;
     updateUserStatus: (isNew: boolean) => void;
+    /**
+     * Merges a saved profile change into the signed-in user, so the name and
+     * avatar shown in the menu and headers update without a reload.
+     */
+    updateCurrentUser: (
+        updates: Partial<Pick<AppUser, "displayName" | "username" | "avatar">>,
+    ) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -320,6 +327,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    const updateCurrentUser: AuthContextType["updateCurrentUser"] = (updates) => {
+        setCurrentUser((previous) => {
+            if (!previous) {
+                return previous;
+            }
+            const next = { ...previous };
+            // An empty name is not saved over the one the menu already shows.
+            if (updates.displayName?.trim()) next.displayName = updates.displayName.trim();
+            if (updates.username?.trim()) next.username = updates.username.trim();
+            if (updates.avatar?.trim()) next.avatar = updates.avatar.trim();
+            return next;
+        });
+    };
+
     const value = {
         currentUser,
         loading,
@@ -329,6 +350,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         logout,
         isAuthenticated,
         updateUserStatus,
+        updateCurrentUser,
     };
 
     return (

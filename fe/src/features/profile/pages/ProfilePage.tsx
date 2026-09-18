@@ -11,6 +11,7 @@ import { auth } from "lib/firebase/config";
 import { API_URL, transactionApi, userApi } from "services/api";
 import { formatCurrency, formatDate } from "utils/formatters";
 import { useToast } from "contexts/ToastContext";
+import { useAuth } from "contexts/AuthContext";
 import { useLocale } from "contexts/LocaleContext";
 import { useTheme } from "contexts/ThemeContext";
 import { hexToRgba } from "lib/utils";
@@ -61,6 +62,7 @@ interface ProfileStats {
 
 const Profile: React.FC = () => {
     const { toast } = useToast();
+    const { updateCurrentUser } = useAuth();
     const { isVietnamese } = useLocale();
     const { appearance } = useTheme();
     const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -150,6 +152,9 @@ const Profile: React.FC = () => {
                 return;
             }
             await userApi.updateProfile(formValues, token);
+            // The menu and page headers read the name from the signed-in
+            // user, which was otherwise only refreshed on the next reload.
+            updateCurrentUser({ displayName: formValues.displayName });
             toast({
                 title: isVietnamese ? "Đã cập nhật hồ sơ" : "Profile updated",
                 variant: "success",
@@ -186,7 +191,8 @@ const Profile: React.FC = () => {
             }
             const formData = new FormData();
             formData.append("avatar", file);
-            await userApi.uploadAvatar(formData, token);
+            const uploaded = await userApi.uploadAvatar(formData, token);
+            updateCurrentUser({ avatar: uploaded?.avatarUrl });
             toast({
                 title: isVietnamese
                     ? "Đã cập nhật ảnh đại diện"

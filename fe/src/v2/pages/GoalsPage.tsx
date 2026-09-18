@@ -19,7 +19,6 @@ import {
   TriangleAlert,
   WalletCards,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { goalApi, transactionApi, walletApi } from "services/api";
 import { useLocale } from "contexts/LocaleContext";
 import { useToast } from "contexts/ToastContext";
@@ -32,7 +31,6 @@ import {
   EmptyState,
   FieldLabel,
   HeroStrip,
-  IconBadge,
   Money,
   Notice,
   PageHeader,
@@ -209,17 +207,14 @@ const savingPace = (view: GoalView) => {
  * against the grey page.
  */
 const GroupHeading: React.FC<{
-  icon: LucideIcon;
-  tone: "accent" | "in";
   title: string;
   count?: number;
   subtitle?: string;
-}> = ({ icon, tone, title, count, subtitle }) => (
+}> = ({ title, count, subtitle }) => (
   <div className="mb-4 flex items-center gap-3">
-    <IconBadge icon={icon} size="md" tone={tone} />
     <div className="min-w-0">
       <div className="flex items-center gap-2">
-        <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ledger-ink">{title}</h2>
+        <h2 className="text-[18px] font-bold tracking-[-0.01em] text-ledger-ink">{title}</h2>
         {count ? (
           <span className="ledger-num rounded-full border border-ledger-line bg-ledger-paper px-2 py-0.5 text-[12px] font-semibold text-ledger-ink-2">
             {count}
@@ -1271,7 +1266,6 @@ const GoalsPage: React.FC = () => {
           <section>
             <GroupHeading
               count={running.length}
-              icon={Target}
               subtitle={
                 running.length
                   ? t(
@@ -1281,7 +1275,6 @@ const GoalsPage: React.FC = () => {
                   : undefined
               }
               title={t("Đang thực hiện", "In progress")}
-              tone="accent"
             />
             {running.length ? (
               <GoalGrid>
@@ -1313,13 +1306,11 @@ const GoalsPage: React.FC = () => {
             <section>
               <GroupHeading
                 count={completed.length}
-                icon={CircleCheck}
                 subtitle={t(
                   "Tiền vẫn nằm trong mục tiêu cho đến khi bạn rút về ví",
                   "The money stays in the goal until you withdraw it",
                 )}
                 title={t("Đã hoàn thành", "Completed")}
-                tone="in"
               />
               <GoalGrid>
                 {completed.map((view) => (

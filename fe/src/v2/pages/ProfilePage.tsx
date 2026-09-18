@@ -35,7 +35,7 @@ import {
   type HeroStat,
 } from "../components/primitives";
 import { Panel } from "../components/overlays";
-import { Avatar } from "../layout/LedgerLayout";
+import { Avatar } from "../components/Avatar";
 import { useLedger } from "../LedgerContext";
 import { currentMonth, formatMoney } from "../lib/format";
 import { useT } from "../lib/i18n";
@@ -132,7 +132,7 @@ const DetailField: React.FC<{
 const ProfilePage: React.FC = () => {
   const t = useT();
   const { toast } = useToast();
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, updateCurrentUser } = useAuth();
   const { timezoneOffsetMinutes } = useLocale();
   const { dataVersion } = useLedger();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -211,6 +211,9 @@ const ProfilePage: React.FC = () => {
         },
         await getIdToken(),
       );
+      // The rail, the tab bar and page greetings read the signed-in user,
+      // which was otherwise only refreshed on the next reload.
+      updateCurrentUser({ displayName: form.displayName });
       toast({ title: t("Đã lưu hồ sơ", "Profile saved"), variant: "success" });
       setEditOpen(false);
       await load();
@@ -226,7 +229,8 @@ const ProfilePage: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append("avatar", file);
-      await userApi.uploadAvatar(formData, await getIdToken());
+      const uploaded = await userApi.uploadAvatar(formData, await getIdToken());
+      updateCurrentUser({ avatar: uploaded?.avatarUrl });
       toast({ title: t("Đã đổi ảnh đại diện", "Photo updated"), variant: "success" });
       await load();
     } catch (error: any) {
