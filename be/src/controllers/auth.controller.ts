@@ -60,6 +60,9 @@ export const verifyToken = async (req: AuthenticatedRequest, res: Response) => {
             displayName: name,
             picture,
             signInProvider,
+            // Already loaded above; this runs on every app start, and each
+            // lookup is a cross-region round trip.
+            existingUser,
         });
 
         res.set("Cache-Control", "private, no-store, max-age=0");

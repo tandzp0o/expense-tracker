@@ -182,7 +182,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
 
                     try {
-                        const token = await firebaseUser.getIdToken(true);
+                        // The SDK already refreshes a token that is about to
+                        // expire; forcing it made every app start wait on an
+                        // extra round trip to Google before anything loaded.
+                        const token = await firebaseUser.getIdToken();
                         const appUserData = await verifyTokenWithBackend(token);
 
                         previousUserIdRef.current = firebaseUser.uid;

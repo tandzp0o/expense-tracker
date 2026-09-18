@@ -1,4 +1,9 @@
-import axios, { AxiosInstance } from "axios";
+import axios, {
+    AxiosAdapter,
+    AxiosInstance,
+    AxiosResponse,
+    InternalAxiosRequestConfig,
+} from "axios";
 import { API_URL } from "../config/api";
 
 export { API_URL };
@@ -179,16 +184,122 @@ const invalidateTransactionCache = () => {
     keysToDelete.forEach((key) => window.sessionStorage.removeItem(key));
 };
 
+/*
+ * Short-lived memory cache for GET responses.
+ *
+ * The API runs on another continent, so every request costs a long round trip,
+ * and each screen used to fetch everything again on every visit: going back to
+ * the overview a few seconds later meant waiting for the same six responses
+ * once more. A GET answered in the last RESPONSE_CACHE_TTL_MS is now served
+ * from memory, identical GETs in flight at the same time share one request,
+ * and any write (POST/PUT/DELETE/PATCH) through these clients empties the
+ * cache, so a user always sees their own changes straight away.
+ */
+const RESPONSE_CACHE_TTL_MS = 45_000;
+const responseCache = new Map<string, { expiresAt: number; response: AxiosResponse }>();
+const inflightRequests = new Map<string, Promise<AxiosResponse>>();
+// Bumped by every write, so a GET that was already on its way when the write
+// happened is not stored as if it were current.
+let responseCacheGeneration = 0;
+
+const clearResponseCache = () => {
+    responseCacheGeneration += 1;
+    responseCache.clear();
+    inflightRequests.clear();
+};
+
+const cloneData = <T,>(data: T): T => {
+    if (data === undefined || data === null || typeof data !== "object") {
+        return data;
+    }
+    return typeof structuredClone === "function"
+        ? structuredClone(data)
+        : JSON.parse(JSON.stringify(data));
+};
+
+// Each caller gets its own copy, so a screen that sorts or edits what it
+// received cannot change what the next screen reads from the cache.
+const cloneResponse = (response: AxiosResponse, config: InternalAxiosRequestConfig) => ({
+    ...response,
+    config,
+    data: cloneData(response.data),
+});
+
+const buildResponseCacheKey = (config: InternalAxiosRequestConfig, token?: string) => {
+    const params = config.params
+        ? new URLSearchParams(
+              Object.entries(config.params)
+                  .filter(([, value]) => value !== undefined && value !== null && value !== "")
+                  .sort(([left], [right]) => left.localeCompare(right))
+                  .map(([key, value]) => [key, String(value)]),
+          ).toString()
+        : "";
+    return `${getTransactionCacheScope(token)}|${config.baseURL || ""}${config.url || ""}?${params}`;
+};
+
+const createCachingAdapter = (token?: string): AxiosAdapter => {
+    const networkAdapter = axios.getAdapter(axios.defaults.adapter);
+
+    return async (config) => {
+        const method = (config.method || "get").toLowerCase();
+
+        if (method !== "get") {
+            try {
+                return await networkAdapter(config);
+            } finally {
+                clearResponseCache();
+            }
+        }
+
+        const key = buildResponseCacheKey(config, token);
+        const cached = responseCache.get(key);
+        if (cached && cached.expiresAt > Date.now()) {
+            return cloneResponse(cached.response, config);
+        }
+
+        const pending = inflightRequests.get(key);
+        if (pending) {
+            return cloneResponse(await pending, config);
+        }
+
+        const generation = responseCacheGeneration;
+        // The raw response is never handed out; every caller, including this
+        // one, gets a copy of it.
+        const request = networkAdapter(config);
+        inflightRequests.set(key, request);
+
+        try {
+            const response = await request;
+            if (
+                generation === responseCacheGeneration &&
+                response.status >= 200 &&
+                response.status < 300
+            ) {
+                responseCache.set(key, {
+                    expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS,
+                    response,
+                });
+            }
+            return cloneResponse(response, config);
+        } finally {
+            if (inflightRequests.get(key) === request) {
+                inflightRequests.delete(key);
+            }
+        }
+    };
+};
+
 export const clearApiCaches = () => {
     invalidateTransactionCache();
+    clearResponseCache();
 };
 
 // Create an authenticated API client with the provided token
 const createApiClient = (token?: string): AxiosInstance => {
     return axios.create({
         baseURL: API_URL + "/api",
+        adapter: createCachingAdapter(token),
         headers: {
-            "Cache-Control": "no-store",
             "Content-Type": "application/json",
             ...(token && { Authorization: `Bearer ${token}` }),
         },
@@ -199,8 +310,8 @@ const createApiClient = (token?: string): AxiosInstance => {
 const createMultipartApiClient = (token?: string): AxiosInstance => {
     return axios.create({
         baseURL: API_URL + "/api",
+        adapter: createCachingAdapter(token),
         headers: {
-            "Cache-Control": "no-store",
             // Let the browser set the Content-Type to multipart/form-data
             ...(token && { Authorization: `Bearer ${token}` }),
         },

@@ -145,7 +145,7 @@ test.beforeEach(async () => {
     await seedUser();
 });
 
-test("createTransaction rejects future dates and rolls back wallet changes", async () => {
+test("createTransaction schedules a future-dated entry instead of rejecting it", async () => {
     const wallet = await createWallet({ balance: 5_000 });
     const res = createResponse();
 
@@ -163,16 +163,16 @@ test("createTransaction rejects future dates and rolls back wallet changes", asy
     );
 
     const refreshedWallet = await Wallet.findById(wallet._id);
-    const transactionCount = await Transaction.countDocuments();
+    const created = await Transaction.findOne({ userId: USER_ID });
 
-    assert.equal(res.statusCode, 400);
-    assert.equal(
-        res.body.message,
-        "Future transactions must use SCHEDULED or PENDING status",
-    );
-    assert.equal(transactionCount, 0);
+    // Entry is never refused for a date in the future: it is kept as a
+    // scheduled item that has not moved any money yet, and the user is told.
+    assert.equal(res.statusCode, 201);
+    assert.equal(created.status, "SCHEDULED");
     assert.equal(refreshedWallet.balance, 5_000);
-    assert.equal(refreshedWallet.hasTransactions, false);
+    assert.ok(
+        res.body.warnings.some((warning) => warning.code === "STATUS_SCHEDULED_AUTOMATICALLY"),
+    );
 });
 
 test("createTransaction keeps future scheduled expenses out of wallet balance and cashflow summary", async () => {
@@ -214,7 +214,7 @@ test("createTransaction keeps future scheduled expenses out of wallet balance an
     assert.equal(summaryRes.body.data.summary.income, 0);
 });
 
-test("createTransaction rejects linking an expense to a budget from another wallet", async () => {
+test("createTransaction records an expense linked to another wallet's budget, unlinked, with a warning", async () => {
     const sourceWallet = await createWallet({ balance: 5_000 });
     const anotherWallet = await createWallet({ balance: 3_000 });
     const budget = await createBudget({
@@ -238,12 +238,11 @@ test("createTransaction rejects linking an expense to a budget from another wall
         res,
     );
 
-    assert.equal(res.statusCode, 400);
-    assert.equal(
-        res.body.message,
-        "Selected budget does not belong to the chosen wallet",
-    );
-    assert.equal(await Transaction.countDocuments(), 0);
+    const created = await Transaction.findOne({ userId: USER_ID });
+    assert.equal(res.statusCode, 201);
+    assert.equal(created.budgetId ?? null, null);
+    assert.equal(created.amount, 400);
+    assert.ok(res.body.warnings.some((warning) => warning.code === "BUDGET_UNLINKED_WALLET"));
 });
 
 test("budget summary groups spent and remaining amounts by wallet", async () => {
@@ -290,7 +289,7 @@ test("budget summary groups spent and remaining amounts by wallet", async () => 
     assert.equal(summaryRes.body.walletSummaries[0].totalRemaining, 2_800);
 });
 
-test("createTransaction rejects a budget linked to the wrong month even for scheduled expenses", async () => {
+test("createTransaction records an expense linked to another month's budget, unlinked, with a warning", async () => {
     const wallet = await createWallet({ balance: 6_000 });
     const budget = await createBudget({
         walletId: String(wallet._id),
@@ -317,13 +316,12 @@ test("createTransaction rejects a budget linked to the wrong month even for sche
     );
 
     const refreshedWallet = await Wallet.findById(wallet._id);
+    const created = await Transaction.findOne({ userId: USER_ID });
 
-    assert.equal(res.statusCode, 400);
-    assert.equal(
-        res.body.message,
-        "Budget does not belong to the selected transaction month",
-    );
-    assert.equal(await Transaction.countDocuments(), 0);
+    assert.equal(res.statusCode, 201);
+    assert.equal(created.budgetId ?? null, null);
+    assert.ok(res.body.warnings.some((warning) => warning.code === "BUDGET_UNLINKED_MONTH"));
+    // Scheduled, so the wallet is untouched until it is paid.
     assert.equal(refreshedWallet.balance, 6_000);
 });
 
@@ -477,7 +475,7 @@ test("deleteTransaction clears hasTransactions when the last normal transaction 
     assert.equal(await Transaction.countDocuments(), 0);
 });
 
-test("updateTransaction aborts cleanly when moving an expense to a wallet without enough balance", async () => {
+test("updateTransaction moves an expense to a wallet that goes negative, with a warning", async () => {
     const sourceWallet = await createWallet({ name: "Source", balance: 1_000 });
     const lowBalanceWallet = await createWallet({
         name: "Low Balance",
@@ -514,19 +512,21 @@ test("updateTransaction aborts cleanly when moving an expense to a wallet withou
         updateRes,
     );
 
-    const [refreshedSource, refreshedLowBalance, unchangedTransaction] =
+    const [refreshedSource, refreshedLowBalance, movedTransaction] =
         await Promise.all([
             Wallet.findById(sourceWallet._id),
             Wallet.findById(lowBalanceWallet._id),
             Transaction.findById(originalTransaction._id),
         ]);
 
-    assert.equal(updateRes.statusCode, 400);
-    assert.equal(updateRes.body.message, "Insufficient wallet balance");
-    assert.equal(refreshedSource.balance, 900);
-    assert.equal(refreshedLowBalance.balance, 50);
-    assert.equal(String(unchangedTransaction.walletId), String(sourceWallet._id));
-    assert.equal(unchangedTransaction.amount, 100);
+    // A wallet may go negative: the book records what happened and the user
+    // is pointed at reconciling the wallet instead of being refused.
+    assert.equal(updateRes.statusCode, 200);
+    assert.equal(refreshedSource.balance, 1_000);
+    assert.equal(refreshedLowBalance.balance, -150);
+    assert.equal(String(movedTransaction.walletId), String(lowBalanceWallet._id));
+    assert.equal(movedTransaction.amount, 200);
+    assert.ok(updateRes.body.warnings.some((warning) => warning.code === "WALLET_NEGATIVE"));
 });
 
 test("updateTransaction applies wallet impact only when a scheduled expense becomes completed", async () => {
@@ -598,4 +598,37 @@ test("updateWallet rejects direct balance edits from the wallet form", async () 
     );
     assert.equal(refreshedWallet.balance, 1_000);
     assert.equal(refreshedWallet.initialBalance, 1_000);
+});
+
+test("deleteTransaction leaves the wallet alone when the entry was only scheduled", async () => {
+    const wallet = await createWallet({ balance: 2_000 });
+
+    const createRes = createResponse();
+    await createTransaction(
+        createRequest({
+            body: {
+                walletId: String(wallet._id),
+                type: "EXPENSE",
+                status: "SCHEDULED",
+                amount: 700,
+                category: "Bills",
+                date: "2099-01-01T12:00:00.000Z",
+            },
+        }),
+        createRes,
+    );
+
+    const scheduled = await Transaction.findOne({ userId: USER_ID });
+    const deleteRes = createResponse();
+    await deleteTransaction(
+        createRequest({ params: { id: String(scheduled._id) } }),
+        deleteRes,
+    );
+
+    // A bill that was never paid never took money out, so deleting it must
+    // not put any back.
+    const refreshedWallet = await Wallet.findById(wallet._id);
+    assert.equal(deleteRes.statusCode, 200);
+    assert.equal(refreshedWallet.balance, 2_000);
+    assert.equal(await Transaction.countDocuments(), 0);
 });

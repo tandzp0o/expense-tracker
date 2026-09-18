@@ -127,6 +127,8 @@ type SyncUserInput = {
     picture?: string;
     signInProvider?: string | null;
     username?: string | null;
+    /** The user row when the caller already loaded it; saves a lookup. */
+    existingUser?: HydratedDocument<IUser> | null;
 };
 
 export const syncUserIdentity = async ({
@@ -136,12 +138,14 @@ export const syncUserIdentity = async ({
     picture,
     signInProvider,
     username,
+    existingUser,
 }: SyncUserInput): Promise<HydratedDocument<IUser>> => {
     const provider = mapSignInProvider(signInProvider);
     const resolvedEmail = (email || "").trim().toLowerCase();
     const resolvedDisplayName = deriveDisplayName(resolvedEmail, displayName);
 
-    let user = await User.findOne({ uid });
+    let user =
+        existingUser !== undefined ? existingUser : await User.findOne({ uid });
     // Generating a username walks candidate names one query at a time, and this
     // runs on every token verify. Only new accounts and accounts that somehow
     // lost their username need it.

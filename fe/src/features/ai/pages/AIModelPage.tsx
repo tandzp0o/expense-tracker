@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Bot, Play, RefreshCw } from "lucide-react";
 import { auth } from "lib/firebase/config";
-import { aiApi } from "services/api";
+import { aiApi, clearApiCaches } from "services/api";
 import { useLocale } from "contexts/LocaleContext";
 import { useToast } from "contexts/ToastContext";
 import { PageHeader } from "components/app/page-header";
@@ -156,7 +156,14 @@ const AIModel: React.FC = () => {
         description={copy.desc}
         actions={
           <div className="flex gap-2">
-            <Button onClick={loadData} variant="outline">
+            <Button
+              onClick={() => {
+                // "Refresh" means ask the server again, not the 45s cache.
+                clearApiCaches();
+                loadData();
+              }}
+              variant="outline"
+            >
               <RefreshCw className="h-4 w-4" />
               {copy.refresh}
             </Button>

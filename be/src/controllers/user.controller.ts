@@ -181,104 +181,134 @@ export const uploadAvatar = async (req: any, res: Response) => {
 export const getProfileStats = async (req: any, res: Response) => {
     try {
         const userId = req.user.uid;
-        const buildCompletedStatusQuery = () => ({
+        const completedStatusQuery = {
             $or: [
                 { status: TransactionStatus.COMPLETED },
                 { status: { $exists: false } },
             ],
-        });
-        const isCompletedLedgerTransaction = (transaction: any) =>
-            (!transaction.status ||
-                transaction.status === TransactionStatus.COMPLETED) &&
-            transaction.category !== TRANSFER_CATEGORY;
+        };
 
-        // Get wallet statistics
-        const wallets = await Wallet.find({ userId, isArchived: { $ne: true } });
+        // The six calendar months shown in the chart, oldest first, as
+        // [start, next month's start) in the server's local time, the same
+        // boundaries the month-by-month queries this replaces used.
+        const now = new Date();
+        const monthStarts = Array.from(
+            { length: 7 },
+            (_, index) =>
+                new Date(now.getFullYear(), now.getMonth() - 5 + index, 1),
+        );
+
+        // One round trip instead of twelve. The database sits in another
+        // region from the API, so every sequential query here used to cost a
+        // trans-Pacific hop; running them together and summing inside MongoDB
+        // (rather than loading eight months of documents to add them up in
+        // JavaScript) is what makes the overview load in about a second.
+        const [
+            wallets,
+            totalTransactions,
+            totalBudgets,
+            monthlyTotals,
+            goalsStats,
+        ] = await Promise.all([
+            Wallet.find({ userId, isArchived: { $ne: true } })
+                .select("balance")
+                .lean(),
+            Transaction.countDocuments({ userId }),
+            Budget.countDocuments({ userId }),
+            Transaction.aggregate([
+                {
+                    $match: {
+                        userId,
+                        ...completedStatusQuery,
+                        type: { $in: ["INCOME", "EXPENSE"] },
+                        category: { $ne: TRANSFER_CATEGORY },
+                        date: {
+                            $gte: monthStarts[0],
+                            $lt: monthStarts[6],
+                        },
+                    },
+                },
+                {
+                    $bucket: {
+                        groupBy: "$date",
+                        boundaries: monthStarts,
+                        output: {
+                            income: {
+                                $sum: {
+                                    $cond: [
+                                        { $eq: ["$type", "INCOME"] },
+                                        "$amount",
+                                        0,
+                                    ],
+                                },
+                            },
+                            expense: {
+                                $sum: {
+                                    $cond: [
+                                        { $eq: ["$type", "EXPENSE"] },
+                                        "$amount",
+                                        0,
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+            ]),
+            Goal.aggregate([
+                { $match: { userId } },
+                {
+                    $group: {
+                        _id: null,
+                        totalGoals: { $sum: 1 },
+                        completedGoals: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ["$status", "completed"] },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+                        activeGoals: {
+                            $sum: {
+                                $cond: [{ $eq: ["$status", "active"] }, 1, 0],
+                            },
+                        },
+                    },
+                },
+            ]),
+        ]);
+
         const totalWallets = wallets.length;
         const totalBalance = wallets.reduce(
-            (sum, wallet) => sum + wallet.balance,
+            (sum, wallet) => sum + Number(wallet.balance || 0),
             0,
         );
 
-        const totalTransactions = await Transaction.countDocuments({ userId });
-        const totalBudgets = await Budget.countDocuments({ userId });
+        // $bucket only returns months that had something; the chart needs all
+        // six, so empty months are filled with zeros.
+        const history = monthStarts.slice(0, 6).map((start) => {
+            const bucket = monthlyTotals.find(
+                (row: any) => new Date(row._id).getTime() === start.getTime(),
+            );
+            const income = Number(bucket?.income || 0);
+            const expense = Number(bucket?.expense || 0);
 
-        // Get transaction statistics for current month
-        const now = new Date();
-        const startOfCurrentMonth = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            1,
-        );
-        // Day 0 of the next month is the last day of this one, but at 00:00.
-        // Querying with $lte against that dropped everything logged on the last
-        // day of the month, so the end of that day has to be spelled out.
-        const endOfCurrentMonth = new Date(
-            now.getFullYear(),
-            now.getMonth() + 1,
-            0,
-            23,
-            59,
-            59,
-            999,
-        );
-
-        const startOfLastMonth = new Date(
-            now.getFullYear(),
-            now.getMonth() - 1,
-            1,
-        );
-        const endOfLastMonth = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            0,
-            23,
-            59,
-            59,
-            999,
-        );
-
-        const monthlyTransactions = await Transaction.find({
-            userId,
-            ...buildCompletedStatusQuery(),
-            date: { $gte: startOfCurrentMonth, $lte: endOfCurrentMonth },
+            return {
+                month: `Th${start.getMonth() + 1}`,
+                balance: income - expense,
+                income,
+                expense,
+            };
         });
 
-        const lastMonthTransactions = await Transaction.find({
-            userId,
-            ...buildCompletedStatusQuery(),
-            date: { $gte: startOfLastMonth, $lte: endOfLastMonth },
-        });
-
-        const monthlyIncome = monthlyTransactions
-            .filter(
-                (t) =>
-                    t.type === "INCOME" &&
-                    isCompletedLedgerTransaction(t),
-            )
-            .reduce((sum, t) => sum + t.amount, 0);
-        const monthlyExpense = monthlyTransactions
-            .filter(
-                (t) =>
-                    t.type === "EXPENSE" &&
-                    isCompletedLedgerTransaction(t),
-            )
-            .reduce((sum, t) => sum + t.amount, 0);
-
-        const lastMonthIncome = lastMonthTransactions
-            .filter(
-                (t) =>
-                    t.type === "INCOME" &&
-                    isCompletedLedgerTransaction(t),
-            )
-            .reduce((sum, t) => sum + t.amount, 0);
-        const lastMonthExpense = lastMonthTransactions
-            .filter(
-                (t) =>
-                    t.type === "EXPENSE" &&
-                    isCompletedLedgerTransaction(t),
-            )
-            .reduce((sum, t) => sum + t.amount, 0);
+        const currentMonth = history[5];
+        const lastMonth = history[4];
+        const monthlyIncome = currentMonth.income;
+        const monthlyExpense = currentMonth.expense;
+        const lastMonthIncome = lastMonth.income;
+        const lastMonthExpense = lastMonth.expense;
 
         const incomeGrowth =
             lastMonthIncome !== 0
@@ -293,11 +323,9 @@ export const getProfileStats = async (req: any, res: Response) => {
                   ? 100
                   : 0;
 
-        // Calculate growth (relative to total balance, but let's use monthly diff for "growth" in assets)
+        // Asset growth: how much the total balance increased this month
+        // compared to the total before it.
         const currentMonthBalance = monthlyIncome - monthlyExpense;
-        const lastMonthBalance = lastMonthIncome - lastMonthExpense;
-
-        // Asset growth: how much the total balance increased this month compared to previous total balance
         const previousTotalBalance = totalBalance - currentMonthBalance;
         const growth =
             previousTotalBalance > 0
@@ -305,69 +333,6 @@ export const getProfileStats = async (req: any, res: Response) => {
                 : totalBalance > 0
                   ? 100
                   : 0;
-
-        // Get 6 months of history for chart
-        const history = [];
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const start = new Date(d.getFullYear(), d.getMonth(), 1);
-            const end = new Date(
-                d.getFullYear(),
-                d.getMonth() + 1,
-                0,
-                23,
-                59,
-                59,
-                999,
-            );
-
-            const trans = await Transaction.find({
-                userId,
-                ...buildCompletedStatusQuery(),
-                date: { $gte: start, $lte: end },
-            });
-
-            const inc = trans
-                .filter(
-                    (t) =>
-                        t.type === "INCOME" &&
-                        isCompletedLedgerTransaction(t),
-                )
-                .reduce((sum, t) => sum + t.amount, 0);
-            const exp = trans
-                .filter(
-                    (t) =>
-                        t.type === "EXPENSE" &&
-                        isCompletedLedgerTransaction(t),
-                )
-                .reduce((sum, t) => sum + t.amount, 0);
-
-            history.push({
-                month: `Th${d.getMonth() + 1}`,
-                balance: inc - exp,
-                income: inc,
-                expense: exp,
-            });
-        }
-
-        // Get goal statistics
-        const goalsStats = await Goal.aggregate([
-            { $match: { userId } },
-            {
-                $group: {
-                    _id: null,
-                    totalGoals: { $sum: 1 },
-                    completedGoals: {
-                        $sum: {
-                            $cond: [{ $eq: ["$status", "completed"] }, 1, 0],
-                        },
-                    },
-                    activeGoals: {
-                        $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] },
-                    },
-                },
-            },
-        ]);
 
         const goalsData = goalsStats[0] || {
             totalGoals: 0,

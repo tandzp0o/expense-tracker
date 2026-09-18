@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import connectDB from "./config/db";
@@ -50,6 +51,11 @@ const corsOptions: cors.CorsOptions = {
     ],
     credentials: true,
     optionsSuccessStatus: 204,
+    // Every API call carries an Authorization header, so the browser asks
+    // permission (a preflight) before each one. Without a max age it asked
+    // again every time, doubling the round trips to a server on another
+    // continent. Chrome caps this at 2 hours, Firefox at 24.
+    maxAge: 86400,
 };
 
 app.use(cors(corsOptions));
@@ -67,6 +73,10 @@ app.use((req, res, next) => {
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
     next();
 });
+
+// Transaction lists are JSON that shrinks several times over when gzipped,
+// which matters over a long-distance link.
+app.use(compression());
 
 // The raw body is kept so the QStash signature can be verified against the
 // exact bytes that were sent.

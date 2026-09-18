@@ -950,7 +950,10 @@ export const getTransactions = async (req: any, res: Response) => {
         res.set("Cache-Control", "private, no-store, max-age=0");
 
         const skip = (pageNumber - 1) * pageSize;
-        const [summaryData, transactions] = await Promise.all([
+        // Wallet names are read alongside the page instead of with populate(),
+        // which waited for the page and then made a second trip to the
+        // database; across regions that second trip was most of the wait.
+        const [summaryData, rows, walletNames] = await Promise.all([
             Transaction.aggregate([
                 { $match: query },
                 {
@@ -997,9 +1000,22 @@ export const getTransactions = async (req: any, res: Response) => {
                 .select(
                     "_id walletId budgetId goalId type status amount category date note createdAt transferGroupId transferPeerWalletId isSystemGenerated",
                 )
-                .populate("walletId", "name")
                 .lean(),
+            Wallet.find({ userId }).select("name").lean(),
         ]);
+
+        // Same shape populate() gave: { _id, name }, or null for a wallet that
+        // no longer exists.
+        const walletById = new Map(
+            walletNames.map((wallet) => [String(wallet._id), wallet]),
+        );
+        const transactions = rows.map((row) => {
+            const wallet = walletById.get(String(row.walletId));
+            return {
+                ...row,
+                walletId: wallet ? { _id: wallet._id, name: wallet.name } : null,
+            };
+        });
 
         const aggregateRow = summaryData[0] || {
             total: 0,

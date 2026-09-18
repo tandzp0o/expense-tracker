@@ -168,38 +168,52 @@ const buildBudgetSummaryPayload = async ({
     year: number;
     walletId?: string;
 }) => {
-    const budgets = await Budget.find(
-        buildBudgetFilter({ userId, month, year, walletId }),
-    )
-        .populate("walletId", "name currency color")
-        .sort({ createdAt: -1 });
-
     const start = getMonthStart(month, year);
     const end = getMonthStart(
         month === 12 ? 1 : month + 1,
         month === 12 ? year + 1 : year,
     );
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
 
     // Spending is matched by category, not by an explicit budgetId link. Someone
     // who records "Ăn uống 85.000" expects it to count against their food budget
     // whether or not they remembered to attach that budget while entering it —
     // and the old link-only rule left most budgets sitting at 0% while the money
     // was quietly going out.
-    const spentAgg = await Transaction.aggregate([
-        {
-            $match: {
+    // The three reads are independent, so they go out together: the database
+    // is in another region from the API, and one after another they cost a
+    // cross-region round trip each.
+    const [budgets, spentAgg, prevBudgets] = await Promise.all([
+        Budget.find(buildBudgetFilter({ userId, month, year, walletId }))
+            .populate("walletId", "name currency color")
+            .sort({ createdAt: -1 }),
+        Transaction.aggregate([
+            {
+                $match: {
+                    userId,
+                    type: TransactionType.EXPENSE,
+                    ...buildCompletedStatusQuery(),
+                    date: { $gte: start, $lt: end },
+                },
+            },
+            {
+                $group: {
+                    _id: { category: "$category", walletId: "$walletId" },
+                    spent: { $sum: "$amount" },
+                },
+            },
+        ]),
+        Budget.find(
+            buildBudgetFilter({
                 userId,
-                type: TransactionType.EXPENSE,
-                ...buildCompletedStatusQuery(),
-                date: { $gte: start, $lt: end },
-            },
-        },
-        {
-            $group: {
-                _id: { category: "$category", walletId: "$walletId" },
-                spent: { $sum: "$amount" },
-            },
-        },
+                month: prevMonth,
+                year: prevYear,
+                walletId,
+            }),
+        )
+            .select("amount")
+            .lean(),
     ]);
 
     const spentByCategoryAndWallet = new Map<string, number>();
@@ -280,16 +294,6 @@ const buildBudgetSummaryPayload = async ({
     // money left over.
     const totalRemaining = totalBudget - totalSpent;
 
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevYear = month === 1 ? year - 1 : year;
-    const prevBudgets = await Budget.find(
-        buildBudgetFilter({
-            userId,
-            month: prevMonth,
-            year: prevYear,
-            walletId,
-        }),
-    );
     const prevTotalBudget = prevBudgets.reduce(
         (sum, budget) => sum + Number(budget.amount || 0),
         0,
