@@ -29,6 +29,25 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { LocaleProvider, useLocale } from "./contexts/LocaleContext";
 import { Spinner } from "./components/ui/spinner";
+import { Versioned, useIsLedger } from "./v2/Versioned";
+import { isLedgerPreview } from "./v2/preview";
+
+// v2 is loaded only by people who switch to it, so v1 users do not download it.
+const LedgerLayout = React.lazy(() =>
+    import("./v2/layout/LedgerLayout").then((module) => ({
+        default: module.LedgerLayout,
+    })),
+);
+const LedgerDashboard = React.lazy(() => import("./v2/pages/DashboardPage"));
+const LedgerTransactions = React.lazy(() => import("./v2/pages/TransactionsPage"));
+const LedgerBudgets = React.lazy(() => import("./v2/pages/BudgetsPage"));
+const LedgerWallets = React.lazy(() => import("./v2/pages/WalletsPage"));
+const LedgerGoals = React.lazy(() => import("./v2/pages/GoalsPage"));
+const LedgerAnalytics = React.lazy(() => import("./v2/pages/AnalyticsPage"));
+const LedgerSettings = React.lazy(() => import("./v2/pages/SettingsPage"));
+const LedgerMore = React.lazy(() => import("./v2/pages/MorePage"));
+const LedgerDishes = React.lazy(() => import("./v2/pages/DishesPage"));
+const LedgerProfile = React.lazy(() => import("./v2/pages/ProfilePage"));
 
 const FullscreenLoader = ({ label }: { label: string }) => (
     <div className="flex min-h-screen items-center justify-center bg-background">
@@ -43,6 +62,18 @@ const ProtectedRoute = () => {
     const { currentUser, loading } = useAuth();
     const location = useLocation();
     const { isVietnamese } = useLocale();
+    const isLedger = useIsLedger();
+
+    // Development screenshots only; see v2/preview.ts.
+    if (isLedgerPreview()) {
+        return (
+            <React.Suspense fallback={<FullscreenLoader label="Ledger" />}>
+                <LedgerLayout>
+                    <Outlet />
+                </LedgerLayout>
+            </React.Suspense>
+        );
+    }
 
     if (loading) {
         return (
@@ -68,9 +99,29 @@ const ProtectedRoute = () => {
     return (
         <QuestProvider isVietnamese={isVietnamese}>
             <NavigationLockProvider>
-                <MainLayout key={currentUser.uid}>
-                    <Outlet />
-                </MainLayout>
+                {/* v2 is a separate shell and component tree, not a skin over
+                    v1, so the whole layout switches with the setting. */}
+                {isLedger ? (
+                    <React.Suspense
+                        fallback={
+                            <FullscreenLoader
+                                label={
+                                    isVietnamese
+                                        ? "Đang tải giao diện..."
+                                        : "Loading the interface..."
+                                }
+                            />
+                        }
+                    >
+                        <LedgerLayout key={currentUser.uid}>
+                            <Outlet />
+                        </LedgerLayout>
+                    </React.Suspense>
+                ) : (
+                    <MainLayout key={currentUser.uid}>
+                        <Outlet />
+                    </MainLayout>
+                )}
             </NavigationLockProvider>
         </QuestProvider>
     );
@@ -129,26 +180,95 @@ function App() {
                                 />
 
                                 <Route element={<ProtectedRoute />}>
-                                    <Route element={<DashboardPage />} path="/dashboard" />
                                     <Route
-                                        element={<TransactionsPage />}
+                                        element={
+                                            <Versioned
+                                                v1={<DashboardPage />}
+                                                v2={<LedgerDashboard />}
+                                            />
+                                        }
+                                        path="/dashboard"
+                                    />
+                                    <Route
+                                        element={
+                                            <Versioned
+                                                v1={<TransactionsPage />}
+                                                v2={<LedgerTransactions />}
+                                            />
+                                        }
                                         path="/transactions"
                                     />
-                                    <Route element={<BudgetsPage />} path="/budgets" />
-                                    <Route element={<GoalsPage />} path="/goals" />
                                     <Route
-                                        element={<AnalyticsPage />}
+                                        element={
+                                            <Versioned
+                                                v1={<BudgetsPage />}
+                                                v2={<LedgerBudgets />}
+                                            />
+                                        }
+                                        path="/budgets"
+                                    />
+                                    <Route
+                                        element={
+                                            <Versioned
+                                                v1={<GoalsPage />}
+                                                v2={<LedgerGoals />}
+                                            />
+                                        }
+                                        path="/goals"
+                                    />
+                                    <Route
+                                        element={
+                                            <Versioned
+                                                v1={<AnalyticsPage />}
+                                                v2={<LedgerAnalytics />}
+                                            />
+                                        }
                                         path="/analytics"
                                     />
-                                    <Route element={<WalletsPage />} path="/wallets" />
                                     <Route
-                                        element={<DishSuggestionsPage />}
+                                        element={
+                                            <Versioned
+                                                v1={<WalletsPage />}
+                                                v2={<LedgerWallets />}
+                                            />
+                                        }
+                                        path="/wallets"
+                                    />
+                                    <Route
+                                        element={
+                                            <Versioned
+                                                v1={<DishSuggestionsPage />}
+                                                v2={<LedgerDishes />}
+                                            />
+                                        }
                                         path="/dishes"
                                     />
-                                    <Route element={<ProfilePage />} path="/profile" />
                                     <Route
-                                        element={<SettingsPage />}
+                                        element={
+                                            <Versioned
+                                                v1={<ProfilePage />}
+                                                v2={<LedgerProfile />}
+                                            />
+                                        }
+                                        path="/profile"
+                                    />
+                                    <Route
+                                        element={
+                                            <Versioned
+                                                v1={<SettingsPage />}
+                                                v2={<LedgerSettings />}
+                                            />
+                                        }
                                         path="/settings"
+                                    />
+                                    <Route
+                                        element={
+                                            <Versioned
+                                                v1={<Navigate replace to="/dashboard" />}
+                                                v2={<LedgerMore />}
+                                            />
+                                        }
+                                        path="/more"
                                     />
                                     <Route
                                         element={<AIModelPage />}

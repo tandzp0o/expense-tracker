@@ -211,9 +211,14 @@ const createMultipartApiClient = (token?: string): AxiosInstance => {
 const handleApiError = (error: any): never => {
     if (error.response) {
         console.error("API Error:", error.response.data);
-        throw new Error(
-            error.response.data.message ||
+        // ApiError is still an Error, so every caller reading `.message` works
+        // as before; the status and body are kept so a screen can tell a 409
+        // "already exists" apart from a real failure.
+        throw new ApiError(
+            error.response.data?.message ||
                 "Có lỗi xảy ra khi kết nối đến máy chủ",
+            error.response.status,
+            error.response.data,
         );
     } else if (error.request) {
         console.error("Network Error:", error.request);
@@ -336,6 +341,25 @@ export const walletApi = {
                     error.response.data,
                 );
             }
+            return handleApiError(error);
+        }
+    },
+    // Set a wallet to the cash the user actually holds. The server records the
+    // difference as a transaction, so the history still explains the balance.
+    reconcileWallet: async (
+        id: string,
+        payload: { actualBalance: number; note?: string },
+        token?: string,
+    ) => {
+        try {
+            const apiClient = createApiClient(token);
+            const response = await apiClient.post(
+                `/wallets/${id}/reconcile`,
+                payload,
+            );
+            invalidateTransactionCache();
+            return response.data;
+        } catch (error) {
             return handleApiError(error);
         }
     },
@@ -673,6 +697,8 @@ export const goalApi = {
         try {
             const apiClient = createApiClient(token);
             const response = await apiClient.delete(`/goals/${id}`);
+            // Deleting a funded goal writes a refund transaction.
+            invalidateTransactionCache();
             return response.data;
         } catch (error) {
             return handleApiError(error);

@@ -128,8 +128,8 @@ const ThemePanel: React.FC<{
                         </div>
                         <p className="mt-2 text-xs leading-5 text-muted-foreground">
                             {isVietnamese
-                                ? "Bản mới bỏ hiệu ứng kính mờ, dùng nền phẳng, thẻ bo góc rộng hơn và số tiền canh thẳng cột."
-                                : "The new version drops the frosted glass for flat surfaces, wider card corners and column-aligned amounts."}
+                                ? "Bản mới được thiết kế lại từ đầu: menu chia nhóm, nút Ghi nhanh luôn sẵn, form mở bên cạnh thay vì che màn hình, và bàn phím số riêng trên điện thoại. Dữ liệu dùng chung, đổi qua lại lúc nào cũng được."
+                                : "A ground-up redesign: grouped navigation, Quick add always at hand, forms that open beside the page instead of over it, and a number pad on phones. Same data, switch back any time."}
                         </p>
                     </div>
 

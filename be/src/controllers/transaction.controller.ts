@@ -995,7 +995,7 @@ export const getTransactions = async (req: any, res: Response) => {
                 .skip(skip)
                 .limit(pageSize)
                 .select(
-                    "_id walletId budgetId type status amount category date note createdAt transferGroupId isSystemGenerated",
+                    "_id walletId budgetId goalId type status amount category date note createdAt transferGroupId transferPeerWalletId isSystemGenerated",
                 )
                 .populate("walletId", "name")
                 .lean(),
@@ -1051,7 +1051,7 @@ export const getTransactionsByWallet = async (req: any, res: Response) => {
         const transactions = await Transaction.find({ walletId, userId })
             .sort({ date: -1, createdAt: -1 })
             .select(
-                "_id walletId budgetId type status amount category date note createdAt transferGroupId isSystemGenerated",
+                "_id walletId budgetId goalId type status amount category date note createdAt transferGroupId transferPeerWalletId isSystemGenerated",
             )
             .populate("walletId", "name")
             .lean();
@@ -1361,6 +1361,18 @@ export const deleteTransaction = async (req: any, res: Response) => {
                     400,
                     "Adjustment transactions cannot be deleted safely",
                 );
+            }
+
+            // A scheduled or pending entry never moved any money, so deleting it
+            // must not move any either. Reversing it regardless used to credit
+            // a wallet for a bill that was never paid.
+            if (
+                !transactionTouchesLedger(
+                    (entry.status as TransactionStatus) ||
+                        TransactionStatus.COMPLETED,
+                )
+            ) {
+                continue;
             }
 
             const wallet = walletMap.get(String(entry.walletId));

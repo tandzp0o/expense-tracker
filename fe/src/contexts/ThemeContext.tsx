@@ -259,6 +259,7 @@ const applyAppearance = (appearance: AppearanceSettings) => {
         FONT_PRESETS[appearance.fontPreset],
     );
     root.style.setProperty("--app-font-size", FONT_SCALES[appearance.fontScale]);
+    root.dataset.fontScale = appearance.fontScale;
     root.style.setProperty(
         "--app-radius-sm",
         RADIUS_PRESETS[appearance.radiusPreset].sm,
