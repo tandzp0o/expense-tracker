@@ -15,6 +15,9 @@ export interface TimelineEntry {
   kind: EntryKind;
   title: string;
   subtitle: string;
+  /** The subtitle split in two, for the wide table layout. */
+  categoryLabel: string;
+  walletLabel: string;
   /** Signed for income/expense; positive for transfers and goal moves. */
   amount: number;
   status: TransactionStatus;
@@ -96,6 +99,8 @@ export const buildTimeline = (
           outgoing.note ||
           (isVietnamese ? `Chuyển sang ${toName || "ví khác"}` : `Transfer to ${toName || "another wallet"}`),
         subtitle: [fromName, toName].filter(Boolean).join(" → "),
+        categoryLabel: isVietnamese ? "Chuyển ví" : "Transfer",
+        walletLabel: [fromName, toName].filter(Boolean).join(" → "),
         amount,
         status,
         meta: getCategoryMeta("Transfer"),
@@ -116,6 +121,8 @@ export const buildTimeline = (
               ? "Rút từ mục tiêu"
               : "Taken from a goal"),
         subtitle: [categoryLabel, walletName].filter(Boolean).join(" · "),
+        categoryLabel,
+        walletLabel: walletName,
         amount,
         status,
         meta,
@@ -129,6 +136,8 @@ export const buildTimeline = (
         kind: isIncome ? "income" : "expense",
         title: transaction.note || categoryLabel,
         subtitle: [categoryLabel, walletName].filter(Boolean).join(" · "),
+        categoryLabel,
+        walletLabel: walletName,
         amount: isIncome ? amount : -amount,
         status,
         meta,

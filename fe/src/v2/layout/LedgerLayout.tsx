@@ -31,8 +31,9 @@ const Avatar: React.FC<{ src?: string | null; name: string; size?: number }> = (
     />
   ) : (
     <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-ledger-accent-wash text-[13px] font-semibold text-ledger-accent"
-      style={{ height: size, width: size }}
+      className="flex shrink-0 items-center justify-center rounded-full bg-ledger-accent-wash font-semibold text-ledger-accent"
+      // The initial scales with the circle instead of staying 13px.
+      style={{ fontSize: Math.round(size * 0.42), height: size, width: size }}
     >
       {(name || "?").trim().charAt(0).toUpperCase()}
     </span>
@@ -234,7 +235,7 @@ export const LedgerLayout: React.FC<{ children: React.ReactNode }> = ({ children
     <LedgerProvider>
       <Rail />
       <main className="min-h-screen lg:pl-[232px]">
-        <div className="ledger-page mx-auto w-full max-w-[1180px] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+96px)] sm:px-6 lg:px-10 lg:pb-16">
+        <div className="ledger-page mx-auto w-full max-w-[1720px] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+96px)] sm:px-6 lg:px-8 lg:pb-16 2xl:px-10">
           {/* Pages load on first visit; the rail and tab bar stay put meanwhile. */}
           <React.Suspense
             fallback={

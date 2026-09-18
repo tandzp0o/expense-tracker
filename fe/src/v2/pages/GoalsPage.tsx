@@ -2,17 +2,24 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowDownToLine,
+  ArrowRight,
   ArrowUpFromLine,
   CalendarClock,
+  CalendarDays,
+  CalendarOff,
   Check,
+  CircleCheck,
+  Hourglass,
   Info,
   Pencil,
+  PiggyBank,
   Plus,
   Target,
   Trash2,
   TriangleAlert,
   WalletCards,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { goalApi, transactionApi, walletApi } from "services/api";
 import { useLocale } from "contexts/LocaleContext";
 import { useToast } from "contexts/ToastContext";
@@ -20,10 +27,12 @@ import { cn } from "lib/utils";
 import { ConfirmDialog, Panel } from "../components/overlays";
 import {
   Button,
+  Card,
   Chip,
   EmptyState,
   FieldLabel,
   HeroStrip,
+  IconBadge,
   Money,
   Notice,
   PageHeader,
@@ -32,6 +41,7 @@ import {
   SkeletonRows,
   TextInput,
   TextLink,
+  Track,
 } from "../components/primitives";
 import { useIsDesktop } from "../hooks/useIsDesktop";
 import { useLedger } from "../LedgerContext";
@@ -111,23 +121,25 @@ const toGoalView = (goal: Goal, today: string, timezoneOffsetMinutes: number): G
 
 const STATE_ORDER: Record<GoalState, number> = { active: 0, expired: 1, completed: 2 };
 
-/* --------------------------------------------------------------- Goal row */
+/* -------------------------------------------------------------- Goal card */
 
-const Pill: React.FC<{ tone: "in" | "spend"; children: React.ReactNode }> = ({
-  tone,
-  children,
-}) => (
+type PillTone = "in" | "spend" | "neutral";
+
+const Pill: React.FC<{ tone: PillTone; children: React.ReactNode }> = ({ tone, children }) => (
   <span
     className={cn(
-      "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-semibold",
-      tone === "in" ? "bg-ledger-in-wash text-ledger-in" : "bg-ledger-spend-wash text-ledger-spend",
+      "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-semibold",
+      tone === "in" && "bg-ledger-in-wash text-ledger-in",
+      tone === "spend" && "bg-ledger-spend-wash text-ledger-spend",
+      tone === "neutral" && "bg-ledger-canvas text-ledger-ink-2",
     )}
   >
     {children}
   </span>
 );
 
-const DeadlineInfo: React.FC<{ view: GoalView }> = ({ view }) => {
+/** Where the goal stands against its deadline, always in the same pill. */
+const DeadlinePill: React.FC<{ view: GoalView }> = ({ view }) => {
   const t = useT();
 
   if (view.state === "completed") {
@@ -147,143 +159,240 @@ const DeadlineInfo: React.FC<{ view: GoalView }> = ({ view }) => {
     );
   }
   if (!view.deadlineKey) {
-    return <span className="text-[13px] text-ledger-muted">{t("Không đặt hạn", "No deadline")}</span>;
+    return (
+      <Pill tone="neutral">
+        <CalendarOff className="h-3.5 w-3.5" />
+        {t("Không đặt hạn", "No deadline")}
+      </Pill>
+    );
   }
 
   const left =
     view.daysLeft === 0
       ? t("hạn là hôm nay", "due today")
       : t(`còn ${view.daysLeft} ngày`, `${view.daysLeft} days left`);
+  // The last week turns amber: close enough to plan around.
   return (
-    <span className="text-[13px] text-ledger-ink-2">
-      <span className="ledger-num">{t(`Hạn ${fullDate(view.deadlineKey)}`, `Due ${fullDate(view.deadlineKey)}`)}</span>
-      <span className="text-ledger-muted"> · {left}</span>
-    </span>
+    <Pill tone={view.daysLeft !== null && view.daysLeft <= 7 ? "spend" : "neutral"}>
+      <CalendarDays className="h-3.5 w-3.5" />
+      <span className="ledger-num">
+        {t(`Hạn ${fullDate(view.deadlineKey)}`, `Due ${fullDate(view.deadlineKey)}`)}
+      </span>
+      <span className="font-medium opacity-80">· {left}</span>
+    </Pill>
   );
 };
 
-const GoalRow: React.FC<{
+/**
+ * What it takes to make the deadline, rounded up to the thousand so saving
+ * that much really does get there: per month when the deadline is far, per
+ * week when it is close, the whole remainder in the last fortnight.
+ */
+const savingPace = (view: GoalView) => {
+  if (view.state !== "active" || view.daysLeft === null || view.missing <= 0) {
+    return null;
+  }
+  const days = Math.max(view.daysLeft, 1);
+  const roundUp = (value: number) => Math.ceil(value / 1000) * 1000;
+  if (days > 62) {
+    return { unit: "month" as const, amount: roundUp(view.missing / (days / 30.4)) };
+  }
+  if (days >= 14) {
+    return { unit: "week" as const, amount: roundUp(view.missing / (days / 7)) };
+  }
+  return { unit: "total" as const, amount: view.missing, days: view.daysLeft };
+};
+
+/**
+ * A heading for a group of cards laid out on the page itself. The count sits
+ * on paper with a border: the card header's grey pill would disappear
+ * against the grey page.
+ */
+const GroupHeading: React.FC<{
+  icon: LucideIcon;
+  tone: "accent" | "in";
+  title: string;
+  count?: number;
+  subtitle?: string;
+}> = ({ icon, tone, title, count, subtitle }) => (
+  <div className="mb-4 flex items-center gap-3">
+    <IconBadge icon={icon} size="md" tone={tone} />
+    <div className="min-w-0">
+      <div className="flex items-center gap-2">
+        <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ledger-ink">{title}</h2>
+        {count ? (
+          <span className="ledger-num rounded-full border border-ledger-line bg-ledger-paper px-2 py-0.5 text-[12px] font-semibold text-ledger-ink-2">
+            {count}
+          </span>
+        ) : null}
+      </div>
+      {subtitle ? <p className="text-[13px] leading-snug text-ledger-muted">{subtitle}</p> : null}
+    </div>
+  </div>
+);
+
+/**
+ * One goal on its own card: how far (the ring), what is in it and what is
+ * missing, the deadline, and the three things you can do with it, always in
+ * view at the foot of the card.
+ */
+const GoalCard: React.FC<{
   view: GoalView;
   onContribute: (view: GoalView, mode: ContributionMode) => void;
   onEdit: (goal: Goal) => void;
 }> = ({ view, onContribute, onEdit }) => {
   const t = useT();
-  const isDesktop = useIsDesktop();
   const { goal, saved, target, missing, state } = view;
   const category = goal.category && goal.category !== DEFAULT_GOAL_CATEGORY ? goal.category : "";
   const nothingSaved = saved <= 0;
+  const complete = state === "completed";
+  const pace = savingPace(view);
 
-  const withdrawReason = nothingSaved ? (
-    <p className="text-[12px] text-ledger-muted">
-      {t("Chưa có tiền trong mục tiêu để rút.", "Nothing saved yet to withdraw.")}
-    </p>
-  ) : null;
-
-  const actions = (
-    <>
-      <Button
-        icon={ArrowDownToLine}
-        onClick={() => onContribute(view, "deposit")}
-        size="sm"
-        variant="outline"
-      >
-        {t("Nạp thêm", "Add money")}
-      </Button>
-      <Button
-        disabled={nothingSaved}
-        icon={ArrowUpFromLine}
-        onClick={() => onContribute(view, "withdraw")}
-        size="sm"
-        variant="ghost"
-      >
-        {t("Rút về ví", "Withdraw")}
-      </Button>
-      <button
-        aria-label={t(`Sửa ${goal.title}`, `Edit ${goal.title}`)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ledger-muted hover:bg-ledger-canvas hover:text-ledger-ink"
-        onClick={() => onEdit(goal)}
-        type="button"
-      >
-        <Pencil className="h-4 w-4" />
-      </button>
-    </>
+  const deposit = (
+    <Button
+      icon={ArrowDownToLine}
+      key="deposit"
+      onClick={() => onContribute(view, "deposit")}
+      size="sm"
+      variant={complete ? "outline" : "soft"}
+    >
+      {t("Nạp thêm", "Add money")}
+    </Button>
+  );
+  const withdraw = (
+    <Button
+      disabled={nothingSaved}
+      icon={ArrowUpFromLine}
+      key="withdraw"
+      onClick={() => onContribute(view, "withdraw")}
+      size="sm"
+      variant={complete ? "soft" : "outline"}
+    >
+      {t("Rút về ví", "Withdraw")}
+    </Button>
   );
 
   return (
-    <div className="border-b border-ledger-line py-5 last:border-b-0">
-      <div className="flex items-center gap-3 lg:gap-4">
+    <Card className="flex flex-col">
+      <div className="flex items-start gap-4">
         <Ring
-          complete={state === "completed"}
-          label={state === "completed" ? <Check className="h-5 w-5 text-ledger-in" /> : percentLabel(view)}
+          complete={complete}
+          label={complete ? <Check className="h-5 w-5 text-ledger-in" /> : percentLabel(view)}
           percent={view.percent}
-          size={isDesktop ? 60 : 48}
+          size={56}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-[15.5px] font-semibold text-ledger-ink">{goal.title}</p>
-            {category ? (
-              <span className="hidden max-w-[140px] shrink-0 truncate rounded-full bg-ledger-canvas px-2 py-0.5 text-[11.5px] text-ledger-ink-2 sm:inline">
-                {category}
-              </span>
-            ) : null}
+          <h3 className="break-words text-[16px] font-semibold leading-snug text-ledger-ink">{goal.title}</h3>
+          {category ? (
+            <p className="mt-0.5 break-words text-[13px] text-ledger-muted">{category}</p>
+          ) : null}
+          <div className="mt-2">
+            <DeadlinePill view={view} />
           </div>
-          <p className="mt-0.5 text-[13px] text-ledger-muted">
-            <span className="ledger-num">
-              {formatMoney(saved)} / {formatMoney(target)}
-            </span>
-            {state !== "completed" ? (
-              <>
-                {" · "}
-                <span className="whitespace-nowrap">
-                  {t("còn thiếu ", "")}
-                  <span className="ledger-num">{formatMoney(missing)}</span>
-                  {t("", " to go")}
-                </span>
-              </>
-            ) : null}
-          </p>
-          <div className="mt-1.5 lg:hidden">
-            <DeadlineInfo view={view} />
-          </div>
-        </div>
-        <div className="hidden w-[230px] shrink-0 lg:block">
-          <DeadlineInfo view={view} />
-        </div>
-        <div className="hidden shrink-0 flex-col items-end gap-1 lg:flex">
-          <div className="flex items-center gap-1.5">{actions}</div>
-          {withdrawReason}
         </div>
       </div>
 
+      {goal.description ? (
+        <p className="mt-4 line-clamp-2 break-words text-[13.5px] leading-snug text-ledger-ink-2">
+          {goal.description}
+        </p>
+      ) : null}
+
+      <div className="mt-5">
+        <p className="flex flex-wrap items-baseline gap-x-2 leading-tight">
+          <Money amount={saved} className="whitespace-nowrap text-[22px] font-semibold tracking-[-0.01em]" />
+          <span className="ledger-num whitespace-nowrap text-[14px] text-ledger-muted">
+            / {formatMoney(target)}
+          </span>
+        </p>
+        <p className="mt-1.5 text-[13.5px]">
+          {complete ? (
+            <span className="font-medium text-ledger-in">{t("Đã đủ số tiền cần có", "Target reached")}</span>
+          ) : (
+            <span className="text-ledger-ink-2">
+              {t("Còn thiếu ", "")}
+              <span className="ledger-num font-semibold text-ledger-ink">{formatMoney(missing)}</span>
+              {t("", " to go")}
+            </span>
+          )}
+        </p>
+      </div>
+
+      {pace ? (
+        <p className="mt-4 flex items-start gap-2.5 rounded-[12px] bg-ledger-canvas px-3.5 py-2.5 text-[13px] leading-snug text-ledger-ink-2">
+          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-ledger-muted" />
+          <span>
+            {t("Để kịp hạn: ", "To make the deadline: ")}
+            {pace.unit === "total" ? (
+              <>
+                {t("cần ", "")}
+                <span className="ledger-num font-semibold text-ledger-ink">{formatMoney(pace.amount)}</span>
+                {pace.days
+                  ? t(` trong ${pace.days} ngày`, ` in ${pace.days} days`)
+                  : t(" ngay hôm nay", " today")}
+              </>
+            ) : (
+              <>
+                {t("khoảng ", "about ")}
+                <span className="ledger-num font-semibold text-ledger-ink">{formatMoney(pace.amount)}</span>
+                {pace.unit === "month" ? t(" mỗi tháng", " a month") : t(" mỗi tuần", " a week")}
+              </>
+            )}
+          </span>
+        </p>
+      ) : null}
+
       {state === "expired" ? (
-        <Notice
-          action={
-            <TextLink onClick={() => onEdit(goal)}>{t("Dời hạn", "Move deadline")}</TextLink>
-          }
-          className="ml-[60px] mt-3 lg:ml-[76px]"
-          tone="muted"
-        >
+        // One paragraph with the link inline, so the card beside this one is
+        // not stretched by a tall notice.
+        <Notice className="mt-4" icon={CalendarClock} tone="muted">
           {saved > 0
             ? t(
-                "Bạn có thể dời hạn hoặc rút phần đã để dành.",
-                "You can move the deadline or withdraw what you saved.",
+                "Bạn có thể dời hạn hoặc rút phần đã để dành. ",
+                "You can move the deadline or withdraw what you saved. ",
               )
             : t(
-                "Hạn đã qua. Bạn có thể dời hạn để tiếp tục để dành.",
-                "The deadline has passed. Move it to keep saving.",
+                "Hạn đã qua. Bạn có thể dời hạn để tiếp tục để dành. ",
+                "The deadline has passed. Move it to keep saving. ",
               )}
+          <TextLink className="whitespace-nowrap" onClick={() => onEdit(goal)}>
+            {t("Dời hạn", "Move deadline")}
+            <ArrowRight className="ml-1 inline h-3.5 w-3.5 align-[-2px]" />
+          </TextLink>
         </Notice>
       ) : null}
 
-      {/* On a phone the actions get their own row under the figures, with the
-          thumb-sized deposit button first. */}
-      <div className="ml-[60px] mt-3 lg:hidden">
-        <div className="flex items-center gap-1.5">{actions}</div>
-        {withdrawReason ? <div className="mt-1">{withdrawReason}</div> : null}
+      {/* The actions sit at the foot of every card, so they line up across a
+          row whatever each card holds above them. */}
+      <div className="mt-auto pt-5">
+        <div className="flex flex-wrap items-center gap-2 border-t border-ledger-line pt-4">
+          {/* A finished goal is more often spent than topped up. */}
+          {complete ? [withdraw, deposit] : [deposit, withdraw]}
+          <Button
+            aria-label={t(`Sửa ${goal.title}`, `Edit ${goal.title}`)}
+            className="ml-auto"
+            icon={Pencil}
+            onClick={() => onEdit(goal)}
+            size="sm"
+            variant="ghost"
+          >
+            {t("Sửa", "Edit")}
+          </Button>
+        </div>
+        {nothingSaved ? (
+          <p className="mt-2 text-[12.5px] text-ledger-muted">
+            {t("Chưa có tiền trong mục tiêu để rút.", "Nothing saved yet to withdraw.")}
+          </p>
+        ) : null}
       </div>
-    </div>
+    </Card>
   );
 };
+
+/** The grid every group of goals is laid out in. */
+const GoalGrid: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:gap-5 2xl:grid-cols-3">{children}</div>
+);
 
 /* ------------------------------------------------------ Contribution panel */
 
@@ -416,10 +525,11 @@ const ContributionPanel: React.FC<{
     }
   };
 
+  // Same arrangement as every other form: cancel beside the main action.
   const footer = wallets.length ? (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center justify-end gap-2">
       {isDesktop ? (
-        <Button className="mr-auto" onClick={onClose} variant="ghost">
+        <Button onClick={onClose} variant="ghost">
           {t("Huỷ", "Cancel")}
         </Button>
       ) : null}
@@ -461,23 +571,34 @@ const ContributionPanel: React.FC<{
         />
       ) : (
         <div className="flex flex-col gap-5">
-          {/* The goal being funded, read-only: context, not another field. */}
-          <div className="flex items-center gap-3 rounded-[14px] bg-ledger-canvas px-4 py-3">
+          {/* The goal being funded, read-only: context, not another field.
+              Outlined rather than filled, so the ring's own grey track stays
+              visible against it. */}
+          <div className="flex items-center gap-3.5 rounded-[14px] border border-ledger-line px-4 py-3.5">
             <Ring
               complete={view.state === "completed"}
               label={percentLabel(view)}
               percent={view.percent}
-              size={42}
+              size={48}
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[14.5px] font-semibold text-ledger-ink">{goal.title}</p>
-              <p className="ledger-num text-[12.5px] text-ledger-muted">
-                {isDeposit
-                  ? missing > 0
-                    ? t(`Còn thiếu ${formatMoney(missing)}`, `${formatMoney(missing)} to go`)
-                    : t("Đã đủ mục tiêu", "Target reached")
-                  : t(`Đang có ${formatMoney(saved)}`, `${formatMoney(saved)} saved`)}
+              <p className="break-words text-[15px] font-semibold leading-snug text-ledger-ink">{goal.title}</p>
+              {/* What is in the goal comes first either way; adding money
+                  also wants to know what is still missing, on its own line
+                  so a narrow sheet never breaks a figure in two. */}
+              <p className="ledger-num mt-0.5 text-[13px] text-ledger-muted">
+                {t(
+                  `Đang có ${formatMoney(saved)} / ${formatMoney(target)}`,
+                  `${formatMoney(saved)} of ${formatMoney(target)} saved`,
+                )}
               </p>
+              {isDeposit ? (
+                <p className="ledger-num text-[13px] font-medium text-ledger-ink-2">
+                  {missing > 0
+                    ? t(`Còn thiếu ${formatMoney(missing)}`, `${formatMoney(missing)} to go`)
+                    : t("Đã đủ mục tiêu", "Target reached")}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -491,8 +612,8 @@ const ContributionPanel: React.FC<{
           />
 
           <div>
-            <label className="flex items-baseline gap-3 border-b-2 border-ledger-line pb-1 focus-within:border-ledger-accent">
-              <span className="shrink-0 text-[13.5px] text-ledger-ink-2">{t("Số tiền", "Amount")}</span>
+            <FieldLabel htmlFor="goal-contribution-amount">{t("Số tiền", "Amount")}</FieldLabel>
+            <label className="flex items-baseline justify-end gap-2 border-b-2 border-ledger-line pb-1 focus-within:border-ledger-accent">
               <input
                 className="ledger-num min-w-0 flex-1 bg-transparent text-right text-[36px] font-semibold leading-tight tracking-[-0.03em] text-ledger-ink outline-none placeholder:text-ledger-line-strong lg:text-[44px]"
                 id="goal-contribution-amount"
@@ -1006,6 +1127,13 @@ const GoalsPage: React.FC = () => {
     };
   }, [views]);
 
+  // Finished goals get their own group: they need a different decision
+  // (spend it or keep it) from the ones still being filled.
+  const running = views.filter((view) => view.state !== "completed");
+  const completed = views.filter((view) => view.state === "completed");
+  const contribute = (target: GoalView, mode: ContributionMode) =>
+    setContribution({ goalId: target.goal._id, mode });
+
   const contributionView = contribution
     ? views.find((view) => view.goal._id === contribution.goalId) || null
     : null;
@@ -1089,50 +1217,139 @@ const GoalsPage: React.FC = () => {
                   )
                 : t("Chưa nạp tiền vào mục tiêu nào.", "Nothing has been put into a goal yet.")
           }
+          icon={PiggyBank}
           label={t("Đang để dành", "Saved in goals")}
           stats={[
-            { label: t("Tổng mục tiêu", "Total target"), value: <Money amount={totals.target} /> },
-            { label: t("Còn thiếu", "Still to go"), value: <Money amount={totals.missing} /> },
+            {
+              label: t("Tổng mục tiêu", "Total target"),
+              icon: Target,
+              tone: "accent",
+              value: <Money amount={totals.target} />,
+              hint: loading ? undefined : t(`${views.length} mục tiêu`, `${views.length} goals`),
+            },
+            {
+              label: t("Còn thiếu", "Still to go"),
+              icon: Hourglass,
+              tone: "spend",
+              value: <Money amount={totals.missing} />,
+              hint: loading
+                ? undefined
+                : running.length
+                  ? t(`${running.length} mục tiêu chưa đủ`, `${running.length} not reached yet`)
+                  : t("Mọi mục tiêu đã đủ", "Every goal is reached"),
+            },
             {
               label: t("Hoàn thành", "Completed"),
+              icon: CircleCheck,
+              tone: "in",
               value: (
                 <span className="ledger-num text-ledger-ink">
                   {totals.completed}/{views.length}
                 </span>
               ),
+              hint: loading
+                ? undefined
+                : totals.expired
+                  ? t(`${totals.expired} mục tiêu quá hạn`, `${totals.expired} overdue`)
+                  : t(`${totals.active} đang thực hiện`, `${totals.active} in progress`),
             },
           ]}
           value={loading ? <span className="text-ledger-line-strong">—</span> : <Money amount={totals.saved} />}
-        />
+        >
+          {!loading && totals.target > 0 ? (
+            <Track percent={(totals.saved / totals.target) * 100} tone="accent" />
+          ) : null}
+        </HeroStrip>
       ) : null}
 
       {loading ? (
-        <SkeletonRows rows={4} />
+        <Card className="mt-3 sm:mt-4 xl:mt-5">
+          <SkeletonRows rows={4} />
+        </Card>
       ) : views.length ? (
-        <div>
-          {views.map((view) => (
-            <GoalRow
-              key={view.goal._id}
-              onContribute={(target, mode) => setContribution({ goalId: target.goal._id, mode })}
-              onEdit={openEdit}
-              view={view}
+        <div className="mt-6 space-y-8 xl:mt-8 xl:space-y-10">
+          <section>
+            <GroupHeading
+              count={running.length}
+              icon={Target}
+              subtitle={
+                running.length
+                  ? t(
+                      "Hạn gần nhất lên trước, mục tiêu quá hạn ở cuối",
+                      "Nearest deadline first, overdue goals last",
+                    )
+                  : undefined
+              }
+              title={t("Đang thực hiện", "In progress")}
+              tone="accent"
             />
-          ))}
+            {running.length ? (
+              <GoalGrid>
+                {running.map((view) => (
+                  <GoalCard
+                    key={view.goal._id}
+                    onContribute={contribute}
+                    onEdit={openEdit}
+                    view={view}
+                  />
+                ))}
+              </GoalGrid>
+            ) : (
+              <Card className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[14px] text-ledger-ink-2">
+                  {t(
+                    "Mọi mục tiêu đều đã hoàn thành. Đặt mục tiêu tiếp theo?",
+                    "Every goal is reached. Set the next one?",
+                  )}
+                </p>
+                <Button icon={Plus} onClick={openCreate} size="sm" variant="outline">
+                  {t("Tạo mục tiêu", "New goal")}
+                </Button>
+              </Card>
+            )}
+          </section>
+
+          {completed.length ? (
+            <section>
+              <GroupHeading
+                count={completed.length}
+                icon={CircleCheck}
+                subtitle={t(
+                  "Tiền vẫn nằm trong mục tiêu cho đến khi bạn rút về ví",
+                  "The money stays in the goal until you withdraw it",
+                )}
+                title={t("Đã hoàn thành", "Completed")}
+                tone="in"
+              />
+              <GoalGrid>
+                {completed.map((view) => (
+                  <GoalCard
+                    key={view.goal._id}
+                    onContribute={contribute}
+                    onEdit={openEdit}
+                    view={view}
+                  />
+                ))}
+              </GoalGrid>
+            </section>
+          ) : null}
         </div>
       ) : (
-        <EmptyState
-          action={
-            <Button icon={Target} onClick={openCreate}>
-              {t("Tạo mục tiêu đầu tiên", "Create your first goal")}
-            </Button>
-          }
-          description={t(
-            "Đặt một khoản cần để dành rồi nạp dần từ ví. Tiền trong mục tiêu vẫn là của bạn, rút về ví lúc nào cũng được.",
-            "Set an amount to save and add to it from your wallets. The money stays yours and can go back to a wallet at any time.",
-          )}
-          icon={Target}
-          title={t("Chưa có mục tiêu nào", "No goals yet")}
-        />
+        <Card>
+          <EmptyState
+            action={
+              <Button icon={Target} onClick={openCreate}>
+                {t("Tạo mục tiêu đầu tiên", "Create your first goal")}
+              </Button>
+            }
+            description={t(
+              "Đặt một khoản cần để dành rồi nạp dần từ ví. Tiền trong mục tiêu vẫn là của bạn, rút về ví lúc nào cũng được.",
+              "Set an amount to save and add to it from your wallets. The money stays yours and can go back to a wallet at any time.",
+            )}
+            icon={Target}
+            title={t("Chưa có mục tiêu nào", "No goals yet")}
+          />
+        </Card>
       )}
 
       <ContributionPanel

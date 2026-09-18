@@ -1,8 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  ArrowDownLeft,
+  ArrowUpRight,
   CalendarDays,
+  ChartColumn,
+  ChartPie,
+  Gauge,
+  History,
   Info,
+  Lightbulb,
+  PiggyBank,
   ReceiptText,
+  Scale,
   TrendingDown,
   TrendingUp,
   TriangleAlert,
@@ -23,6 +32,7 @@ import {
   Section,
   Segmented,
   SkeletonRows,
+  Track,
 } from "../components/primitives";
 import { useLedger } from "../LedgerContext";
 import { getCategoryMeta, type CategoryMeta } from "../lib/categories";
@@ -148,43 +158,142 @@ const dayEndIso = (dayKey: string, timezoneOffsetMinutes: number) =>
 
 /* ------------------------------------------------------------ Local parts */
 
+/** Column template shared by the header and rows of "Chi theo nhóm". */
+const SHARE_COLUMNS =
+  "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_8.5rem_3.25rem] 2xl:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_9rem_3.5rem]";
+
 const ShareRow: React.FC<{
   meta: CategoryMeta;
   total: number;
+  count: number;
   share: number;
   relative: number;
   overBudget: boolean;
-}> = ({ meta, total, share, relative, overBudget }) => {
+}> = ({ meta, total, count, share, relative, overBudget }) => {
   const t = useT();
   const { isVietnamese } = useLocale();
+  const name = isVietnamese ? meta.vi : meta.en;
+  const shareLabel = share > 0 && share < 1 ? "<1%" : `${Math.round(share)}%`;
 
-  // Mobile: name and figure on one line, the bar full width beneath. From
-  // `sm` up the three sit in one row like a ranked table.
+  // A phone gets name and figure on one line and the bar under them; from
+  // `sm` up it is a ranked table: name, bar, amount, share.
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b border-ledger-line py-3.5 last:border-b-0 sm:grid-cols-[180px_minmax(0,1fr)_170px]">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-[14.5px] text-ledger-ink">{isVietnamese ? meta.vi : meta.en}</span>
-        {overBudget ? (
-          <span className="shrink-0 whitespace-nowrap rounded-full bg-ledger-out-wash px-2 py-0.5 text-[11px] font-semibold text-ledger-out">
-            {t("Vượt hạn mức", "Over budget")}
-          </span>
-        ) : null}
+    <div
+      className={cn(
+        "grid items-center gap-x-4 gap-y-2.5 py-3.5 first:pt-0 last:pb-0",
+        SHARE_COLUMNS,
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <CategoryIcon meta={meta} size={36} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-[15px] font-medium leading-snug text-ledger-ink">{name}</span>
+            {overBudget ? (
+              <span className="whitespace-nowrap rounded-full bg-ledger-out-wash px-2 py-0.5 text-[12px] font-semibold text-ledger-out">
+                {t("Vượt hạn mức", "Over budget")}
+              </span>
+            ) : null}
+          </div>
+          <p className="text-[13px] leading-snug text-ledger-muted">
+            {t(`${count} khoản chi`, `${count} ${count === 1 ? "expense" : "expenses"}`)}
+          </p>
+        </div>
       </div>
-      <div className="col-span-2 row-start-2 h-2 overflow-hidden rounded-full bg-ledger-canvas sm:col-span-1 sm:row-start-auto">
+      <div
+        className="col-span-2 row-start-2 ml-12 h-2 overflow-hidden rounded-full bg-ledger-canvas sm:col-span-1 sm:row-start-auto sm:ml-0"
+        title={`${name}: ${formatMoney(total)} · ${shareLabel}`}
+      >
         <div
           className={cn("h-full rounded-full", overBudget ? "bg-ledger-out" : "bg-ledger-spend")}
           style={{ width: `${Math.max(relative, 1.5)}%` }}
         />
       </div>
-      <div className="text-right text-[14px]">
-        <Money amount={total} className="font-semibold" />
-        <span className="ledger-num ml-1.5 inline-block w-[42px] text-left text-[12.5px] text-ledger-muted">
-          · {Math.round(share)}%
-        </span>
+      <div className="text-right">
+        <Money amount={total} className="text-[15px] font-semibold" />
+        <p className="ledger-num text-[13px] text-ledger-muted sm:hidden">{shareLabel}</p>
       </div>
+      <span className="ledger-num hidden text-right text-[14px] font-medium text-ledger-ink-2 sm:block">
+        {shareLabel}
+      </span>
     </div>
   );
 };
+
+/** ▲ 20% in rose, ▼ 12% in green, "Mới" for a group that did not exist before. */
+const ChangePill: React.FC<{ current: number; previous: number }> = ({ current, previous }) => {
+  const t = useT();
+  const change = previous > 0 ? ((current - previous) / previous) * 100 : null;
+  const rounded = change === null ? 0 : Math.round(change);
+
+  return (
+    <span
+      className={cn(
+        "ledger-num inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[12.5px] font-semibold",
+        change === null || rounded === 0
+          ? "bg-ledger-canvas text-ledger-ink-2"
+          : rounded > 0
+            ? "bg-ledger-out-wash text-ledger-out"
+            : "bg-ledger-in-wash text-ledger-in",
+      )}
+    >
+      {change === null
+        ? t("Mới", "New")
+        : rounded === 0
+          ? "0%"
+          : `${rounded > 0 ? "▲" : "▼"} ${Math.abs(rounded)}%`}
+    </span>
+  );
+};
+
+/** Column template shared by the header and rows of "So với kỳ trước". */
+const COMPARE_COLUMNS =
+  "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_8.5rem_8.5rem_6rem] 2xl:grid-cols-[minmax(0,1fr)_10rem_10rem_6.5rem]";
+
+const CompareRow: React.FC<{
+  label: React.ReactNode;
+  icon?: React.ReactNode;
+  previous: number;
+  current: number;
+  total?: boolean;
+}> = ({ label, icon, previous, current, total }) => (
+  <div
+    className={cn(
+      "grid items-center gap-x-4 gap-y-1",
+      COMPARE_COLUMNS,
+      total ? "mt-1 rounded-[12px] bg-ledger-canvas px-3 py-3" : "py-3",
+    )}
+  >
+    <div className="flex min-w-0 items-center gap-3">
+      {icon}
+      <span
+        className={cn(
+          "min-w-0 leading-snug text-ledger-ink",
+          total ? "text-[14.5px] font-semibold" : "text-[15px] font-medium",
+        )}
+      >
+        {label}
+      </span>
+    </div>
+    <Money
+      amount={previous}
+      className="hidden text-right text-[14px] sm:block"
+      tone="muted"
+    />
+    <Money
+      amount={current}
+      className="hidden text-right text-[14.5px] font-semibold sm:block"
+    />
+    <div className="text-right">
+      <ChangePill current={current} previous={previous} />
+    </div>
+    {/* The two figures on their own line on a phone, before → now. */}
+    <p className={cn("col-span-2 text-[13px] text-ledger-muted sm:hidden", icon ? "pl-11" : null)}>
+      <Money amount={previous} tone="muted" /> →{" "}
+      <Money amount={current} className="font-semibold" />
+    </p>
+  </div>
+);
 
 type ObservationTone = "rose" | "amber" | "green" | "neutral";
 
@@ -198,29 +307,43 @@ interface Observation {
   detail: string;
 }
 
-const ObservationRow: React.FC<{ item: Observation }> = ({ item }) => {
+/**
+ * One observation as its own tile, so four of them read as four separate
+ * facts. The tile takes the tone's wash; the icon sits on paper inside it.
+ */
+const ObservationTile: React.FC<{ item: Observation }> = ({ item }) => {
   const Icon = item.icon;
 
   return (
-    <div className="flex gap-3 border-b border-ledger-line py-3.5 first:pt-0 last:border-b-0 last:pb-0">
+    <div
+      className={cn(
+        "flex gap-3 rounded-[14px] p-3.5 sm:p-4",
+        item.tone === "rose" && "bg-ledger-out-wash",
+        item.tone === "amber" && "bg-ledger-spend-wash",
+        item.tone === "green" && "bg-ledger-in-wash",
+        item.tone === "neutral" && "bg-ledger-canvas",
+      )}
+    >
       {item.category ? (
-        <CategoryIcon meta={item.category} size={38} />
+        <span className="shrink-0 rounded-full bg-ledger-paper">
+          <CategoryIcon meta={item.category} size={36} />
+        </span>
       ) : (
         <span
           className={cn(
-            "flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full",
-            item.tone === "rose" && "bg-ledger-out-wash text-ledger-out",
-            item.tone === "amber" && "bg-ledger-spend-wash text-ledger-spend",
-            item.tone === "green" && "bg-ledger-in-wash text-ledger-in",
-            item.tone === "neutral" && "bg-ledger-canvas text-ledger-ink-2",
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ledger-paper",
+            item.tone === "rose" && "text-ledger-out",
+            item.tone === "amber" && "text-ledger-spend",
+            item.tone === "green" && "text-ledger-in",
+            item.tone === "neutral" && "text-ledger-ink-2",
           )}
         >
           <Icon className="h-[18px] w-[18px]" />
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-[14.5px] font-semibold leading-snug text-ledger-ink">{item.headline}</p>
-        <p className="mt-0.5 text-[13px] leading-snug text-ledger-ink-2">{item.detail}</p>
+        <p className="text-[15px] font-semibold leading-snug text-ledger-ink">{item.headline}</p>
+        <p className="mt-1 text-[13px] leading-snug text-ledger-ink-2">{item.detail}</p>
       </div>
     </div>
   );
@@ -370,6 +493,7 @@ const AnalyticsPage: React.FC = () => {
 
     const income = total(current, "INCOME");
     const expense = total(current, "EXPENSE");
+    const previousIncome = total(previous, "INCOME");
     const previousExpense = total(previous, "EXPENSE");
     const currentCategories = byCategory(current);
     const previousCategories = byCategory(previous);
@@ -431,7 +555,10 @@ const AnalyticsPage: React.FC = () => {
       income,
       expense,
       net: income - expense,
+      previousIncome,
       previousExpense,
+      // Any row at all in the previous period, for the hero's "Kỳ trước" hints.
+      hasPreviousRows: previous.length > 0,
       hasPrevious: previous.some((row) => row.type === "EXPENSE"),
       categories,
       comparison,
@@ -628,17 +755,23 @@ const AnalyticsPage: React.FC = () => {
   const maxShare = analysis.categories[0]?.total || 0;
 
   const observationsSection = (
-    <Section title={t("Đáng chú ý", "Worth noticing")}>
+    <Section
+      icon={Lightbulb}
+      meta={!loading && observations.length ? String(observations.length) : undefined}
+      subtitle={t("Rút ra từ các khoản trong kỳ", "Read off this period's entries")}
+      title={t("Đáng chú ý", "Worth noticing")}
+      tone="spend"
+    >
       {loading ? (
         <SkeletonRows rows={3} />
       ) : observations.length ? (
-        <div>
+        <div className="space-y-2.5">
           {observations.map((item) => (
-            <ObservationRow item={item} key={item.key} />
+            <ObservationTile item={item} key={item.key} />
           ))}
         </div>
       ) : (
-        <p className="text-[13.5px] text-ledger-ink-2">
+        <p className="text-[14px] text-ledger-ink-2">
           {analysis.expenseCount
             ? t(
                 "Kỳ này chưa có gì nổi bật để nêu ra. Số liệu vẫn nằm đầy đủ ở các mục bên cạnh.",
@@ -653,28 +786,49 @@ const AnalyticsPage: React.FC = () => {
     </Section>
   );
 
+  // Not tied to the period picker, so it says so in its subtitle.
+  const chartSection = chartData.length ? (
+    <Section
+      action={<ChartLegend />}
+      icon={ChartColumn}
+      subtitle={t("Luôn là 6 tháng gần nhất", "Always the latest six months")}
+      title={t("Thu chi 6 tháng", "Last 6 months")}
+    >
+      <IncomeExpenseBars data={chartData} height={220} />
+    </Section>
+  ) : null;
+
   const perDayChange =
     analysis.hasPrevious && analysis.previousPerDay > 0
       ? ((analysis.perDay - analysis.previousPerDay) / analysis.previousPerDay) * 100
       : null;
+  const spentShareOfIncome = analysis.income > 0 ? (analysis.expense / analysis.income) * 100 : 0;
+  const previousHint = (amount: number) =>
+    !loading && analysis.hasPreviousRows
+      ? t(`Kỳ trước: ${formatMoney(amount)}`, `Before: ${formatMoney(amount)}`)
+      : undefined;
 
   return (
     <div>
       <PageHeader
         actions={
-          <Segmented
-            // Four labels have to share a 358px phone row; tighter padding
-            // keeps "Tháng trước" on one line.
-            className="w-full sm:w-auto [&>button]:whitespace-nowrap [&>button]:px-2.5 sm:[&>button]:px-3"
-            onChange={setPeriod}
-            options={[
-              { value: "month", label: t("Tháng này", "This month") },
-              { value: "last", label: t("Tháng trước", "Last month") },
-              { value: "3m", label: t("3 tháng", "3 months") },
-              { value: "6m", label: t("6 tháng", "6 months") },
-            ]}
-            value={period}
-          />
+          // On the grey page a bare segmented track all but disappears, so
+          // it sits on a paper card like every other control group.
+          <div className="w-full rounded-[14px] border border-ledger-line bg-ledger-paper p-1 shadow-card sm:w-auto">
+            <Segmented
+              // Four labels have to share a 358px phone row; tighter padding
+              // keeps "Tháng trước" on one line.
+              className="w-full sm:w-auto [&>button]:whitespace-nowrap [&>button]:px-2.5 sm:[&>button]:px-3.5"
+              onChange={setPeriod}
+              options={[
+                { value: "month", label: t("Tháng này", "This month") },
+                { value: "last", label: t("Tháng trước", "Last month") },
+                { value: "3m", label: t("3 tháng", "3 months") },
+                { value: "6m", label: t("6 tháng", "6 months") },
+              ]}
+              value={period}
+            />
+          </div>
         }
         subtitle={<span className="ledger-num">{`${fullDate(range.current.start)} – ${fullDate(range.current.end)}`}</span>}
         title={t("Phân tích", "Analytics")}
@@ -704,20 +858,53 @@ const AnalyticsPage: React.FC = () => {
                     `You spent ${formatMoney(Math.abs(analysis.net))} more than came in.`,
                   )
         }
+        icon={PiggyBank}
         label={t("Tỷ lệ tiết kiệm", "Saving rate")}
         stats={[
           // A zero is not good or bad news, so it is not coloured as either.
           {
             label: t("Thu", "In"),
+            icon: ArrowDownLeft,
+            tone: "in",
             value: <Money amount={analysis.income} signed tone={analysis.income > 0 ? "in" : "muted"} />,
+            hint: previousHint(analysis.previousIncome),
           },
           {
             label: t("Chi", "Out"),
+            icon: ArrowUpRight,
+            tone: "out",
             value: <Money amount={analysis.expense} tone={analysis.expense > 0 ? "out" : "muted"} />,
+            hint: previousHint(analysis.previousExpense),
           },
           {
             label: t("Chênh lệch", "Net"),
+            icon: Scale,
+            tone: "accent",
             value: <Money amount={analysis.net} signed tone={analysis.net < 0 ? "out" : "neutral"} />,
+            hint: previousHint(analysis.previousIncome - analysis.previousExpense),
+          },
+          // Total spending over the period's days; the pill compares it with
+          // the previous period's own per-day figure.
+          {
+            label: t("Chi mỗi ngày", "Per day"),
+            icon: Gauge,
+            tone: "spend",
+            value: (
+              <span className="inline-flex flex-wrap items-center justify-end gap-x-2 gap-y-1 sm:justify-start">
+                <Money amount={Math.round(analysis.perDay)} tone={analysis.perDay > 0 ? "neutral" : "muted"} />
+                {!loading && perDayChange !== null && Math.abs(perDayChange) >= 1 ? (
+                  <ChangePill current={analysis.perDay} previous={analysis.previousPerDay} />
+                ) : null}
+              </span>
+            ),
+            hint: loading
+              ? undefined
+              : perDayChange !== null
+                ? t(
+                    `Kỳ trước: ${formatMoney(Math.round(analysis.previousPerDay))}`,
+                    `Before: ${formatMoney(Math.round(analysis.previousPerDay))}`,
+                  )
+                : t(`Chia cho ${analysis.days} ngày của kỳ`, `Over ${analysis.days} days`),
           },
         ]}
         value={
@@ -734,10 +921,24 @@ const AnalyticsPage: React.FC = () => {
             </span>
           )
         }
-      />
+      >
+        {/* How much of what came in went out again: the track fills amber
+            near the whole of it and rose past it. */}
+        {!loading && analysis.income > 0 ? (
+          <div>
+            <Track percent={spentShareOfIncome} />
+            <p className="ledger-num mt-2 text-[13px] text-ledger-muted">
+              {t(
+                `Đã chi ${Math.round(spentShareOfIncome)}% số thu · ${formatMoney(analysis.expense)} / ${formatMoney(analysis.income)}`,
+                `${Math.round(spentShareOfIncome)}% of income spent · ${formatMoney(analysis.expense)} / ${formatMoney(analysis.income)}`,
+              )}
+            </p>
+          </div>
+        ) : null}
+      </HeroStrip>
 
       {truncated ? (
-        <Notice className="mt-4" icon={Info} tone="muted">
+        <Notice className="mt-3 sm:mt-4 xl:mt-5" icon={Info} tone="muted">
           {t(
             `Khoảng này có hơn ${formatAmountInput(FETCH_LIMIT)} giao dịch; số liệu chỉ tính ${formatAmountInput(FETCH_LIMIT)} giao dịch mới nhất.`,
             `This range has more than ${FETCH_LIMIT} transactions; only the latest ${FETCH_LIMIT} are counted.`,
@@ -745,180 +946,175 @@ const AnalyticsPage: React.FC = () => {
         </Notice>
       ) : null}
 
-      <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0">
-          {/* On a phone the observations come first: they are the summary
-              the rest of the page backs up. */}
-          <div className="lg:hidden">{observationsSection}</div>
-
-          {chartData.length ? (
-            <Section action={<ChartLegend />} title={t("Thu chi 6 tháng", "Last 6 months")}>
-              <IncomeExpenseBars data={chartData} />
-            </Section>
-          ) : null}
+      <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:mt-5 xl:grid-cols-12 xl:gap-5">
+        <div className="min-w-0 space-y-3 sm:space-y-4 xl:col-span-8 xl:space-y-5">
+          {/* Below xl the observations come first: they are the summary the
+              rest of the page backs up. */}
+          <div className="xl:hidden">{observationsSection}</div>
 
           <Section
-            action={<span className="text-[12.5px] text-ledger-muted">{periodName}</span>}
+            icon={ChartPie}
+            meta={!loading && analysis.categories.length ? String(analysis.categories.length) : undefined}
+            subtitle={
+              loading || !analysis.expense ? (
+                periodName
+              ) : (
+                <>
+                  {periodName} ·{" "}
+                  <span className="ledger-num">
+                    {t(`tổng ${formatMoney(analysis.expense)}`, `${formatMoney(analysis.expense)} in total`)}
+                  </span>
+                </>
+              )
+            }
             title={t("Chi theo nhóm", "Spending by group")}
+            tone="spend"
           >
             {loading ? (
               <SkeletonRows rows={4} />
             ) : analysis.categories.length ? (
-              <div>
-                {analysis.categories.map((item) => (
-                  <ShareRow
-                    key={item.key}
-                    meta={getCategoryMeta(item.key)}
-                    overBudget={showBudgets && overBudget.has(item.key)}
-                    relative={maxShare > 0 ? (item.total / maxShare) * 100 : 0}
-                    share={item.share}
-                    total={item.total}
-                  />
-                ))}
-              </div>
+              <>
+                <div
+                  className={cn(
+                    "mb-3 hidden items-center gap-x-4 rounded-[10px] bg-ledger-canvas px-3 py-2 sm:-mx-3 sm:grid",
+                    SHARE_COLUMNS,
+                  )}
+                >
+                  <Eyebrow>{t("Nhóm", "Group")}</Eyebrow>
+                  <Eyebrow>{t("So với nhóm lớn nhất", "Against the largest")}</Eyebrow>
+                  <Eyebrow className="text-right">{t("Số tiền", "Amount")}</Eyebrow>
+                  <Eyebrow className="text-right">{t("Tỷ lệ", "Share")}</Eyebrow>
+                </div>
+                <div className="divide-y divide-ledger-line">
+                  {analysis.categories.map((item) => (
+                    <ShareRow
+                      count={item.count}
+                      key={item.key}
+                      meta={getCategoryMeta(item.key)}
+                      overBudget={showBudgets && overBudget.has(item.key)}
+                      relative={maxShare > 0 ? (item.total / maxShare) * 100 : 0}
+                      share={item.share}
+                      total={item.total}
+                    />
+                  ))}
+                </div>
+              </>
             ) : (
-              <p className="text-[13.5px] text-ledger-ink-2">
+              <p className="text-[14px] text-ledger-ink-2">
                 {t("Chưa có khoản chi nào trong kỳ này.", "No spending in this period.")}
               </p>
             )}
           </Section>
 
           <Section
-            bare
-            className="border-b border-ledger-line lg:border-b-0"
+            icon={History}
+            subtitle={
+              <>
+                <span className="ledger-num">{rangeLabel(range.previous, currentYear)}</span>
+                {t(" so với ", " against ")}
+                <span className="ledger-num">{rangeLabel(range.current, currentYear)}</span>
+              </>
+            }
             title={t("So với kỳ trước", "Against the previous period")}
           >
-            <p className="-mt-1 mb-3 text-[12.5px] text-ledger-muted">
-              <span className="ledger-num">{rangeLabel(range.previous, currentYear)}</span>
-              {t(" so với ", " against ")}
-              <span className="ledger-num">{rangeLabel(range.current, currentYear)}</span>
-            </p>
             {loading ? (
               <SkeletonRows rows={3} />
             ) : !analysis.hasPrevious ? (
-              <p className="text-[13.5px] text-ledger-ink-2">
+              <p className="text-[14px] text-ledger-ink-2">
                 {t(
                   "Kỳ trước chưa ghi khoản chi nào nên chưa có gì để so sánh.",
                   "Nothing was spent in the previous period, so there is nothing to compare with.",
                 )}
               </p>
             ) : (
-              <table className="w-full table-fixed text-[13px] sm:text-[13.5px]">
-                <thead>
-                  <tr className="border-b border-ledger-line">
-                    <th className="pb-2 text-left font-normal">
-                      <Eyebrow>{t("Nhóm", "Group")}</Eyebrow>
-                    </th>
-                    <th className="w-[86px] whitespace-nowrap pb-2 text-right font-normal sm:w-[140px]">
-                      <Eyebrow>{t("Kỳ trước", "Before")}</Eyebrow>
-                    </th>
-                    <th className="w-[86px] whitespace-nowrap pb-2 text-right font-normal sm:w-[140px]">
-                      <Eyebrow>{t("Kỳ này", "Now")}</Eyebrow>
-                    </th>
-                    <th className="w-[74px] whitespace-nowrap pb-2 text-right font-normal sm:w-[100px]">
-                      <Eyebrow>{t("Thay đổi", "Change")}</Eyebrow>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
+              <>
+                <div
+                  className={cn(
+                    "mb-1 hidden items-center gap-x-4 rounded-[10px] bg-ledger-canvas px-3 py-2 sm:-mx-3 sm:grid",
+                    COMPARE_COLUMNS,
+                  )}
+                >
+                  <Eyebrow>{t("Nhóm", "Group")}</Eyebrow>
+                  <Eyebrow className="text-right">{t("Kỳ trước", "Before")}</Eyebrow>
+                  <Eyebrow className="text-right">{t("Kỳ này", "Now")}</Eyebrow>
+                  <Eyebrow className="text-right">{t("Thay đổi", "Change")}</Eyebrow>
+                </div>
+                <div className="divide-y divide-ledger-line">
                   {analysis.comparison.map((item) => {
                     const meta = getCategoryMeta(item.key);
-                    const change = item.previous > 0 ? ((item.current - item.previous) / item.previous) * 100 : null;
                     return (
-                      <tr className="border-b border-ledger-line last:border-b-0" key={item.key}>
-                        <td className="truncate py-3 pr-2 text-ledger-ink">{isVietnamese ? meta.vi : meta.en}</td>
-                        <td className="py-3 text-right">
-                          <Money amount={item.previous} tone="muted" />
-                        </td>
-                        <td className="py-3 text-right">
-                          <Money amount={item.current} className="font-semibold" />
-                        </td>
-                        <td
-                          className={cn(
-                            "ledger-num py-3 text-right text-[12.5px] font-semibold",
-                            change === null || Math.round(change) === 0
-                              ? "text-ledger-muted"
-                              : change > 0
-                                ? "text-ledger-out"
-                                : "text-ledger-in",
-                          )}
-                        >
-                          {change === null
-                            ? t("Mới", "New")
-                            : Math.round(change) === 0
-                              ? "0%"
-                              : `${change > 0 ? "▲" : "▼"} ${Math.abs(Math.round(change))}%`}
-                        </td>
-                      </tr>
+                      <CompareRow
+                        current={item.current}
+                        icon={<CategoryIcon meta={meta} size={32} />}
+                        key={item.key}
+                        label={isVietnamese ? meta.vi : meta.en}
+                        previous={item.previous}
+                      />
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+                <div className="sm:-mx-3">
+                  <CompareRow
+                    current={analysis.expense}
+                    label={t("Tổng chi", "Total spent")}
+                    previous={analysis.previousExpense}
+                    total
+                  />
+                </div>
+              </>
             )}
           </Section>
         </div>
 
-        <aside className="min-w-0 lg:border-l lg:border-ledger-line lg:pl-8">
-          <div className="hidden lg:block">{observationsSection}</div>
+        {/* The busiest days and the chart side by side from md to xl, one
+            column beside the main one from xl up. */}
+        <div className="grid min-w-0 content-start gap-3 sm:gap-4 md:grid-cols-2 xl:col-span-4 xl:grid-cols-1 xl:gap-5">
+          <div className="hidden xl:block">{observationsSection}</div>
 
-          <Section title={t("Ngày chi nhiều nhất", "Biggest spending days")}>
+          <Section
+            icon={CalendarDays}
+            subtitle={t("Ba ngày tiêu nhiều nhất trong kỳ", "The three costliest days")}
+            title={t("Ngày chi nhiều nhất", "Biggest spending days")}
+            tone="out"
+          >
             {loading ? (
               <SkeletonRows rows={3} />
             ) : analysis.topDays.length ? (
-              <div>
-                {analysis.topDays.map((day) => (
+              <div className="divide-y divide-ledger-line">
+                {analysis.topDays.map((day, index) => (
                   <div
-                    className="flex items-center justify-between gap-3 border-b border-ledger-line py-3 first:pt-0 last:border-b-0 last:pb-0"
+                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
                     key={day.dayKey}
                   >
-                    <div className="min-w-0">
-                      <p className="ledger-num text-[14px] text-ledger-ink">
+                    <span className="ledger-num flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ledger-canvas text-[13px] font-semibold text-ledger-ink-2">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="ledger-num text-[15px] font-medium text-ledger-ink">
                         {dayGroupLabel(day.dayKey, timezoneOffsetMinutes, isVietnamese)}
                       </p>
-                      <p className="text-[12px] text-ledger-muted">
+                      <p className="text-[13px] text-ledger-muted">
                         {t(`${day.count} khoản chi`, `${day.count} ${day.count === 1 ? "expense" : "expenses"}`)}
+                        {analysis.expense > 0
+                          ? ` · ${Math.round((day.total / analysis.expense) * 100)}% ${t("tổng chi", "of spending")}`
+                          : ""}
                       </p>
                     </div>
-                    <Money amount={day.total} className="text-[14.5px] font-semibold" tone="out" />
+                    <Money amount={day.total} className="shrink-0 text-[15px] font-semibold" tone="out" />
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[13.5px] text-ledger-ink-2">
+              <p className="text-[14px] text-ledger-ink-2">
                 {t("Chưa có ngày nào có khoản chi.", "No spending days yet.")}
               </p>
             )}
           </Section>
 
-          <Section bare title={t("Trung bình mỗi ngày", "Daily average")}>
-            {loading ? (
-              <SkeletonRows rows={1} />
-            ) : (
-              <>
-                <Money
-                  amount={Math.round(analysis.perDay)}
-                  className="text-[30px] font-semibold leading-none tracking-[-0.02em]"
-                />
-                <p className="mt-2 text-[13px] text-ledger-ink-2">
-                  {perDayChange !== null && Math.abs(perDayChange) >= 1
-                    ? perDayChange < 0
-                      ? t(
-                          `Thấp hơn kỳ trước khoảng ${Math.round(-perDayChange)}% (${formatMoney(Math.round(analysis.previousPerDay))} mỗi ngày).`,
-                          `About ${Math.round(-perDayChange)}% lower than before (${formatMoney(Math.round(analysis.previousPerDay))} a day).`,
-                        )
-                      : t(
-                          `Cao hơn kỳ trước khoảng ${Math.round(perDayChange)}% (${formatMoney(Math.round(analysis.previousPerDay))} mỗi ngày).`,
-                          `About ${Math.round(perDayChange)}% higher than before (${formatMoney(Math.round(analysis.previousPerDay))} a day).`,
-                        )
-                    : t(
-                        `Tổng chi chia cho ${analysis.days} ngày của kỳ.`,
-                        `Total spending over the ${analysis.days} days of the period.`,
-                      )}
-                </p>
-              </>
-            )}
-          </Section>
-        </aside>
+          {/* The six-month chart comes last: it does not change with the
+              period, so the period's own figures go first. */}
+          {chartSection ? <div className="min-w-0">{chartSection}</div> : null}
+        </div>
       </div>
     </div>
   );

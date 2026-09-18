@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from "react";
-import { Delete, X } from "lucide-react";
+import { Delete, Info, TriangleAlert, X } from "lucide-react";
 import { cn } from "lib/utils";
 import { useIsDesktop } from "../hooks/useIsDesktop";
-import { Button } from "./primitives";
+import { Button, IconBadge } from "./primitives";
 
 /** Locks page scroll while an overlay is open and hands focus back after. */
 const useOverlayBehaviour = (open: boolean, onClose: () => void) => {
@@ -34,9 +34,10 @@ const useOverlayBehaviour = (open: boolean, onClose: () => void) => {
 };
 
 /**
- * Where every form lives. On desktop it is a drawer on the right edge, so the
- * list the user is working from stays in view; on a phone it becomes a bottom
- * sheet with the primary action pinned under the thumb.
+ * Where every form lives. On desktop it is a drawer that floats over the right
+ * edge like one more card, so the list the user is working from stays in
+ * view; on a phone it becomes a bottom sheet with the primary action pinned
+ * under the thumb.
  */
 export const Panel: React.FC<{
   open: boolean;
@@ -44,10 +45,11 @@ export const Panel: React.FC<{
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** A fixed drawer width. Left out, it is 480px, and 520px on wide screens. */
   width?: number;
   /** Lets the mobile sheet fill the screen, for forms with a keypad. */
   tall?: boolean;
-}> = ({ open, onClose, title, children, footer, width = 480, tall }) => {
+}> = ({ open, onClose, title, children, footer, width, tall }) => {
   const isDesktop = useIsDesktop();
   useOverlayBehaviour(open, onClose);
 
@@ -58,11 +60,12 @@ export const Panel: React.FC<{
   if (isDesktop) {
     return (
       <div className="fixed inset-0 z-50">
-        {/* Barely tinted: the page behind stays readable, but a click on it
-            still closes the drawer the way people expect. */}
+        {/* Lightly tinted: the page behind stays readable, but the drawer is
+            clearly on top, and a click on the page still closes it the way
+            people expect. */}
         <button
           aria-label="Đóng"
-          className="ledger-backdrop absolute inset-0 h-full w-full cursor-default bg-[rgba(13,18,32,0.06)]"
+          className="ledger-backdrop absolute inset-0 h-full w-full cursor-default bg-[rgba(13,18,32,0.16)] dark:bg-[rgba(0,0,0,0.5)]"
           onClick={onClose}
           tabIndex={-1}
           type="button"
@@ -70,19 +73,24 @@ export const Panel: React.FC<{
         <aside
           aria-label={title}
           aria-modal="true"
-          className="ledger-drawer absolute bottom-0 right-0 top-0 flex max-w-full flex-col border-l border-ledger-line bg-ledger-paper shadow-float"
+          className={cn(
+            "ledger-drawer absolute bottom-3 right-3 top-3 flex max-w-[calc(100%-24px)] flex-col overflow-hidden rounded-[20px] border border-ledger-line bg-ledger-paper shadow-float",
+            width === undefined && "w-[480px] 2xl:w-[520px]",
+          )}
           role="dialog"
-          style={{ width }}
+          style={width === undefined ? undefined : { width }}
         >
-          <div className="flex h-16 shrink-0 items-center justify-between border-b border-ledger-line px-6">
-            <h2 className="text-[17px] font-semibold text-ledger-ink">{title}</h2>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-ledger-line px-6 py-4">
+            <h2 className="min-w-0 truncate text-[18px] font-semibold tracking-[-0.01em] text-ledger-ink">
+              {title}
+            </h2>
             <button
               aria-label="Đóng"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-ledger-ink-2 hover:bg-ledger-canvas hover:text-ledger-ink"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-ledger-line text-ledger-ink-2 transition-colors hover:bg-ledger-canvas hover:text-ledger-ink"
               onClick={onClose}
               type="button"
             >
-              <X className="h-5 w-5" />
+              <X className="h-[18px] w-[18px]" />
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
@@ -100,7 +108,7 @@ export const Panel: React.FC<{
     <div className="fixed inset-0 z-50">
       <button
         aria-label="Đóng"
-        className="ledger-backdrop absolute inset-0 h-full w-full cursor-default bg-black/40"
+        className="ledger-backdrop absolute inset-0 h-full w-full cursor-default bg-black/40 dark:bg-black/60"
         onClick={onClose}
         tabIndex={-1}
         type="button"
@@ -109,7 +117,7 @@ export const Panel: React.FC<{
         aria-label={title}
         aria-modal="true"
         className={cn(
-          "ledger-sheet absolute inset-x-0 bottom-0 flex flex-col rounded-t-[24px] bg-ledger-paper shadow-float",
+          "ledger-sheet absolute inset-x-0 bottom-0 flex flex-col rounded-t-[24px] border-t border-ledger-line bg-ledger-paper shadow-float",
           tall ? "h-[94dvh]" : "max-h-[90dvh]",
         )}
         role="dialog"
@@ -117,18 +125,18 @@ export const Panel: React.FC<{
         <div className="flex shrink-0 justify-center pt-2.5">
           <span className="h-1 w-10 rounded-full bg-ledger-line-strong" />
         </div>
-        <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-2">
-          <h2 className="text-[17px] font-semibold text-ledger-ink">{title}</h2>
+        <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-3 pt-1.5">
+          <h2 className="min-w-0 truncate text-[17px] font-semibold text-ledger-ink">{title}</h2>
           <button
             aria-label="Đóng"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-ledger-ink-2 hover:bg-ledger-canvas"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ledger-canvas text-ledger-ink-2 active:bg-ledger-line"
             onClick={onClose}
             type="button"
           >
-            <X className="h-5 w-5" />
+            <X className="h-[18px] w-[18px]" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-3">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">{children}</div>
         {footer ? (
           <div className="shrink-0 border-t border-ledger-line px-5 pb-[calc(env(safe-area-inset-bottom,0px)+14px)] pt-3">
             {footer}
@@ -182,22 +190,44 @@ export const ConfirmDialog: React.FC<{
         type="button"
       />
       <div
+        aria-label={title}
         aria-modal="true"
-        className="ledger-sheet relative w-full max-w-[420px] rounded-[18px] bg-ledger-paper p-6 shadow-float"
+        className="ledger-sheet relative w-full max-w-[440px] rounded-[20px] border border-ledger-line bg-ledger-paper p-5 shadow-float sm:p-6"
         role="alertdialog"
       >
-        <h2 className="text-[17px] font-semibold text-ledger-ink">{title}</h2>
-        {description ? (
-          <p className="mt-2 text-[14px] leading-relaxed text-ledger-ink-2">
-            {description}
-          </p>
-        ) : null}
-        {children ? <div className="mt-4">{children}</div> : null}
-        <div className="mt-6 flex justify-end gap-2">
-          <Button disabled={busy} onClick={onClose} variant="ghost">
+        {/* The badge says what kind of question this is before a word is
+            read: rose for something that removes or changes money. */}
+        <div className="flex items-start gap-3.5">
+          <IconBadge
+            icon={tone === "danger" ? TriangleAlert : Info}
+            size="md"
+            tone={tone === "danger" ? "out" : "accent"}
+          />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h2 className="text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ledger-ink [overflow-wrap:anywhere]">
+              {title}
+            </h2>
+            {description ? (
+              <p className="mt-1.5 text-[14px] leading-relaxed text-ledger-ink-2">
+                {description}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        {children ? <div className="mt-5">{children}</div> : null}
+        {/* Side by side and equally wide on a phone, so the thumb has two
+            clear targets; right-aligned on a wider screen. */}
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <Button
+            className="w-full sm:w-auto"
+            disabled={busy}
+            onClick={onClose}
+            variant="outline"
+          >
             {cancelLabel}
           </Button>
           <Button
+            className="w-full sm:w-auto"
             disabled={busy}
             onClick={onConfirm}
             variant={tone === "danger" ? "danger" : "primary"}
@@ -221,11 +251,13 @@ export const Keypad: React.FC<{
 }> = ({ onDigits, onBackspace }) => {
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "000", "0"];
 
+  // Raised keys on a sunken tray, like a phone's own number pad: each key is
+  // its own target instead of a cell in a hairline grid.
   return (
-    <div className="grid grid-cols-3 border-t border-ledger-line">
+    <div className="grid grid-cols-3 gap-1.5 rounded-[16px] bg-ledger-canvas p-1.5">
       {keys.map((key) => (
         <button
-          className="ledger-num h-[52px] border-b border-r border-ledger-line text-[22px] font-medium text-ledger-ink active:bg-ledger-canvas [&:nth-child(3n)]:border-r-0"
+          className="ledger-num h-12 rounded-[11px] bg-ledger-paper text-[22px] font-medium text-ledger-ink shadow-card transition-colors active:bg-ledger-line"
           key={key}
           onClick={() => onDigits(key)}
           type="button"
@@ -235,7 +267,7 @@ export const Keypad: React.FC<{
       ))}
       <button
         aria-label="Xoá một số"
-        className="flex h-[52px] items-center justify-center border-b border-ledger-line text-ledger-ink-2 active:bg-ledger-canvas"
+        className="flex h-12 items-center justify-center rounded-[11px] text-ledger-ink-2 transition-colors active:bg-ledger-line"
         onClick={onBackspace}
         type="button"
       >

@@ -2,15 +2,22 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
+  Banknote,
   Bell,
   BellRing,
+  CalendarCheck2,
   Check,
   ChevronDown,
+  CircleDollarSign,
   Clock,
   Coins,
   Globe2,
+  Info,
+  Languages,
+  LayoutTemplate,
   LogOut,
   Monitor,
+  MonitorSmartphone,
   Moon,
   Palette,
   PenLine,
@@ -20,7 +27,9 @@ import {
   Send,
   Smartphone,
   Sun,
+  SunMoon,
   Trash2,
+  Type,
   UserRound,
 } from "lucide-react";
 import {
@@ -54,13 +63,15 @@ import { Avatar } from "../layout/LedgerLayout";
 import {
   Button,
   ButtonLink,
+  Card,
   Chip,
   EmptyState,
+  IconBadge,
   Notice,
   PageHeader,
-  Section,
   Segmented,
   SkeletonRows,
+  type Tone,
 } from "../components/primitives";
 import { useT } from "../lib/i18n";
 import { getIdToken } from "../lib/session";
@@ -69,11 +80,47 @@ import { getIdToken } from "../lib/session";
 
 type TabId = "appearance" | "display" | "reminders" | "account";
 
-const TABS: Array<{ id: TabId; vi: string; en: string; icon: LucideIcon }> = [
-  { id: "appearance", vi: "Giao diện", en: "Appearance", icon: Palette },
-  { id: "display", vi: "Hiển thị & tiền tệ", en: "Display & currency", icon: Coins },
-  { id: "reminders", vi: "Nhắc ghi chép", en: "Reminders", icon: Bell },
-  { id: "account", vi: "Tài khoản", en: "Account", icon: UserRound },
+const TABS: Array<{
+  id: TabId;
+  vi: string;
+  en: string;
+  /** One line under the tab name, so the list says what is behind each tab. */
+  viHint: string;
+  enHint: string;
+  icon: LucideIcon;
+}> = [
+  {
+    id: "appearance",
+    vi: "Giao diện",
+    en: "Appearance",
+    viHint: "Phiên bản, chế độ, màu, cỡ chữ",
+    enHint: "Version, mode, colour, text size",
+    icon: Palette,
+  },
+  {
+    id: "display",
+    vi: "Hiển thị & tiền tệ",
+    en: "Display & currency",
+    viHint: "Ngôn ngữ, số tiền, múi giờ",
+    enHint: "Language, money, timezone",
+    icon: Coins,
+  },
+  {
+    id: "reminders",
+    vi: "Nhắc ghi chép",
+    en: "Reminders",
+    viHint: "Mốc giờ và thiết bị nhận",
+    enHint: "Times and devices",
+    icon: Bell,
+  },
+  {
+    id: "account",
+    vi: "Tài khoản",
+    en: "Account",
+    viHint: "Hồ sơ và đăng xuất",
+    enHint: "Profile and sign out",
+    icon: UserRound,
+  },
 ];
 
 const isTabId = (value: string | null): value is TabId =>
@@ -84,31 +131,74 @@ const errorMessage = (error: unknown) =>
 
 /* ----------------------------------------------------------- Local pieces */
 
-/** A settings block: what it is on the left, the control under or beside it. */
-const SettingRow: React.FC<{
+/**
+ * One group of settings on its own card: an icon and a title saying what it
+ * is, a sentence on what it does, then the control. A switch sits in the title
+ * row; anything wider goes underneath, at its natural width.
+ */
+const SettingCard: React.FC<{
+  icon: LucideIcon;
+  tone?: Tone;
   title: string;
   description?: React.ReactNode;
-  control: React.ReactNode;
-  /** Switches sit beside their label; wider controls go underneath. */
-  inline?: boolean;
+  meta?: React.ReactNode;
+  action?: React.ReactNode;
   hint?: React.ReactNode;
   children?: React.ReactNode;
-  last?: boolean;
-}> = ({ title, description, control, inline, hint, children, last }) => (
-  <div className={cn("py-6", !last && "border-b border-ledger-line")}>
-    <div className={cn(inline && "flex items-start justify-between gap-6")}>
-      <div className="min-w-0">
-        <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-ledger-ink">{title}</h2>
+  className?: string;
+  /** Let the body grow to the card's height, for a card stretched by its row. */
+  fill?: boolean;
+}> = ({ icon, tone = "accent", title, description, meta, action, hint, children, className, fill }) => (
+  <Card className={cn("flex flex-col", className)}>
+    <div className="flex items-start gap-3">
+      <IconBadge icon={icon} tone={tone} />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1">
+          <h2 className="text-[16px] font-semibold leading-snug tracking-[-0.01em] text-ledger-ink">
+            {title}
+          </h2>
+          {meta ? (
+            <span className="shrink-0 rounded-full bg-ledger-canvas px-2 py-0.5 text-[12px] font-medium text-ledger-ink-2">
+              {meta}
+            </span>
+          ) : null}
+        </div>
         {description ? (
-          <p className="mt-1 max-w-[560px] text-[13.5px] text-ledger-ink-2">{description}</p>
+          <p className="max-w-[640px] text-[13.5px] leading-relaxed text-ledger-ink-2">
+            {description}
+          </p>
+        ) : null}
+        {/* With nothing under the title row, the hint stays in its text
+            column instead of jumping back to the card's edge. */}
+        {hint && !children ? (
+          <p className="mt-2 text-[12.5px] leading-snug text-ledger-muted">{hint}</p>
         ) : null}
       </div>
-      {inline ? <div className="shrink-0 pt-0.5">{control}</div> : null}
+      {action ? <div className="flex min-h-8 shrink-0 items-center">{action}</div> : null}
     </div>
-    {!inline ? <div className="mt-4">{control}</div> : null}
-    {hint ? <p className="mt-2 text-[12.5px] text-ledger-muted">{hint}</p> : null}
+    {children ? (
+      <div className={cn("mt-5", fill && "flex flex-1 flex-col")}>{children}</div>
+    ) : null}
+    {hint && children ? (
+      <p className="mt-3 text-[12.5px] leading-snug text-ledger-muted">{hint}</p>
+    ) : null}
+  </Card>
+);
+
+/** The grid every tab lays its cards in: one column, two on a wide screen. */
+const TabGrid: React.FC<{ children: React.ReactNode; className?: string }> = ({
+  children,
+  className,
+}) => (
+  <div className={cn("grid gap-3 sm:gap-4 xl:gap-5 2xl:grid-cols-2", className)}>{children}</div>
+);
+
+/** A quiet line under a tab's cards, for facts that apply to all of them. */
+const TabFootnote: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <p className="mt-4 flex items-center gap-2 px-1 text-[12.5px] text-ledger-muted">
+    <Info className="h-3.5 w-3.5 shrink-0" />
     {children}
-  </div>
+  </p>
 );
 
 const Toggle: React.FC<{
@@ -144,7 +234,7 @@ const SelectField: React.FC<
   <div className={cn("relative", wrapperClassName)}>
     <select
       className={cn(
-        "h-11 w-full cursor-pointer appearance-none rounded-[10px] border border-ledger-line bg-ledger-paper pl-3.5 pr-10 text-[14px] text-ledger-ink outline-none transition-colors hover:border-ledger-line-strong focus:border-ledger-accent disabled:cursor-not-allowed disabled:opacity-50",
+        "h-11 w-full cursor-pointer appearance-none rounded-[10px] border border-ledger-line-strong bg-ledger-paper pl-3.5 pr-10 text-[14px] text-ledger-ink outline-none transition-colors hover:border-ledger-muted focus:border-ledger-accent disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
@@ -163,7 +253,7 @@ const SelectMark: React.FC<{ selected: boolean }> = ({ selected }) => (
       "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
       selected
         ? "border-ledger-accent bg-ledger-accent text-ledger-accent-ink"
-        : "border-ledger-line-strong",
+        : "border-ledger-line-strong bg-ledger-paper",
     )}
   >
     {selected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
@@ -175,7 +265,7 @@ const tileClasses = (selected: boolean) =>
     "rounded-[14px] border text-left transition-colors",
     selected
       ? "border-ledger-accent bg-ledger-accent-wash ring-1 ring-ledger-accent"
-      : "border-ledger-line bg-ledger-paper hover:border-ledger-line-strong",
+      : "border-ledger-line-strong bg-ledger-paper hover:bg-ledger-hover",
   );
 
 /* -------------------------------------------------------------- Appearance */
@@ -186,11 +276,11 @@ const V1Wireframe: React.FC = () => (
     aria-hidden
     className="flex h-full w-full flex-col gap-[6%] overflow-hidden rounded-[10px] border border-ledger-line bg-ledger-accent-wash p-[6%]"
   >
-    <div className="flex h-[38%] flex-col justify-center gap-[10%] rounded-[7px] bg-ledger-accent px-[7%]">
+    <div className="flex h-[38%] shrink-0 flex-col justify-center gap-[10%] rounded-[7px] bg-ledger-accent px-[7%]">
       <span className="h-[3px] w-[30%] rounded-full bg-ledger-accent-ink opacity-70" />
       <span className="h-[6px] w-[48%] rounded-full bg-ledger-accent-ink" />
     </div>
-    <div className="flex flex-1 gap-[5%]">
+    <div className="flex min-h-0 flex-1 gap-[5%]">
       {[0, 1, 2].map((index) => (
         <div
           className="flex flex-1 flex-col justify-center gap-[14%] rounded-[6px] bg-ledger-paper px-[10%] shadow-md"
@@ -204,13 +294,13 @@ const V1Wireframe: React.FC = () => (
   </div>
 );
 
-/** v2 in miniature: a rail, one big number, and rows split by hairlines. */
+/** v2 in miniature: a rail, white cards on a grey page, one big number. */
 const V2Wireframe: React.FC = () => (
   <div
     aria-hidden
-    className="flex h-full w-full overflow-hidden rounded-[10px] border border-ledger-line bg-ledger-paper"
+    className="flex h-full w-full overflow-hidden rounded-[10px] border border-ledger-line bg-ledger-page"
   >
-    <div className="flex w-[24%] shrink-0 flex-col gap-1.5 border-r border-ledger-line px-[5%] py-2">
+    <div className="flex w-[22%] shrink-0 flex-col gap-1.5 border-r border-ledger-line bg-ledger-paper px-[5%] py-2">
       <span className="h-[6px] w-full shrink-0 rounded-full bg-ledger-accent" />
       <span className="h-[3px] w-[80%] shrink-0 rounded-full bg-ledger-line-strong" />
       <span className="h-[3px] w-[65%] shrink-0 rounded-full bg-ledger-line-strong" />
@@ -218,19 +308,30 @@ const V2Wireframe: React.FC = () => (
     </div>
     {/* Fixed heights with shrink-0: the tile is short on a phone, and empty
         flex items would otherwise shrink to nothing. */}
-    <div className="flex min-w-0 flex-1 flex-col px-[7%] py-2">
-      <span className="h-[3px] w-[28%] shrink-0 rounded-full bg-ledger-line-strong" />
-      <span className="mt-1.5 h-[9px] w-[46%] shrink-0 rounded-[3px] bg-ledger-ink" />
-      <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-ledger-line">
-        {[0, 1, 2].map((index) => (
-          <div
-            className="flex flex-1 items-center justify-between border-b border-ledger-line last:border-b-0"
-            key={index}
-          >
-            <span className="h-[3px] w-[40%] rounded-full bg-ledger-line-strong" />
-            <span className="h-[4px] w-[20%] rounded-full bg-ledger-ink" />
-          </div>
-        ))}
+    <div className="flex min-w-0 flex-1 flex-col gap-[6%] p-[5%]">
+      <div className="flex h-[40%] shrink-0 gap-[5%]">
+        <div className="flex flex-[1.5] flex-col justify-center gap-1.5 rounded-[5px] border border-ledger-line bg-ledger-paper px-[8%]">
+          <span className="h-[3px] w-[45%] shrink-0 rounded-full bg-ledger-line-strong" />
+          <span className="h-[7px] w-[75%] shrink-0 rounded-[2px] bg-ledger-ink" />
+        </div>
+        <div className="flex flex-1 flex-col justify-center gap-1.5 rounded-[5px] border border-ledger-line bg-ledger-paper px-[10%]">
+          <span className="h-[3px] w-[60%] shrink-0 rounded-full bg-ledger-line-strong" />
+          <span className="h-[5px] w-[80%] shrink-0 rounded-full bg-ledger-in" />
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 gap-[5%]">
+        <div className="flex flex-[1.5] flex-col justify-evenly rounded-[5px] border border-ledger-line bg-ledger-paper px-[8%]">
+          {[0, 1].map((index) => (
+            <div className="flex items-center justify-between" key={index}>
+              <span className="h-[3px] w-[40%] rounded-full bg-ledger-line-strong" />
+              <span className="h-[4px] w-[22%] rounded-full bg-ledger-ink" />
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-1 flex-col justify-evenly rounded-[5px] border border-ledger-line bg-ledger-paper px-[10%]">
+          <span className="h-[4px] w-full rounded-full bg-ledger-accent" />
+          <span className="h-[4px] w-[70%] rounded-full bg-ledger-canvas" />
+        </div>
       </div>
     </div>
   </div>
@@ -251,8 +352,8 @@ const VersionTile: React.FC<{
           "The familiar look: raised cards, coloured panels and shadows.",
         )
       : t(
-          "Ledger: đường kẻ mảnh thay cho thẻ, một con số chính mỗi trang, Ghi nhanh luôn sẵn.",
-          "Ledger: hairlines instead of cards, one headline number per page, Quick add always at hand.",
+          "Ledger: bố cục rộng theo thẻ, một con số chính mỗi trang, Ghi nhanh luôn sẵn.",
+          "Ledger: a wide card layout, one headline number per page, Quick add always at hand.",
         );
 
   return (
@@ -260,26 +361,26 @@ const VersionTile: React.FC<{
       aria-pressed={selected}
       className={cn(
         tileClasses(selected),
-        "flex w-full items-center gap-4 p-3 sm:flex-col sm:items-stretch sm:p-4",
+        "flex h-full w-full items-center gap-4 p-3 sm:flex-col sm:items-stretch sm:p-4",
       )}
       onClick={onSelect}
       type="button"
     >
-      <div className="h-[80px] w-[112px] shrink-0 sm:h-[132px] sm:w-full">
+      <div className="h-[72px] w-[100px] shrink-0 sm:h-[140px] sm:w-full 2xl:h-auto 2xl:min-h-[140px] 2xl:flex-1">
         {version === "v1" ? <V1Wireframe /> : <V2Wireframe />}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1 sm:flex-none">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span
             className={cn(
-              "min-w-0 text-[14.5px] font-semibold",
+              "min-w-0 text-[15px] font-semibold",
               selected ? "text-ledger-accent" : "text-ledger-ink",
             )}
           >
             {title}
           </span>
           {selected ? (
-            <span className="shrink-0 rounded-full bg-ledger-accent px-2 py-0.5 text-[11px] font-semibold text-ledger-accent-ink">
+            <span className="shrink-0 rounded-full bg-ledger-accent px-2 py-0.5 text-[11.5px] font-semibold text-ledger-accent-ink">
               {t("Đang dùng", "In use")}
             </span>
           ) : null}
@@ -287,7 +388,7 @@ const VersionTile: React.FC<{
             <SelectMark selected={selected} />
           </span>
         </div>
-        <p className="mt-1 text-[12.5px] leading-snug text-ledger-ink-2">{description}</p>
+        <p className="mt-1 text-[13px] leading-snug text-ledger-ink-2">{description}</p>
       </div>
     </button>
   );
@@ -314,143 +415,179 @@ const AppearanceTab: React.FC = () => {
   const { appearance, updateAppearance } = useTheme();
   const primary = appearance.primaryColor.toLowerCase();
   const isCustomColor = !COLOR_PRESETS.some((preset) => preset.value === primary);
+  const presetName = COLOR_PRESETS.find((preset) => preset.value === primary);
 
   return (
     <>
-      <Section title={t("Phiên bản giao diện", "Interface version")}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(["v1", "v2"] as UiVersion[]).map((version) => (
-            <VersionTile
-              key={version}
-              // Switching to v1 swaps the whole shell on the next render; there
-              // is nothing to save or reload, the data is the same.
-              onSelect={() => updateAppearance({ uiVersion: version })}
-              selected={appearance.uiVersion === version}
-              version={version}
-            />
-          ))}
-        </div>
-        <p className="mt-3 text-[12.5px] text-ledger-muted">
-          {t(
+      {/* Wide screen: the version choice on the left, as tall as the three
+          smaller choices stacked beside it. */}
+      <TabGrid>
+        <SettingCard
+          className="2xl:row-span-3"
+          description={t(
+            "Chọn cách trình bày bạn thấy dễ dùng hơn.",
+            "Pick the layout you find easier to use.",
+          )}
+          fill
+          hint={t(
             "Đổi lại bất cứ lúc nào, dữ liệu không thay đổi.",
             "Switch back any time; your data stays the same.",
           )}
-        </p>
-      </Section>
+          icon={LayoutTemplate}
+          title={t("Phiên bản giao diện", "Interface version")}
+        >
+          <div className="grid flex-1 gap-3 sm:grid-cols-2">
+            {(["v1", "v2"] as UiVersion[]).map((version) => (
+              <VersionTile
+                key={version}
+                // Switching to v1 swaps the whole shell on the next render; there
+                // is nothing to save or reload, the data is the same.
+                onSelect={() => updateAppearance({ uiVersion: version })}
+                selected={appearance.uiVersion === version}
+                version={version}
+              />
+            ))}
+          </div>
+        </SettingCard>
 
-      <Section title={t("Chế độ", "Mode")}>
-        <div className="grid grid-cols-2 gap-3 sm:max-w-[520px]">
-          {(["light", "dark"] as ThemeMode[]).map((mode) => {
-            const selected = appearance.mode === mode;
-            const Icon = mode === "light" ? Sun : Moon;
-            return (
-              <button
-                aria-pressed={selected}
-                className={cn(tileClasses(selected), "flex h-14 items-center gap-3 px-3.5")}
-                key={mode}
-                onClick={() => updateAppearance({ mode })}
-                type="button"
-              >
-                <span
-                  className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                    mode === "light"
-                      ? "bg-ledger-spend-wash text-ledger-spend"
-                      : "bg-ledger-ink text-ledger-paper",
-                  )}
+        <SettingCard
+          description={t("Nền sáng hoặc tối cho toàn ứng dụng.", "A light or dark background everywhere.")}
+          icon={SunMoon}
+          title={t("Chế độ", "Mode")}
+        >
+          <div className="grid max-w-[520px] grid-cols-2 gap-3">
+            {(["light", "dark"] as ThemeMode[]).map((mode) => {
+              const selected = appearance.mode === mode;
+              const Icon = mode === "light" ? Sun : Moon;
+              return (
+                <button
+                  aria-pressed={selected}
+                  className={cn(tileClasses(selected), "flex h-14 items-center gap-3 px-3.5")}
+                  key={mode}
+                  onClick={() => updateAppearance({ mode })}
+                  type="button"
                 >
-                  <Icon className="h-4 w-4" />
-                </span>
-                <span className="flex-1 text-[14px] font-medium text-ledger-ink">
-                  {mode === "light" ? t("Sáng", "Light") : t("Tối", "Dark")}
-                </span>
-                <SelectMark selected={selected} />
-              </button>
-            );
-          })}
-        </div>
-      </Section>
+                  <span
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                      mode === "light"
+                        ? "bg-ledger-spend-wash text-ledger-spend"
+                        : "bg-ledger-ink text-ledger-paper",
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 text-[14px] font-medium text-ledger-ink">
+                    {mode === "light" ? t("Sáng", "Light") : t("Tối", "Dark")}
+                  </span>
+                  <SelectMark selected={selected} />
+                </button>
+              );
+            })}
+          </div>
+        </SettingCard>
 
-      <Section title={t("Màu chủ đạo", "Accent colour")}>
-        <div className="flex flex-wrap items-center gap-3.5">
-          {COLOR_PRESETS.map((preset) => {
-            const selected = primary === preset.value;
-            return (
-              <button
-                aria-label={t(preset.vi, preset.en)}
-                aria-pressed={selected}
-                className="flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-105"
-                key={preset.value}
-                onClick={() => updateAppearance({ primaryColor: preset.value })}
-                style={{
-                  backgroundColor: preset.value,
-                  boxShadow: selected
-                    ? `0 0 0 2px var(--l-paper), 0 0 0 4px ${preset.value}`
-                    : undefined,
-                }}
-                title={t(preset.vi, preset.en)}
-                type="button"
-              >
-                {/* Only the active dot shows a tick, and the active dot is the
-                    accent itself, so the accent's own contrast ink fits it. */}
-                {selected ? <Check className="h-4 w-4 text-ledger-accent-ink" strokeWidth={3} /> : null}
-              </button>
-            );
-          })}
-          <label
-            className={cn(
-              "relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105",
-              !isCustomColor && "border border-dashed border-ledger-line-strong text-ledger-ink-2",
-            )}
-            style={
-              isCustomColor
-                ? {
-                    backgroundColor: appearance.primaryColor,
-                    boxShadow: `0 0 0 2px var(--l-paper), 0 0 0 4px ${appearance.primaryColor}`,
-                  }
-                : undefined
-            }
-            title={t("Màu khác", "Custom colour")}
-          >
-            {isCustomColor ? (
-              <Check className="h-4 w-4 text-ledger-accent-ink" strokeWidth={3} />
-            ) : (
-              <Pipette className="h-4 w-4" />
-            )}
-            <input
-              aria-label={t("Chọn màu khác", "Pick a custom colour")}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              onChange={(event) => updateAppearance({ primaryColor: event.target.value })}
-              type="color"
-              value={appearance.primaryColor}
-            />
-          </label>
-        </div>
-        <p className="mt-4 text-[12.5px] text-ledger-muted">
-          {t(
+        <SettingCard
+          description={t(
             "Dùng cho nút bấm, liên kết và mục đang chọn trên toàn ứng dụng.",
             "Used for buttons, links and the selected item across the app.",
           )}
-        </p>
-      </Section>
+          icon={Palette}
+          meta={
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: appearance.primaryColor }}
+              />
+              {presetName ? t(presetName.vi, presetName.en) : appearance.primaryColor.toUpperCase()}
+            </span>
+          }
+          title={t("Màu chủ đạo", "Accent colour")}
+        >
+          {/* Seven dots fit one row of a phone card at 36px; larger from sm. */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5">
+            {COLOR_PRESETS.map((preset) => {
+              const selected = primary === preset.value;
+              return (
+                <button
+                  aria-label={t(preset.vi, preset.en)}
+                  aria-pressed={selected}
+                  className="flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-105 sm:h-10 sm:w-10"
+                  key={preset.value}
+                  onClick={() => updateAppearance({ primaryColor: preset.value })}
+                  style={{
+                    backgroundColor: preset.value,
+                    boxShadow: selected
+                      ? `0 0 0 2px var(--l-paper), 0 0 0 4px ${preset.value}`
+                      : undefined,
+                  }}
+                  title={t(preset.vi, preset.en)}
+                  type="button"
+                >
+                  {/* Only the active dot shows a tick, and the active dot is the
+                      accent itself, so the accent's own contrast ink fits it. */}
+                  {selected ? <Check className="h-4 w-4 text-ledger-accent-ink" strokeWidth={3} /> : null}
+                </button>
+              );
+            })}
+            <label
+              className={cn(
+                "relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105 sm:h-10 sm:w-10",
+                !isCustomColor && "border border-dashed border-ledger-line-strong text-ledger-ink-2",
+              )}
+              style={
+                isCustomColor
+                  ? {
+                      backgroundColor: appearance.primaryColor,
+                      boxShadow: `0 0 0 2px var(--l-paper), 0 0 0 4px ${appearance.primaryColor}`,
+                    }
+                  : undefined
+              }
+              title={t("Màu khác", "Custom colour")}
+            >
+              {isCustomColor ? (
+                <Check className="h-4 w-4 text-ledger-accent-ink" strokeWidth={3} />
+              ) : (
+                <Pipette className="h-4 w-4" />
+              )}
+              <input
+                aria-label={t("Chọn màu khác", "Pick a custom colour")}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={(event) => updateAppearance({ primaryColor: event.target.value })}
+                type="color"
+                value={appearance.primaryColor}
+              />
+            </label>
+          </div>
+        </SettingCard>
 
-      <Section bare title={t("Cỡ chữ", "Text size")}>
-        <Segmented
-          className="max-w-[420px]"
-          onChange={(fontScale) => updateAppearance({ fontScale })}
-          options={FONT_SCALES.map((scale) => ({
-            value: scale.value,
-            label: t(scale.vi, scale.en),
-          }))}
-          value={appearance.fontScale}
-        />
-        <p className="mt-6 text-[12.5px] text-ledger-muted">
-          {t(
-            "Các lựa chọn giao diện được lưu trên trình duyệt này.",
-            "Appearance choices are saved in this browser.",
+        <SettingCard
+          description={t(
+            "Phóng to hoặc thu nhỏ nội dung của mọi trang.",
+            "Scales the content of every page up or down.",
           )}
-        </p>
-      </Section>
+          icon={Type}
+          title={t("Cỡ chữ", "Text size")}
+        >
+          <Segmented
+            className="max-w-[420px]"
+            onChange={(fontScale) => updateAppearance({ fontScale })}
+            options={FONT_SCALES.map((scale) => ({
+              value: scale.value,
+              label: t(scale.vi, scale.en),
+            }))}
+            value={appearance.fontScale}
+          />
+        </SettingCard>
+      </TabGrid>
+
+      <TabFootnote>
+        {t(
+          "Các lựa chọn giao diện được lưu trên trình duyệt này.",
+          "Appearance choices are saved in this browser.",
+        )}
+      </TabFootnote>
     </>
   );
 };
@@ -494,8 +631,15 @@ const DisplayTab: React.FC = () => {
 
   return (
     <>
-      <SettingRow
-        control={
+      <TabGrid>
+        <SettingCard
+          description={t(
+            "Chọn ngôn ngữ cho các nhãn và nội dung chính giữa tiếng Việt và tiếng Anh.",
+            "Choose the language for the main labels and content.",
+          )}
+          icon={Languages}
+          title={t("Ngôn ngữ hiển thị", "Display language")}
+        >
           <Segmented
             className="max-w-[360px]"
             onChange={setLanguage}
@@ -505,17 +649,17 @@ const DisplayTab: React.FC = () => {
             ]}
             value={language}
           />
-        }
-        description={t(
-          "Chọn ngôn ngữ cho các nhãn và nội dung chính giữa tiếng Việt và tiếng Anh.",
-          "Choose the language for the main labels and content.",
-        )}
-        title={t("Ngôn ngữ hiển thị", "Display language")}
-      />
+        </SettingCard>
 
-      <SettingRow
-        control={
-          <div className="grid grid-cols-2 gap-3 sm:max-w-[520px]">
+        <SettingCard
+          description={t(
+            "Chọn dạng đầy đủ hoặc rút gọn. Rút gọn giúp số lớn vừa màn hình điện thoại.",
+            "Choose full or compact money labels. Compact keeps large figures on one line on a phone.",
+          )}
+          icon={Banknote}
+          title={t("Kiểu hiển thị số tiền", "Money display style")}
+        >
+          <div className="grid max-w-[520px] grid-cols-2 gap-3">
             {(["full", "compact"] as MoneyDisplayMode[]).map((mode) => {
               const selected = moneyDisplayMode === mode;
               return (
@@ -527,11 +671,11 @@ const DisplayTab: React.FC = () => {
                   type="button"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-medium text-ledger-ink">
+                    <span className="block text-[13.5px] font-medium text-ledger-ink-2">
                       {mode === "full" ? t("Đầy đủ", "Full") : t("Rút gọn", "Compact")}
                     </span>
                     {/* Each tile shows its own mode, whatever is active now. */}
-                    <span className="ledger-num mt-1 block text-[17px] font-semibold text-ledger-ink">
+                    <span className="ledger-num mt-1 block text-[18px] font-semibold text-ledger-ink">
                       {formatMoney(1500000, defaultCurrency, { displayMode: mode })}
                     </span>
                   </span>
@@ -540,16 +684,20 @@ const DisplayTab: React.FC = () => {
               );
             })}
           </div>
-        }
-        description={t(
-          "Chọn dạng đầy đủ hoặc rút gọn. Rút gọn giúp số lớn vừa màn hình điện thoại.",
-          "Choose full or compact money labels. Compact keeps large figures on one line on a phone.",
-        )}
-        title={t("Kiểu hiển thị số tiền", "Money display style")}
-      />
+        </SettingCard>
 
-      <SettingRow
-        control={
+        <SettingCard
+          description={t(
+            "Dùng cho ví mới tạo và các số tổng không gắn với ví cụ thể. Ví đã tạo vẫn giữ nguyên tiền tệ của nó.",
+            "Used for newly created wallets and totals with no specific wallet. Existing wallets keep their own currency.",
+          )}
+          hint={t(
+            "Ở chế độ theo ngôn ngữ: tiếng Việt dùng VND, tiếng Anh dùng USD.",
+            "In follow-language mode: Vietnamese uses VND, English uses USD.",
+          )}
+          icon={CircleDollarSign}
+          title={t("Tiền tệ mặc định", "Default currency")}
+        >
           <SelectField
             aria-label={t("Tiền tệ mặc định", "Default currency")}
             onChange={(event) =>
@@ -567,20 +715,22 @@ const DisplayTab: React.FC = () => {
               </option>
             ))}
           </SelectField>
-        }
-        description={t(
-          "Dùng cho ví mới tạo và các số tổng không gắn với ví cụ thể. Ví đã tạo vẫn giữ nguyên tiền tệ của nó.",
-          "Used for newly created wallets and totals with no specific wallet. Existing wallets keep their own currency.",
-        )}
-        hint={t(
-          "Ở chế độ theo ngôn ngữ: tiếng Việt dùng VND, tiếng Anh dùng USD.",
-          "In follow-language mode: Vietnamese uses VND, English uses USD.",
-        )}
-        title={t("Tiền tệ mặc định", "Default currency")}
-      />
+        </SettingCard>
 
-      <SettingRow
-        control={
+        <SettingCard
+          description={t(
+            "Ứng dụng dùng múi giờ này để xác định một giao dịch thuộc ngày nào, kể cả khi máy chủ đặt ở múi giờ khác.",
+            "The app uses this timezone to decide which day a transaction belongs to, even when the server runs elsewhere.",
+          )}
+          hint={
+            <span className="ledger-num">
+              {t("Hiện tại: ", "Currently: ")}
+              {formatOffset(timezoneOffsetMinutes)}
+            </span>
+          }
+          icon={Globe2}
+          title={t("Múi giờ", "Timezone")}
+        >
           <SelectField
             aria-label={t("Múi giờ", "Timezone")}
             onChange={(event) => setTimezone(event.target.value)}
@@ -593,27 +743,15 @@ const DisplayTab: React.FC = () => {
               </option>
             ))}
           </SelectField>
-        }
-        description={t(
-          "Ứng dụng dùng múi giờ này để xác định một giao dịch thuộc ngày nào, kể cả khi máy chủ đặt ở múi giờ khác.",
-          "The app uses this timezone to decide which day a transaction belongs to, even when the server runs elsewhere.",
+        </SettingCard>
+      </TabGrid>
+
+      <TabFootnote>
+        {t(
+          "Các lựa chọn hiển thị được lưu trên trình duyệt này.",
+          "Display choices are saved in this browser.",
         )}
-        hint={
-          <span className="ledger-num">
-            {t("Hiện tại: ", "Currently: ")}
-            {formatOffset(timezoneOffsetMinutes)}
-          </span>
-        }
-        last
-        title={t("Múi giờ", "Timezone")}
-      >
-        <p className="mt-6 text-[12.5px] text-ledger-muted">
-          {t(
-            "Các lựa chọn hiển thị được lưu trên trình duyệt này.",
-            "Display choices are saved in this browser.",
-          )}
-        </p>
-      </SettingRow>
+      </TabFootnote>
     </>
   );
 };
@@ -959,24 +1097,26 @@ const RemindersTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="py-6">
+      <Card>
         <SkeletonRows rows={4} />
-      </div>
+      </Card>
     );
   }
 
   if (!config) {
     return (
-      <EmptyState
-        action={
-          <Button icon={RefreshCw} onClick={() => setReloadKey((key) => key + 1)} variant="outline">
-            {t("Thử lại", "Try again")}
-          </Button>
-        }
-        description={loadError || undefined}
-        icon={Bell}
-        title={t("Không tải được cấu hình nhắc nhở", "Could not load the reminder settings")}
-      />
+      <Card>
+        <EmptyState
+          action={
+            <Button icon={RefreshCw} onClick={() => setReloadKey((key) => key + 1)} variant="outline">
+              {t("Thử lại", "Try again")}
+            </Button>
+          }
+          description={loadError || undefined}
+          icon={Bell}
+          title={t("Không tải được cấu hình nhắc nhở", "Could not load the reminder settings")}
+        />
+      </Card>
     );
   }
 
@@ -991,10 +1131,13 @@ const RemindersTab: React.FC = () => {
         ? t("Đã chặn thông báo", "Notifications blocked")
         : t("Chưa cho phép thông báo", "Notifications not allowed yet");
 
+  // On a phone the cards follow the order you set things up in: switch on,
+  // pick times, fine-tune, then the device. A wide screen pairs the two
+  // switches on the first row and the two longer cards under them.
   return (
-    <>
-      <SettingRow
-        control={
+    <TabGrid>
+      <SettingCard
+        action={
           <Toggle
             checked={config.remindersEnabled}
             disabled={saving}
@@ -1002,6 +1145,7 @@ const RemindersTab: React.FC = () => {
             onChange={(checked) => void persist({ remindersEnabled: checked })}
           />
         }
+        className="2xl:order-1"
         description={t(
           "Ứng dụng sẽ nhắc bạn ghi lại thu chi để số liệu không bị bỏ trống ngày nào.",
           "The app nudges you to record income and expenses so no day is left empty.",
@@ -1010,11 +1154,24 @@ const RemindersTab: React.FC = () => {
           "Tắt đi thì các mốc giờ vẫn được giữ lại cho lần bật sau.",
           "Turning this off keeps your times for the next time you enable it.",
         )}
-        inline
+        icon={Bell}
         title={t("Nhắc ghi chép", "Logging reminders")}
       />
 
-      <Section
+      <SettingCard
+        className="2xl:order-3"
+        description={
+          <span className="inline-flex items-start gap-1.5">
+            <Globe2 className="mt-[3px] h-3.5 w-3.5 shrink-0 text-ledger-muted" />
+            <span>
+              {t(
+                `Giờ nhắc tính theo múi giờ ${zoneLabel(config.timezone, true)}.`,
+                `Reminder times follow the ${zoneLabel(config.timezone, false)} timezone.`,
+              )}
+            </span>
+          </span>
+        }
+        icon={Clock}
         meta={
           <span className="ledger-num">
             {config.reminderTimes.length}/{config.maxRemindersPerDay}
@@ -1022,14 +1179,6 @@ const RemindersTab: React.FC = () => {
         }
         title={t("Các mốc nhắc trong ngày", "Times of day")}
       >
-        <p className="-mt-1 mb-3 flex items-center gap-1.5 text-[12.5px] text-ledger-muted">
-          <Globe2 className="h-3.5 w-3.5 shrink-0" />
-          {t(
-            `Giờ nhắc tính theo múi giờ ${zoneLabel(config.timezone, true)}.`,
-            `Reminder times follow the ${zoneLabel(config.timezone, false)} timezone.`,
-          )}
-        </p>
-
         {zoneMismatch ? (
           <Notice
             action={
@@ -1055,15 +1204,17 @@ const RemindersTab: React.FC = () => {
 
         <div
           className={cn(
-            "divide-y divide-ledger-line border-y border-ledger-line transition-opacity",
+            "max-w-[640px] divide-y divide-ledger-line rounded-[14px] border border-ledger-line transition-opacity",
             // Still editable while off; the fade only says they will not fire.
             !config.remindersEnabled && "opacity-60",
           )}
         >
           {config.reminderTimes.length ? (
             config.reminderTimes.map((time, index) => (
-              <div className="flex items-center gap-3 py-3" key={`${time}-${index}`}>
-                <Clock className="h-[18px] w-[18px] shrink-0 text-ledger-ink-2" />
+              <div className="flex items-center gap-3 px-3 py-2.5" key={`${time}-${index}`}>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ledger-canvas text-ledger-ink-2">
+                  <Clock className="h-4 w-4" />
+                </span>
                 <SelectField
                   aria-label={t(`Mốc giờ ${index + 1}`, `Time ${index + 1}`)}
                   className="ledger-num h-10 text-[16px] font-semibold"
@@ -1074,7 +1225,7 @@ const RemindersTab: React.FC = () => {
                     void persist({ reminderTimes: next });
                   }}
                   value={time}
-                  wrapperClassName="w-[128px]"
+                  wrapperClassName="w-[120px] shrink-0"
                 >
                   {TIME_OPTIONS.map((option) => (
                     // The server merges duplicates silently, which would look
@@ -1088,7 +1239,7 @@ const RemindersTab: React.FC = () => {
                     </option>
                   ))}
                 </SelectField>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-ledger-muted">
+                <span className="min-w-0 flex-1 text-[13px] text-ledger-ink-2">
                   {t("Mỗi ngày", "Every day")}
                 </span>
                 <button
@@ -1102,6 +1253,7 @@ const RemindersTab: React.FC = () => {
                       ),
                     })
                   }
+                  title={t("Xoá mốc này", "Remove this time")}
                   type="button"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -1109,35 +1261,37 @@ const RemindersTab: React.FC = () => {
               </div>
             ))
           ) : (
-            <p className="py-4 text-[13.5px] text-ledger-ink-2">
+            <p className="px-4 py-4 text-[13.5px] text-ledger-ink-2">
               {t("Chưa có mốc giờ nào.", "No times yet.")}
             </p>
           )}
         </div>
 
-        <button
-          className="mt-3 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ledger-accent hover:underline disabled:cursor-not-allowed disabled:text-ledger-muted disabled:no-underline"
-          disabled={saving || atLimit}
-          onClick={() =>
-            void persist({
-              reminderTimes: [...config.reminderTimes, nextFreeTime(config.reminderTimes)],
-            })
-          }
-          type="button"
-        >
-          <Plus className="h-4 w-4" />
-          {t("Thêm mốc giờ", "Add a time")}
-        </button>
-        <p className="mt-1.5 text-[12.5px] text-ledger-muted">
-          {t(
-            `Tài khoản của bạn được đặt tối đa ${config.maxRemindersPerDay} mốc nhắc mỗi ngày.`,
-            `Your account can schedule up to ${config.maxRemindersPerDay} reminders per day.`,
-          )}
-        </p>
-      </Section>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Button
+            disabled={saving || atLimit}
+            icon={Plus}
+            onClick={() =>
+              void persist({
+                reminderTimes: [...config.reminderTimes, nextFreeTime(config.reminderTimes)],
+              })
+            }
+            size="sm"
+            variant="outline"
+          >
+            {t("Thêm mốc giờ", "Add a time")}
+          </Button>
+          <p className="text-[12.5px] text-ledger-muted">
+            {t(
+              `Tài khoản của bạn được đặt tối đa ${config.maxRemindersPerDay} mốc nhắc mỗi ngày.`,
+              `Your account can schedule up to ${config.maxRemindersPerDay} reminders per day.`,
+            )}
+          </p>
+        </div>
+      </SettingCard>
 
-      <SettingRow
-        control={
+      <SettingCard
+        action={
           <Toggle
             checked={config.skipWhenAlreadyLogged}
             disabled={saving}
@@ -1145,16 +1299,29 @@ const RemindersTab: React.FC = () => {
             onChange={(checked) => void persist({ skipWhenAlreadyLogged: checked })}
           />
         }
+        className="2xl:order-2"
         description={t(
           "Hôm nào bạn đã nhập giao dịch rồi thì không nhắc nữa cho đỡ phiền.",
           "No nudge on days where you already recorded a transaction.",
         )}
-        inline
+        icon={CalendarCheck2}
         title={t("Bỏ qua nếu đã ghi hôm nay", "Skip when already logged")}
       />
 
-      <Section
-        bare
+      <SettingCard
+        className="2xl:order-4"
+        description={
+          config.deviceCount > 0
+            ? t(
+                `Đang có ${config.deviceCount} thiết bị nhận thông báo. Bật lại trên thiết bị mới để thêm.`,
+                `${config.deviceCount} device(s) are set up. Enable again on a new device to add it.`,
+              )
+            : t(
+                "Chưa có thiết bị nào. Bấm nút bên dưới để cho phép thông báo trên trình duyệt này.",
+                "No device yet. Use the button below to allow notifications in this browser.",
+              )
+        }
+        icon={MonitorSmartphone}
         meta={
           config.deviceCount > 0 ? (
             <span className="ledger-num">
@@ -1164,29 +1331,17 @@ const RemindersTab: React.FC = () => {
         }
         title={t("Thiết bị nhận thông báo", "Devices receiving notifications")}
       >
-        <p className="-mt-1 text-[13.5px] text-ledger-ink-2">
-          {config.deviceCount > 0
-            ? t(
-                `Đang có ${config.deviceCount} thiết bị nhận thông báo. Bật lại trên thiết bị mới để thêm.`,
-                `${config.deviceCount} device(s) are set up. Enable again on a new device to add it.`,
-              )
-            : t(
-                "Chưa có thiết bị nào. Bấm nút bên dưới để cho phép thông báo trên trình duyệt này.",
-                "No device yet. Use the button below to allow notifications in this browser.",
-              )}
-        </p>
-
-        <div className="mt-4 flex items-center gap-3 border-y border-ledger-line py-3.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ledger-canvas text-ledger-ink-2">
+        <div className="flex max-w-[640px] items-center gap-3 rounded-[14px] bg-ledger-canvas px-3.5 py-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ledger-paper text-ledger-ink-2 shadow-card">
             <DeviceIcon className="h-[18px] w-[18px]" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-medium text-ledger-ink">
+            <p className="text-[14.5px] font-medium text-ledger-ink">
               {t("Trình duyệt này", "This browser")}
             </p>
             <p
               className={cn(
-                "text-[12.5px]",
+                "text-[13px]",
                 !pushSupported || permission === "denied"
                   ? "text-ledger-out"
                   : permission === "granted"
@@ -1202,7 +1357,7 @@ const RemindersTab: React.FC = () => {
               disabled={deviceBusy}
               onClick={() => void handleRemoveDevice()}
               size="sm"
-              variant="ghost"
+              variant="outline"
             >
               {t("Gỡ", "Remove")}
             </Button>
@@ -1225,7 +1380,7 @@ const RemindersTab: React.FC = () => {
           </Notice>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button
             disabled={!pushSupported || deviceBusy}
             icon={BellRing}
@@ -1235,18 +1390,18 @@ const RemindersTab: React.FC = () => {
           >
             {t("Cho phép thông báo trên thiết bị này", "Allow notifications on this device")}
           </Button>
-          <button
-            className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ledger-accent hover:underline disabled:cursor-not-allowed disabled:text-ledger-muted disabled:no-underline"
+          <Button
             disabled={saving || config.deviceCount === 0}
+            icon={Send}
             onClick={() => void handleSendTest()}
-            type="button"
+            size="sm"
+            variant="soft"
           >
-            <Send className="h-4 w-4" />
             {t("Gửi thử ngay", "Send a test now")}
-          </button>
+          </Button>
         </div>
-      </Section>
-    </>
+      </SettingCard>
+    </TabGrid>
   );
 };
 
@@ -1310,60 +1465,66 @@ const AccountTab: React.FC = () => {
   ];
 
   return (
-    <>
-      <Section
+    <TabGrid className="2xl:items-start">
+      <SettingCard
         action={
           <ButtonLink icon={PenLine} to="/profile">
             {t("Sửa hồ sơ", "Edit profile")}
           </ButtonLink>
         }
+        hint={t(
+          "Đổi tên, ảnh đại diện hoặc mật khẩu trong trang hồ sơ.",
+          "Change your name, photo or password on the profile page.",
+        )}
+        icon={UserRound}
         title={t("Tài khoản", "Account")}
       >
-        <div className="flex items-center gap-3.5 py-2">
-          <Avatar name={name} size={48} src={avatar} />
-          <div className="min-w-0">
-            <p className="truncate text-[16px] font-semibold text-ledger-ink">{name || "—"}</p>
-            <p className="truncate text-[13px] text-ledger-ink-2">{email || "—"}</p>
-          </div>
-        </div>
-        <dl className="mt-3 divide-y divide-ledger-line border-t border-ledger-line">
-          {fields.map((field) => (
-            <div
-              className="flex flex-col gap-0.5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
-              key={field.label}
+        {/* The name and the address the account signs in with, each labelled,
+            beside the photo that stands for them in the rail. */}
+        <div className="flex max-w-[640px] items-center gap-4 rounded-[14px] bg-ledger-canvas px-4 py-4">
+          {avatar ? (
+            <Avatar name={name} size={52} src={avatar} />
+          ) : (
+            // The shared avatar keeps a 13px initial, lost in a 52px circle.
+            <span
+              aria-hidden
+              className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-ledger-paper text-[20px] font-semibold text-ledger-accent shadow-card"
             >
-              <dt className="text-[13px] text-ledger-muted">{field.label}</dt>
-              <dd className="min-w-0 truncate text-[14px] text-ledger-ink">{field.value || "—"}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-1 text-[12.5px] text-ledger-muted">
-          {t(
-            "Đổi tên, ảnh đại diện hoặc mật khẩu trong trang hồ sơ.",
-            "Change your name, photo or password on the profile page.",
+              {(name || "?").trim().charAt(0).toUpperCase()}
+            </span>
           )}
-        </p>
-      </Section>
+          <dl className="grid min-w-0 flex-1 gap-2.5 sm:grid-cols-2 sm:gap-6">
+            {fields.map((field) => (
+              <div className="min-w-0" key={field.label}>
+                <dt className="text-[12.5px] text-ledger-muted">{field.label}</dt>
+                <dd className="break-words text-[15px] font-medium text-ledger-ink">
+                  {field.value || "—"}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </SettingCard>
 
-      <SettingRow
-        control={
-          <Button
-            disabled={signingOut}
-            icon={LogOut}
-            onClick={() => void handleLogout()}
-            variant="danger"
-          >
-            {signingOut ? t("Đang đăng xuất…", "Signing out…") : t("Đăng xuất", "Sign out")}
-          </Button>
-        }
+      <SettingCard
         description={t(
           "Thoát khỏi TonFin trên trình duyệt này. Dữ liệu của bạn vẫn được giữ nguyên.",
           "Leave TonFin on this browser. Your data stays as it is.",
         )}
-        last
+        icon={LogOut}
         title={t("Đăng xuất", "Sign out")}
-      />
-    </>
+        tone="out"
+      >
+        <Button
+          disabled={signingOut}
+          icon={LogOut}
+          onClick={() => void handleLogout()}
+          variant="danger"
+        >
+          {signingOut ? t("Đang đăng xuất…", "Signing out…") : t("Đăng xuất", "Sign out")}
+        </Button>
+      </SettingCard>
+    </TabGrid>
   );
 };
 
@@ -1436,10 +1597,10 @@ const SettingsPage: React.FC = () => {
         title={t("Cài đặt", "Settings")}
       />
 
-      <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)]">
+      <div className="lg:grid lg:grid-cols-[248px_minmax(0,1fr)] lg:items-start lg:gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
         {/* Phone: the tabs become a chip row that scrolls sideways. */}
         <div
-          className="ledger-scroll-x -mx-4 flex gap-2 border-b border-ledger-line px-4 py-3 sm:-mx-6 sm:px-6 lg:hidden"
+          className="ledger-scroll-x -mx-4 mb-3 flex gap-2 px-4 sm:-mx-6 sm:mb-4 sm:px-6 lg:hidden"
           ref={chipRowRef}
         >
           {TABS.map((item) => (
@@ -1454,38 +1615,61 @@ const SettingsPage: React.FC = () => {
           ))}
         </div>
 
-        <nav
-          aria-label={t("Mục cài đặt", "Settings sections")}
-          aria-orientation="vertical"
-          className="hidden flex-col gap-1 border-r border-ledger-line py-6 pr-4 lg:flex"
-          role="tablist"
-        >
-          {TABS.map((item) => {
-            const Icon = item.icon;
-            const selected = tab === item.id;
-            return (
-              <button
-                aria-controls="settings-panel"
-                aria-selected={selected}
-                className={cn(
-                  "flex h-10 items-center gap-3 rounded-[10px] px-3 text-left text-[14px] transition-colors",
-                  selected
-                    ? "bg-ledger-accent-wash font-semibold text-ledger-accent"
-                    : "text-ledger-ink-2 hover:bg-ledger-canvas hover:text-ledger-ink",
-                )}
-                key={item.id}
-                onClick={() => selectTab(item.id)}
-                role="tab"
-                type="button"
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
-                <span className="truncate">{isVietnamese ? item.vi : item.en}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Desktop: the tab list is its own card and stays put while a long
+            tab scrolls, so switching never means scrolling back up. */}
+        <Card as="aside" className="hidden p-2 lg:sticky lg:top-6 lg:block" flush>
+          <nav
+            aria-label={t("Mục cài đặt", "Settings sections")}
+            aria-orientation="vertical"
+            className="flex flex-col gap-1"
+            role="tablist"
+          >
+            {TABS.map((item) => {
+              const Icon = item.icon;
+              const selected = tab === item.id;
+              return (
+                <button
+                  aria-controls="settings-panel"
+                  aria-selected={selected}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-[12px] px-2.5 py-2.5 text-left transition-colors",
+                    selected ? "bg-ledger-accent-wash" : "hover:bg-ledger-hover",
+                  )}
+                  key={item.id}
+                  onClick={() => selectTab(item.id)}
+                  role="tab"
+                  type="button"
+                >
+                  <span
+                    className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors",
+                      selected
+                        ? "bg-ledger-accent text-ledger-accent-ink"
+                        : "bg-ledger-canvas text-ledger-ink-2",
+                    )}
+                  >
+                    <Icon className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="min-w-0">
+                    <span
+                      className={cn(
+                        "block text-[14.5px] font-semibold leading-snug",
+                        selected ? "text-ledger-accent" : "text-ledger-ink",
+                      )}
+                    >
+                      {isVietnamese ? item.vi : item.en}
+                    </span>
+                    <span className="block text-[12.5px] leading-snug text-ledger-muted">
+                      {isVietnamese ? item.viHint : item.enHint}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </Card>
 
-        <div className="min-w-0 lg:pl-10" id="settings-panel" role="tabpanel">
+        <div className="min-w-0" id="settings-panel" role="tabpanel">
           {tab === "appearance" ? <AppearanceTab /> : null}
           {tab === "display" ? <DisplayTab /> : null}
           {tab === "reminders" ? <RemindersTab /> : null}

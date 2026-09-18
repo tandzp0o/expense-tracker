@@ -20,7 +20,9 @@ module.exports = {
                 // Ledger (v2) tokens. They only resolve inside .ledger, which is
                 // the only place v2 components render.
                 ledger: {
+                    page: "var(--l-page)",
                     paper: "var(--l-paper)",
+                    hover: "var(--l-hover)",
                     canvas: "var(--l-canvas)",
                     line: "var(--l-line)",
                     "line-strong": "var(--l-line-strong)",
@@ -41,6 +43,7 @@ module.exports = {
             boxShadow: {
                 soft: "0 18px 45px rgba(15, 23, 42, 0.08)",
                 float: "var(--l-shadow-float)",
+                card: "var(--l-shadow-card)",
             },
             borderRadius: {
                 xl: "1rem",

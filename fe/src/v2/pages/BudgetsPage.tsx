@@ -2,33 +2,41 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
+  CalendarRange,
   ChartPie,
   Check,
   ChevronLeft,
   ChevronRight,
   Copy,
+  Gauge,
   Info,
+  Layers,
+  PiggyBank,
   Pencil,
   Plus,
+  ShieldCheck,
   Trash2,
   TriangleAlert,
+  WalletCards,
 } from "lucide-react";
 import { budgetApi, walletApi } from "services/api";
 import { useLocale } from "contexts/LocaleContext";
 import { useToast } from "contexts/ToastContext";
 import { cn } from "lib/utils";
-import { BudgetTrackRow } from "../components/finance";
 import { ConfirmDialog, Panel } from "../components/overlays";
 import {
   Button,
+  Card,
   CategoryIcon,
   Chip,
   EmptyState,
   FieldLabel,
   HeroStrip,
+  IconBadge,
   Money,
   Notice,
   PageHeader,
+  Section,
   SkeletonRows,
   TextInput,
   TextLink,
@@ -39,6 +47,7 @@ import { useLedger } from "../LedgerContext";
 import { EXPENSE_CATEGORIES, getCategoryMeta } from "../lib/categories";
 import {
   currentMonth,
+  daysInMonth,
   daysLeftInMonth,
   formatAmountInput,
   formatMoney,
@@ -754,6 +763,290 @@ const BudgetFormPanel: React.FC<{
   );
 };
 
+/* ------------------------------------------------------------- Budget card */
+
+/**
+ * One budget on its own card. The question a budget answers is "how much is
+ * left", so that is the big figure; what went out and the limit sit under the
+ * track. Past the limit the card says so in place, with a way to see why,
+ * and the spending itself is never refused.
+ */
+const BudgetCard: React.FC<{
+  budget: BudgetItem;
+  onEdit: (budget: BudgetItem) => void;
+}> = ({ budget, onEdit }) => {
+  const t = useT();
+  const { isVietnamese } = useLocale();
+  const categoryMeta = getCategoryMeta(budget.category);
+  // The colour the user picked for this budget, when there is one.
+  const meta =
+    budget.color && /^#[0-9a-f]{6}$/i.test(budget.color)
+      ? { ...categoryMeta, color: budget.color }
+      : categoryMeta;
+  const name = isVietnamese ? meta.vi : meta.en;
+  const limit = toAmount(budget.amount);
+  const spent = toAmount(budget.spent);
+  const percent = limit > 0 ? (spent / limit) * 100 : spent > 0 ? 101 : 0;
+  const over = spent - limit;
+  const usedUp = over === 0 && limit > 0;
+  const pinned = Boolean(walletScopeOf(budget));
+  const ScopeIcon = pinned ? WalletCards : Layers;
+
+  const figureLabel = (vi: string, en: string) => (
+    <span className="text-[14px] font-medium text-ledger-ink-2">{t(vi, en)}</span>
+  );
+
+  return (
+    <Card className="flex flex-col">
+      <div className="flex items-start gap-3">
+        <CategoryIcon meta={meta} size={40} />
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-[16px] font-semibold leading-snug text-ledger-ink">{name}</h3>
+          <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ledger-muted">
+            <ScopeIcon className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 break-words">
+              {pinned
+                ? budget.walletName
+                  ? t(`Chỉ ví ${budget.walletName}`, `${budget.walletName} only`)
+                  : t("Một ví cụ thể", "One wallet")
+                : t("Mọi ví", "All wallets")}
+            </span>
+          </p>
+        </div>
+        <Button
+          aria-label={t(`Sửa ngân sách ${name}`, `Edit the ${name} budget`)}
+          icon={Pencil}
+          onClick={() => onEdit(budget)}
+          size="sm"
+          variant="outline"
+        >
+          {t("Sửa", "Edit")}
+        </Button>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+        {usedUp ? (
+          <span className="text-[20px] font-semibold leading-tight text-ledger-spend">
+            {t("Đã dùng hết", "All used")}
+          </span>
+        ) : (
+          <p className="flex flex-wrap items-baseline gap-x-1.5 leading-tight">
+            {isVietnamese ? figureLabel(over > 0 ? "Vượt" : "Còn", "") : null}
+            <Money
+              amount={Math.abs(over)}
+              className="text-[22px] font-semibold tracking-[-0.01em]"
+              tone={over > 0 ? "out" : "neutral"}
+            />
+            {isVietnamese ? null : figureLabel("", over > 0 ? "over" : "left")}
+          </p>
+        )}
+        <span
+          className={cn(
+            "ledger-num shrink-0 rounded-full px-2.5 py-1 text-[12.5px] font-semibold",
+            over > 0
+              ? "bg-ledger-out-wash text-ledger-out"
+              : percent >= 85
+                ? "bg-ledger-spend-wash text-ledger-spend"
+                : "bg-ledger-canvas text-ledger-ink-2",
+          )}
+        >
+          {Math.round(percent)}%
+        </span>
+      </div>
+      <Track className="mt-3" percent={percent} />
+      {/* Two unbreakable halves, so a narrow card wraps between the figures
+          rather than inside one. */}
+      <p className="mt-2 text-[13px] text-ledger-muted">
+        <span className="whitespace-nowrap">
+          {t("Đã chi ", "")}
+          <span className="ledger-num text-ledger-ink-2">{formatMoney(spent)}</span>
+          {t("", " spent")}
+        </span>{" "}
+        <span className="whitespace-nowrap">
+          {t("trên hạn mức ", "of ")}
+          <span className="ledger-num text-ledger-ink-2">{formatMoney(limit)}</span>
+        </span>
+      </p>
+
+      {budget.note ? (
+        <p className="mt-3 break-words border-l-2 border-ledger-line pl-3 text-[13px] leading-snug text-ledger-ink-2">
+          {budget.note}
+        </p>
+      ) : null}
+
+      {over > 0 ? (
+        // Kept to one short paragraph with the link inline: the figure, pill
+        // and track already say by how much, and a tall notice would stretch
+        // every card beside this one.
+        <Notice className="mt-4" icon={TriangleAlert} tone="rose">
+          {t("Đã vượt, mọi khoản vẫn được ghi nhận. ", "Over, and everything is still recorded. ")}
+          <TextLink
+            className="whitespace-nowrap"
+            to={`/transactions?category=${encodeURIComponent(budget.category)}`}
+          >
+            {t("Xem giao dịch", "See transactions")}
+            <ArrowRight className="ml-1 inline h-3.5 w-3.5 align-[-2px]" />
+          </TextLink>
+        </Notice>
+      ) : null}
+    </Card>
+  );
+};
+
+/** The last cell of the grid: another budget, where the list ends. */
+const AddBudgetTile: React.FC<{ onClick: () => void; freeGroups: number }> = ({
+  onClick,
+  freeGroups,
+}) => {
+  const t = useT();
+  return (
+    <button
+      className="flex min-h-[152px] flex-col items-center justify-center gap-1 rounded-[18px] border-2 border-dashed border-ledger-line-strong px-5 py-6 text-center transition-colors hover:border-ledger-accent hover:bg-ledger-paper"
+      onClick={onClick}
+      type="button"
+    >
+      <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-ledger-accent-wash text-ledger-accent">
+        <Plus className="h-5 w-5" />
+      </span>
+      <span className="text-[15px] font-semibold text-ledger-ink">{t("Thêm ngân sách", "Add a budget")}</span>
+      <span className="text-[13px] text-ledger-muted">
+        {freeGroups > 0
+          ? t(`${freeGroups} nhóm chi tiêu chưa có hạn mức`, `${freeGroups} spending groups have no limit yet`)
+          : t("Có thể đặt thêm hạn mức riêng cho một ví", "You can add a limit for a single wallet")}
+      </span>
+    </button>
+  );
+};
+
+/* -------------------------------------------------------------- Side cards */
+
+/**
+ * The month so far against the budget so far: 61% of the money gone on the
+ * 18th of 30 days is on pace, the same 61% on the 5th is not.
+ */
+const PaceCard: React.FC<{ usedPercent: number; period: Period }> = ({ usedPercent, period }) => {
+  const t = useT();
+  const { timezoneOffsetMinutes } = useLocale();
+  const total = daysInMonth(period.month, period.year);
+  const day = total - daysLeftInMonth(timezoneOffsetMinutes) + 1;
+  const elapsed = (day / total) * 100;
+  const verdict = usedPercent > 100 ? "over" : usedPercent > elapsed + 5 ? "fast" : "steady";
+  // The "today" label follows its tick but never runs off the card's edge.
+  const labelShift = elapsed < 12 ? "0%" : elapsed > 88 ? "-100%" : "-50%";
+
+  return (
+    <Section
+      icon={Gauge}
+      subtitle={t(`Hôm nay là ngày ${day}/${total} của tháng`, `Today is day ${day} of ${total}`)}
+      title={t("Nhịp chi tiêu", "Spending pace")}
+    >
+      <div className="relative pt-6">
+        <span
+          className="absolute top-0 whitespace-nowrap text-[12px] font-medium text-ledger-ink-2"
+          style={{ left: `${elapsed}%`, transform: `translateX(${labelShift})` }}
+        >
+          {t("Hôm nay", "Today")}
+        </span>
+        <Track percent={usedPercent} />
+        <span
+          aria-hidden
+          className="absolute -bottom-1 top-[19px] w-[2px] -translate-x-1/2 rounded-full bg-ledger-ink"
+          style={{ left: `${elapsed}%` }}
+        />
+      </div>
+      <dl className="mt-5 grid grid-cols-2 gap-3">
+        <div className="rounded-[12px] bg-ledger-canvas px-3.5 py-3">
+          <dt className="text-[12.5px] text-ledger-ink-2">{t("Hạn mức đã dùng", "Limit used")}</dt>
+          <dd
+            className={cn(
+              "ledger-num mt-0.5 text-[20px] font-semibold",
+              verdict === "over" ? "text-ledger-out" : verdict === "fast" ? "text-ledger-spend" : "text-ledger-ink",
+            )}
+          >
+            {Math.round(usedPercent)}%
+          </dd>
+        </div>
+        <div className="rounded-[12px] bg-ledger-canvas px-3.5 py-3">
+          <dt className="text-[12.5px] text-ledger-ink-2">{t("Tháng đã qua", "Month elapsed")}</dt>
+          <dd className="ledger-num mt-0.5 text-[20px] font-semibold text-ledger-ink">{Math.round(elapsed)}%</dd>
+        </div>
+      </dl>
+      <Notice
+        className="mt-4"
+        icon={verdict === "steady" ? Check : TriangleAlert}
+        tone={verdict === "over" ? "rose" : verdict === "fast" ? "amber" : "blue"}
+      >
+        {verdict === "over"
+          ? t(
+              "Đã vượt tổng hạn mức của tháng. Mọi khoản vẫn được ghi nhận.",
+              "This month's total limit is passed. Everything is still recorded.",
+            )
+          : verdict === "fast"
+            ? t(
+                "Bạn đang chi nhanh hơn thời gian trôi qua. Chậm lại một chút để kịp đến cuối tháng.",
+                "Money is going faster than the month. Slow down a little to make it to the end.",
+              )
+            : t(
+                "Đúng nhịp: phần hạn mức đã dùng theo kịp số ngày đã qua.",
+                "On pace: the share of the limit used keeps up with the days gone.",
+              )}
+      </Notice>
+    </Section>
+  );
+};
+
+/** What counts towards a budget, for someone who has never set one. */
+const HowBudgetsCountCard: React.FC = () => {
+  const t = useT();
+  const points = [
+    {
+      icon: Layers,
+      title: t("Ngân sách cho mọi ví", "All-wallet budgets"),
+      text: t(
+        "Mọi khoản chi thuộc nhóm đều được tính, bất kể bạn trả bằng ví nào.",
+        "Every expense in the group counts, whichever wallet paid.",
+      ),
+    },
+    {
+      icon: WalletCards,
+      title: t("Ngân sách gắn với một ví", "Single-wallet budgets"),
+      text: t("Chỉ khoản chi trả từ ví đó mới được tính.", "Only spending paid from that wallet counts."),
+    },
+    {
+      icon: ShieldCheck,
+      title: t("Không bao giờ chặn chi tiêu", "Never blocks spending"),
+      text: t(
+        "Vượt hạn mức thì khoản chi vẫn được ghi nhận, bạn chỉ thấy cảnh báo.",
+        "Going over still records the expense; you only see a warning.",
+      ),
+    },
+    {
+      icon: CalendarRange,
+      title: t("Mỗi tháng một bộ hạn mức", "One set of limits per month"),
+      text: t(
+        "Chuyển tháng ở đầu trang để xem lại hoặc đặt trước cho tháng sau.",
+        "Switch the month at the top to look back or plan ahead.",
+      ),
+    },
+  ];
+
+  return (
+    <Section icon={Info} title={t("Ngân sách được tính thế nào", "How budgets count")} tone="neutral">
+      <ul className="space-y-4">
+        {points.map((point) => (
+          <li className="flex items-start gap-3" key={point.title}>
+            <IconBadge icon={point.icon} tone="neutral" />
+            <div className="min-w-0">
+              <p className="text-[14px] font-semibold text-ledger-ink">{point.title}</p>
+              <p className="mt-0.5 text-[13px] leading-snug text-ledger-ink-2">{point.text}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+};
+
 /* -------------------------------------------------------------------- Page */
 
 interface LoadedMonth {
@@ -770,7 +1063,6 @@ const BudgetsPage: React.FC = () => {
   const { toast } = useToast();
   const { dataVersion, notifyDataChanged } = useLedger();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isDesktop = useIsDesktop();
 
   const today = currentMonth(timezoneOffsetMinutes);
   const [period, setPeriod] = useState<Period>(today);
@@ -886,7 +1178,15 @@ const BudgetsPage: React.FC = () => {
   const totalOverspent = items.reduce((sum, budget) => sum + overspendOf(budget), 0);
   const usedPercent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
   const relation = comparePeriods(period, today);
-  const hasPinned = items.some((budget) => walletScopeOf(budget));
+  const pinnedCount = items.filter((budget) => walletScopeOf(budget)).length;
+  const overCount = items.filter((budget) => overspendOf(budget) > 0).length;
+  const freeGroups = EXPENSE_CATEGORIES.filter(
+    (item) => !items.some((budget) => getCategoryMeta(budget.category).key === item.key),
+  ).length;
+  const daysLeft = daysLeftInMonth(timezoneOffsetMinutes);
+  // Rounded down to the thousand, as on the overview: a figure to hold in
+  // your head, not one that only looks precise.
+  const perDay = Math.floor(totalRemaining / Math.max(daysLeft, 1) / 1000) * 1000;
   const periodName = monthLabel(month, year, isVietnamese);
   const previousPeriod = shiftMonth(period, -1);
 
@@ -951,10 +1251,7 @@ const BudgetsPage: React.FC = () => {
 
   const periodNote =
     relation === 0
-      ? t(
-          `Còn ${daysLeftInMonth(timezoneOffsetMinutes)} ngày trong tháng`,
-          `${daysLeftInMonth(timezoneOffsetMinutes)} days left this month`,
-        )
+      ? t(`Còn ${daysLeft} ngày trong tháng`, `${daysLeft} days left this month`)
       : relation > 0
         ? t("Tháng này chưa bắt đầu", "This month has not started")
         : t("Tháng đã kết thúc", "This month is over");
@@ -968,66 +1265,81 @@ const BudgetsPage: React.FC = () => {
   let body: React.ReactNode;
   if (!ready) {
     body = (
-      <div className="py-6">
+      <Card>
         <SkeletonRows rows={4} />
-      </div>
+      </Card>
     );
   } else if (loaded?.failed) {
     body = (
-      <EmptyState
-        action={
-          <Button onClick={() => setRetry((value) => value + 1)} variant="outline">
-            {t("Thử lại", "Try again")}
-          </Button>
-        }
-        description={t(
-          "Có thể mạng đang chập chờn. Dữ liệu của bạn vẫn an toàn.",
-          "The connection may be unstable. Your data is safe.",
-        )}
-        icon={ChartPie}
-        title={t("Không tải được ngân sách", "Budgets could not be loaded")}
-      />
+      <Card>
+        <EmptyState
+          action={
+            <Button onClick={() => setRetry((value) => value + 1)} variant="outline">
+              {t("Thử lại", "Try again")}
+            </Button>
+          }
+          description={t(
+            "Có thể mạng đang chập chờn. Dữ liệu của bạn vẫn an toàn.",
+            "The connection may be unstable. Your data is safe.",
+          )}
+          icon={ChartPie}
+          title={t("Không tải được ngân sách", "Budgets could not be loaded")}
+        />
+      </Card>
     );
   } else if (!items.length) {
     const previousTotal = previous.reduce((sum, budget) => sum + toAmount(budget.amount), 0);
+    // An empty month is where someone new lands, so the explanation of how a
+    // budget counts sits right beside the first step.
     body = (
-      <EmptyState
-        action={
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex flex-wrap justify-center gap-2">
-              {createButton}
-              {previous.length ? (
-                <Button disabled={copying} icon={Copy} onClick={() => void copyPrevious()} variant="outline">
-                  {copying ? t("Đang chép...", "Copying...") : t("Chép từ tháng trước", "Copy last month")}
-                </Button>
-              ) : null}
-            </div>
-            {previous.length ? (
-              <p className="ledger-num text-[12.5px] text-ledger-muted">
-                {t(
-                  `${monthLabel(previousPeriod.month, previousPeriod.year, true)} có ${previous.length} ngân sách, tổng ${formatMoney(previousTotal)}`,
-                  `${monthLabel(previousPeriod.month, previousPeriod.year, false)} had ${previous.length} budgets, ${formatMoney(previousTotal)} in total`,
-                )}
-              </p>
-            ) : null}
-          </div>
-        }
-        description={t(
-          "Ngân sách chỉ để theo dõi: bạn đặt hạn mức cho từng nhóm và thấy mình đã chi bao nhiêu. Nó không bao giờ chặn một khoản chi, vượt hạn mức thì khoản đó vẫn được ghi nhận.",
-          "A budget only tracks: you set a limit per group and see how much has gone out. It never stops a payment; going over still records it.",
-        )}
-        icon={ChartPie}
-        title={t(`Chưa có ngân sách cho ${periodName.toLowerCase()}`, `No budgets for ${periodName} yet`)}
-      />
+      <div className="grid gap-3 sm:gap-4 xl:gap-5 min-[1400px]:grid-cols-12">
+        <Card className="flex flex-col justify-center min-[1400px]:col-span-8">
+          <EmptyState
+            action={
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-wrap justify-center gap-2">
+                  {createButton}
+                  {previous.length ? (
+                    <Button disabled={copying} icon={Copy} onClick={() => void copyPrevious()} variant="outline">
+                      {copying ? t("Đang chép...", "Copying...") : t("Chép từ tháng trước", "Copy last month")}
+                    </Button>
+                  ) : null}
+                </div>
+                {previous.length ? (
+                  <p className="ledger-num text-[12.5px] text-ledger-muted">
+                    {t(
+                      `${monthLabel(previousPeriod.month, previousPeriod.year, true)} có ${previous.length} ngân sách, tổng ${formatMoney(previousTotal)}`,
+                      `${monthLabel(previousPeriod.month, previousPeriod.year, false)} had ${previous.length} budgets, ${formatMoney(previousTotal)} in total`,
+                    )}
+                  </p>
+                ) : null}
+              </div>
+            }
+            description={t(
+              "Ngân sách chỉ để theo dõi: bạn đặt hạn mức cho từng nhóm và thấy mình đã chi bao nhiêu. Nó không bao giờ chặn một khoản chi, vượt hạn mức thì khoản đó vẫn được ghi nhận.",
+              "A budget only tracks: you set a limit per group and see how much has gone out. It never stops a payment; going over still records it.",
+            )}
+            icon={ChartPie}
+            title={t(`Chưa có ngân sách cho ${periodName.toLowerCase()}`, `No budgets for ${periodName} yet`)}
+          />
+        </Card>
+        <div className="min-w-0 min-[1400px]:col-span-4">
+          <HowBudgetsCountCard />
+        </div>
+      </div>
     );
   } else {
+    const showPace = relation === 0;
     body = (
       <>
         <HeroStrip
-          label={t("Đã chi trong tháng", "Spent this month")}
+          icon={ChartPie}
+          label={t(`Đã chi trong ${periodName.toLowerCase()}`, `Spent in ${periodName}`)}
           stats={[
             {
               label: t("Còn lại", "Left"),
+              icon: PiggyBank,
+              tone: totalRemaining < 0 ? "out" : "accent",
               value:
                 totalRemaining < 0 ? (
                   <span className="ledger-num text-ledger-out">
@@ -1036,108 +1348,83 @@ const BudgetsPage: React.FC = () => {
                 ) : (
                   <Money amount={totalRemaining} />
                 ),
+              hint:
+                totalRemaining < 0
+                  ? t("Mọi khoản vẫn được ghi nhận", "Everything is still recorded")
+                  : relation === 0 && perDay > 0
+                    ? t(`≈ ${formatMoney(perDay)}/ngày`, `≈ ${formatMoney(perDay)}/day`)
+                    : undefined,
             },
             {
-              // Three columns share a 390px screen; the long label would be
-              // cut to "VƯỢT HẠN M…" there.
-              label: isDesktop ? t("Vượt hạn mức", "Over limit") : t("Vượt mức", "Over"),
+              label: t("Vượt hạn mức", "Over limit"),
+              icon: TriangleAlert,
+              tone: totalOverspent > 0 ? "out" : "neutral",
               value: <Money amount={totalOverspent} tone={totalOverspent > 0 ? "out" : "muted"} />,
+              hint: overCount
+                ? t(`${overCount} nhóm đã vượt`, `${overCount} ${overCount === 1 ? "group" : "groups"} over`)
+                : t("Chưa nhóm nào vượt", "No group is over"),
             },
             {
               label: t("Số nhóm", "Groups"),
+              icon: Layers,
+              tone: "neutral",
               value: <span className="ledger-num text-ledger-ink">{items.length}</span>,
+              hint: t(
+                `${items.length - pinnedCount} mọi ví · ${pinnedCount} theo ví`,
+                `${items.length - pinnedCount} all wallets · ${pinnedCount} one wallet`,
+              ),
             },
           ]}
           value={
-            <>
-              <Money amount={totalSpent} tone={totalSpent > totalBudget ? "out" : "neutral"} />
-              <span className="ledger-num mt-2 block text-[17px] font-medium tracking-[-0.01em] text-ledger-muted sm:ml-3 sm:mt-0 sm:inline sm:text-[22px]">
+            // The limit follows the figure when there is room and wraps under
+            // it when there is not, instead of running out of the card.
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+              <Money
+                amount={totalSpent}
+                className="whitespace-nowrap"
+                tone={totalSpent > totalBudget ? "out" : "neutral"}
+              />
+              <span className="ledger-num whitespace-nowrap text-[17px] font-medium tracking-[-0.01em] text-ledger-muted sm:text-[22px]">
                 / {formatMoney(totalBudget)}
               </span>
-            </>
+            </span>
           }
         >
-          <div className="mt-5 w-full lg:min-w-[340px]">
-            <Track percent={usedPercent} />
-            <div className="mt-2 flex items-center justify-between gap-3 text-[12.5px] text-ledger-muted">
-              <span className={cn("ledger-num", usedPercent > 100 && "text-ledger-out")}>
-                {t(
-                  `Đã dùng ${Math.round(usedPercent)}% tổng hạn mức`,
-                  `${Math.round(usedPercent)}% of the total limit used`,
-                )}
-              </span>
-              <span className="text-right">{periodNote}</span>
-            </div>
+          <Track percent={usedPercent} />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[12.5px] text-ledger-muted">
+            <span className={cn("ledger-num", usedPercent > 100 && "text-ledger-out")}>
+              {t(
+                `Đã dùng ${Math.round(usedPercent)}% tổng hạn mức`,
+                `${Math.round(usedPercent)}% of the total limit used`,
+              )}
+            </span>
+            <span>{periodNote}</span>
           </div>
         </HeroStrip>
 
-        <div className="border-b border-ledger-line py-2">
-          {items.map((budget) => {
-            const name = isVietnamese
-              ? getCategoryMeta(budget.category).vi
-              : getCategoryMeta(budget.category).en;
-            return (
-              <BudgetTrackRow
-                budget={budget}
-                footnote={
-                  overspendOf(budget) > 0 ? (
-                    <Notice
-                      action={
-                        <TextLink to={`/transactions?category=${encodeURIComponent(budget.category)}`}>
-                          <span className="inline-flex items-center gap-1">
-                            {t("Xem giao dịch", "See transactions")}
-                            <ArrowRight className="h-3.5 w-3.5" />
-                          </span>
-                        </TextLink>
-                      }
-                      className="mt-3"
-                      icon={TriangleAlert}
-                      tone="rose"
-                    >
-                      {t(
-                        "Bạn đã tiêu quá hạn mức nhóm này. Các khoản vẫn được ghi nhận bình thường.",
-                        "You have spent past this group's limit. Every entry is still recorded as usual.",
-                      )}
-                    </Notice>
-                  ) : null
-                }
-                key={budget._id}
-                trailing={
-                  <button
-                    aria-label={t(`Sửa ngân sách ${name}`, `Edit the ${name} budget`)}
-                    className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ledger-muted transition-colors hover:bg-ledger-canvas hover:text-ledger-ink"
-                    onClick={() => openEdit(budget)}
-                    type="button"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                }
-              />
-            );
-          })}
-        </div>
+        {/* The side column only opens at 1400px: below that, two budget
+            cards and a side card in one row leave each card too narrow for
+            its figures, so the side cards drop under the grid instead. */}
+        <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:mt-5 xl:gap-5 min-[1400px]:grid-cols-12">
+          {/* The budgets are peers, so each gets its own card in a grid; the
+              last cell adds another, which is also where a phone's thumb is
+              once the list has been read. */}
+          <div className="grid min-w-0 content-start gap-3 sm:gap-4 md:grid-cols-2 xl:gap-5 min-[1400px]:col-span-8">
+            {items.map((budget) => (
+              <BudgetCard budget={budget} key={budget._id} onEdit={openEdit} />
+            ))}
+            <AddBudgetTile freeGroups={freeGroups} onClick={openCreate} />
+          </div>
 
-        <p className="flex items-start gap-2 py-5 text-[13px] leading-relaxed text-ledger-muted">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            {hasPinned
-              ? t(
-                  "Mọi khoản chi thuộc nhóm đều được tính vào ngân sách, bất kể bạn trả bằng ví nào, trừ ngân sách đã gắn với một ví cụ thể.",
-                  "Every expense in a group counts towards its budget, whichever wallet paid, except for budgets tied to one wallet.",
-                )
-              : t(
-                  "Mọi khoản chi thuộc nhóm đều được tính vào ngân sách, bất kể bạn trả bằng ví nào.",
-                  "Every expense in a group counts towards its budget, whichever wallet paid.",
-                )}
-          </span>
-        </p>
-
-        {/* On a phone the header keeps only the month; creating sits after
-            the list, where the thumb already is once it has been read. */}
-        <div className="pb-4 lg:hidden">
-          <Button block icon={Plus} onClick={openCreate} size="lg" variant="outline">
-            {t("Tạo ngân sách", "New budget")}
-          </Button>
+          <div
+            className={cn(
+              "grid min-w-0 content-start gap-3 sm:gap-4 xl:gap-5 min-[1400px]:col-span-4 min-[1400px]:grid-cols-1",
+              showPace && "md:grid-cols-2",
+            )}
+          >
+            {showPace ? <PaceCard period={period} usedPercent={usedPercent} /> : null}
+            <HowBudgetsCountCard />
+          </div>
         </div>
       </>
     );

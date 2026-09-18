@@ -4,7 +4,7 @@ import {
   Archive,
   ArchiveRestore,
   ArrowLeftRight,
-  ChevronRight,
+  ChevronDown,
   CircleCheck,
   Clock,
   Ellipsis,
@@ -16,6 +16,8 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  TriangleAlert,
+  Wallet as WalletGlyph,
   WalletCards,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -24,19 +26,22 @@ import { useAuth } from "contexts/AuthContext";
 import { SUPPORTED_CURRENCIES, useLocale } from "contexts/LocaleContext";
 import { useToast } from "contexts/ToastContext";
 import { cn } from "lib/utils";
-import { WALLET_TYPE_META, WalletIcon, WalletRow } from "../components/finance";
+import { WALLET_TYPE_META, WalletIcon, walletTypeMeta } from "../components/finance";
 import { ConfirmDialog, Panel } from "../components/overlays";
 import {
   Button,
+  ButtonLink,
+  Card,
+  CardHeader,
   EmptyState,
   Eyebrow,
   FieldLabel,
   HeroStrip,
+  IconBadge,
   Money,
   Notice,
   PageHeader,
   Segmented,
-  SkeletonRows,
   TextInput,
 } from "../components/primitives";
 import { useIsDesktop } from "../hooks/useIsDesktop";
@@ -76,36 +81,214 @@ const errorPayload = (error: unknown) =>
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : undefined;
 
-/* ------------------------------------------------------------ Row actions */
+/** "Ngân hàng · **** 4417"; the type is dropped when it is also the name. */
+const walletSubtitle = (wallet: Wallet, isVietnamese: boolean) => {
+  const meta = walletTypeMeta(wallet.type);
+  const typeLabel = isVietnamese ? meta.vi : meta.en;
+  return [
+    typeLabel.toLowerCase() === String(wallet.name || "").trim().toLowerCase() ? "" : typeLabel,
+    wallet.accountNumber,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+};
 
-const iconActionClass = (danger?: boolean) =>
-  cn(
-    "flex h-8 w-8 items-center justify-center rounded-[8px] text-ledger-muted transition-colors hover:bg-ledger-canvas",
-    danger ? "hover:text-ledger-out" : "hover:text-ledger-ink",
-  );
+const shareText = (share: number) => (share > 0 && share < 1 ? "<1%" : `${Math.round(share)}%`);
 
-const IconAction: React.FC<{
-  icon: LucideIcon;
-  label: string;
-  onClick?: () => void;
-  to?: string;
-  danger?: boolean;
-}> = ({ icon: Icon, label, onClick, to, danger }) =>
-  to ? (
-    <Link aria-label={label} className={iconActionClass(danger)} title={label} to={to}>
-      <Icon className="h-4 w-4" />
-    </Link>
-  ) : (
-    <button
-      aria-label={label}
-      className={iconActionClass(danger)}
-      onClick={onClick}
-      title={label}
-      type="button"
-    >
-      <Icon className="h-4 w-4" />
-    </button>
+/* ------------------------------------------------------------ Wallet card */
+
+/**
+ * One wallet as a card: who it is, what it holds, and everything that can be
+ * done with it in plain view. A negative balance says so inside the card,
+ * with the two ways to fix it right there.
+ */
+const WalletCard: React.FC<{
+  wallet: Wallet;
+  /** Share of the money held across wallets; null when it would say nothing. */
+  share: number | null;
+  onReconcile: () => void;
+  onAddIncome: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+  onMore: () => void;
+}> = ({ wallet, share, onReconcile, onAddIncome, onEdit, onRemove, onMore }) => {
+  const t = useT();
+  const { isVietnamese } = useLocale();
+  const balance = toAmount(wallet.balance);
+  const subtitle = walletSubtitle(wallet, isVietnamese);
+  const foreignCurrency = wallet.currency && wallet.currency !== "VND" ? wallet.currency : "";
+  const removeLabel = wallet.hasTransactions
+    ? t("Lưu trữ ví", "Archive wallet")
+    : t("Xoá ví", "Delete wallet");
+  const RemoveIcon = wallet.hasTransactions ? Archive : Trash2;
+
+  return (
+    <Card className="flex flex-col">
+      <div className="flex items-center gap-3">
+        <WalletIcon size={44} wallet={wallet} />
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-[16px] font-semibold leading-snug text-ledger-ink">
+            {wallet.name}
+          </h3>
+          {subtitle ? (
+            <p className="break-words text-[13px] leading-snug text-ledger-muted">{subtitle}</p>
+          ) : null}
+        </div>
+        {foreignCurrency ? (
+          <span className="shrink-0 rounded-full bg-ledger-canvas px-2 py-0.5 text-[12px] font-medium text-ledger-ink-2">
+            {foreignCurrency}
+          </span>
+        ) : null}
+        {/* Archive/delete stays apart from the everyday actions below, as a
+            quiet icon in the corner. */}
+        <button
+          aria-label={removeLabel}
+          className="-mr-1.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-ledger-muted transition-colors hover:bg-ledger-out-wash hover:text-ledger-out sm:flex"
+          onClick={onRemove}
+          title={removeLabel}
+          type="button"
+        >
+          <RemoveIcon className="h-4 w-4" />
+        </button>
+        {/* On a phone the actions live in a sheet with their labels; four
+            buttons under every card would bury the balances. */}
+        <button
+          aria-label={t(`Thao tác với ví ${wallet.name}`, `Actions for ${wallet.name}`)}
+          className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ledger-ink-2 hover:bg-ledger-canvas hover:text-ledger-ink sm:hidden"
+          onClick={onMore}
+          type="button"
+        >
+          <Ellipsis className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="mt-5">
+        <p className="text-[13px] text-ledger-ink-2">{t("Số dư", "Balance")}</p>
+        <Money
+          amount={balance}
+          className="mt-1 block text-[26px] font-semibold leading-tight tracking-[-0.02em] 2xl:text-[28px]"
+          currency={wallet.currency}
+          tone={balance < 0 ? "out" : "neutral"}
+        />
+        {share !== null ? (
+          <p className="mt-1 text-[13px] text-ledger-muted">
+            <span className="ledger-num">{shareText(share)}</span>{" "}
+            {t("số tiền bạn đang có", "of the money you hold")}
+          </p>
+        ) : null}
+      </div>
+
+      {balance < 0 ? (
+        <Notice
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-[8px] border border-current px-2.5 py-1 text-[12.5px] font-semibold text-ledger-out hover:bg-ledger-paper"
+                onClick={onReconcile}
+                type="button"
+              >
+                {t("Cân đối ví", "Reconcile")}
+              </button>
+              <button
+                className="rounded-[8px] px-2.5 py-1 text-[12.5px] font-semibold text-ledger-out underline-offset-2 hover:underline"
+                onClick={onAddIncome}
+                type="button"
+              >
+                {t("Ghi khoản thu", "Log income")}
+              </button>
+            </div>
+          }
+          className="mt-4"
+          icon={TriangleAlert}
+          tone="rose"
+        >
+          {t(
+            `Ví đang âm ${formatMoney(Math.abs(balance), wallet.currency)}. Có thể bạn quên ghi một khoản thu.`,
+            `This wallet is ${formatMoney(Math.abs(balance), wallet.currency)} below zero. An income may be missing.`,
+          )}
+        </Notice>
+      ) : null}
+
+      <div className="mt-auto hidden pt-5 sm:block">
+        <div className="flex flex-wrap items-center gap-2 border-t border-ledger-line pt-4">
+          <Button icon={Scale} onClick={onReconcile} size="sm" variant="outline">
+            {t("Cân đối", "Reconcile")}
+          </Button>
+          <ButtonLink icon={ReceiptText} to={`/transactions?walletId=${wallet._id}`}>
+            {t("Giao dịch", "Transactions")}
+          </ButtonLink>
+          <Button icon={Pencil} onClick={onEdit} size="sm" variant="outline">
+            {t("Sửa", "Edit")}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
+};
+
+const WalletCardSkeleton: React.FC = () => (
+  <div aria-hidden>
+    <Card>
+      <div className="flex animate-pulse items-center gap-3">
+        <span className="h-11 w-11 rounded-[11px] bg-ledger-canvas" />
+        <span className="h-3.5 w-32 rounded bg-ledger-canvas" />
+      </div>
+      <span className="mt-6 block h-3 w-14 animate-pulse rounded bg-ledger-canvas" />
+      <span className="mt-2.5 block h-6 w-44 animate-pulse rounded bg-ledger-canvas" />
+    </Card>
+  </div>
+);
+
+/**
+ * How the money held splits across wallet types, as one segmented track with
+ * a labelled legend: each type keeps the colour its wallet icons wear.
+ */
+const AllocationBar: React.FC<{
+  parts: Array<{ type: WalletType; amount: number; share: number }>;
+}> = ({ parts }) => {
+  const t = useT();
+  const { isVietnamese } = useLocale();
+  const label = (type: WalletType) =>
+    isVietnamese ? WALLET_TYPE_META[type].vi : WALLET_TYPE_META[type].en;
+
+  return (
+    <div>
+      <p className="mb-2.5 text-[13px] font-medium text-ledger-ink-2">
+        {t("Tiền đang nằm ở đâu", "Where the money is")}
+      </p>
+      <div
+        aria-label={parts.map((part) => `${label(part.type)} ${shareText(part.share)}`).join(", ")}
+        className="flex h-2 w-full gap-[2px] overflow-hidden rounded-full"
+        role="img"
+      >
+        {parts.map((part) => (
+          <span
+            className="h-full min-w-[4px]"
+            key={part.type}
+            style={{
+              backgroundColor: WALLET_TYPE_META[part.type].color,
+              flexBasis: 0,
+              flexGrow: part.amount,
+            }}
+            title={`${label(part.type)}: ${formatMoney(part.amount)} · ${shareText(part.share)}`}
+          />
+        ))}
+      </div>
+      <ul className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-ledger-ink-2">
+        {parts.map((part) => (
+          <li className="flex items-center gap-1.5" key={part.type}>
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: WALLET_TYPE_META[part.type].color }}
+            />
+            {label(part.type)}
+            <span className="ledger-num font-semibold text-ledger-ink">{shareText(part.share)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
 
 /** One line of the phone's action sheet: big enough for a thumb, labelled in words. */
 const SheetAction: React.FC<{
@@ -393,14 +576,39 @@ const WalletFormPanel: React.FC<{
 
           <div>
             <FieldLabel>{t("Loại ví", "Type")}</FieldLabel>
-            <Segmented
-              onChange={setType}
-              options={WALLET_TYPES.map((value) => ({
-                value,
-                label: isVietnamese ? WALLET_TYPE_META[value].vi : WALLET_TYPE_META[value].en,
-              }))}
-              value={type}
-            />
+            {/* Three tiles with the type's own icon read faster than three
+                words in a segmented bar, and match the icons in the list. */}
+            <div
+              aria-label={t("Loại ví", "Type")}
+              className="grid grid-cols-3 gap-2"
+              role="radiogroup"
+            >
+              {WALLET_TYPES.map((value) => {
+                const meta = WALLET_TYPE_META[value];
+                const selected = value === type;
+                return (
+                  <button
+                    aria-checked={selected}
+                    className={cn(
+                      "flex min-w-0 flex-col items-center gap-2 rounded-[12px] border px-2 py-3 text-center text-[13px] font-medium transition-colors",
+                      selected
+                        ? "border-ledger-accent bg-ledger-accent-wash text-ledger-accent"
+                        : "border-ledger-line bg-ledger-paper text-ledger-ink-2 hover:border-ledger-line-strong hover:text-ledger-ink",
+                    )}
+                    key={value}
+                    onClick={() => setType(value)}
+                    role="radio"
+                    type="button"
+                  >
+                    <meta.icon
+                      className="h-5 w-5"
+                      style={selected ? undefined : { color: meta.color }}
+                    />
+                    {isVietnamese ? meta.vi : meta.en}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div>
@@ -475,20 +683,20 @@ const WalletFormPanel: React.FC<{
 
           {editing && balanceLocked ? (
             <div>
-              <dl className="grid grid-cols-2 divide-x divide-ledger-line border-y border-ledger-line py-3">
-                <div className="min-w-0 pr-4">
+              <dl className="grid grid-cols-2 divide-x divide-ledger-line rounded-[12px] bg-ledger-canvas py-3.5">
+                <div className="min-w-0 px-4">
                   <dt>
                     <Eyebrow>{t("Số dư ban đầu", "Opening balance")}</Eyebrow>
                   </dt>
-                  <dd className="mt-1 text-[15px] font-semibold">
+                  <dd className="mt-1 text-[16px] font-semibold">
                     <Money amount={toAmount(editing.initialBalance)} currency={editing.currency} />
                   </dd>
                 </div>
-                <div className="min-w-0 pl-4">
+                <div className="min-w-0 px-4">
                   <dt>
                     <Eyebrow>{t("Tiền tệ", "Currency")}</Eyebrow>
                   </dt>
-                  <dd className="mt-1 text-[15px] font-semibold text-ledger-ink">
+                  <dd className="mt-1 text-[16px] font-semibold text-ledger-ink">
                     {editing.currency || "VND"}
                   </dd>
                 </div>
@@ -697,62 +905,57 @@ const ReconcilePanel: React.FC<{
             )}
           </p>
 
-          <div className="flex items-center gap-3 rounded-[12px] border border-ledger-line px-3.5 py-2.5">
-            <Eyebrow>{t("Ví", "Wallet")}</Eyebrow>
-            <span className="ml-auto flex min-w-0 items-center gap-2.5">
-              <WalletIcon size={30} wallet={wallet} />
-              <span className="min-w-0 text-right">
-                <span className="block truncate text-[14px] font-medium text-ledger-ink">
+          {/* The wallet and what the app has on record, as one sunken block;
+              the one thing to type sits under it on its own. */}
+          <div className="rounded-[14px] bg-ledger-canvas p-4">
+            <div className="flex items-center gap-3">
+              <WalletIcon size={40} wallet={wallet} />
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-[15px] font-semibold leading-snug text-ledger-ink">
                   {walletName}
-                </span>
+                </p>
                 {walletDetail ? (
-                  <span className="block truncate text-[12px] text-ledger-muted">
+                  <p className="break-words text-[13px] leading-snug text-ledger-muted">
                     {walletDetail}
-                  </span>
+                  </p>
                 ) : null}
+              </div>
+            </div>
+            <div className="mt-3.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-ledger-line pt-3.5">
+              <span className="text-[13.5px] text-ledger-ink-2">
+                {t("Số dư đang ghi", "Recorded balance")}
               </span>
-            </span>
-          </div>
-
-          <div className="grid overflow-hidden rounded-[12px] border border-ledger-line sm:grid-cols-2">
-            <div className="flex items-center justify-between gap-3 border-b border-ledger-line px-4 py-3.5 sm:block sm:border-b-0 sm:border-r sm:py-4">
-              <Eyebrow>{t("Số dư đang ghi", "Recorded balance")}</Eyebrow>
               <Money
                 amount={current}
-                className="block text-[17px] font-semibold sm:mt-2.5 sm:text-[22px]"
+                className="text-[18px] font-semibold"
                 currency={wallet.currency}
                 tone={current < 0 ? "out" : "neutral"}
               />
             </div>
-            <label className="block px-4 py-3.5 sm:py-4" htmlFor="reconcile-actual">
-              <Eyebrow>{t("Số dư thực tế", "Actual balance")}</Eyebrow>
-              <span className="mt-1 flex cursor-text items-baseline gap-1.5 border-b-2 border-ledger-line pb-0.5 transition-colors focus-within:border-ledger-accent">
-                {/* An invisible copy of the digits sizes the input, so the
-                    currency sign sits right after the number the way the
-                    amount reads everywhere else. */}
-                <span className="relative min-w-0 overflow-hidden">
-                  <span
-                    aria-hidden
-                    className="ledger-num invisible block pr-0.5 text-[30px] font-semibold leading-tight tracking-[-0.02em]"
-                  >
-                    {actualText || "0"}
-                  </span>
-                  <input
-                    className="ledger-num absolute inset-0 h-full w-full bg-transparent text-[30px] font-semibold leading-tight tracking-[-0.02em] text-ledger-ink outline-none placeholder:text-ledger-line-strong"
-                    id="reconcile-actual"
-                    inputMode="numeric"
-                    onChange={(event) => {
-                      const digits = event.target.value.replace(/\D/g, "");
-                      setInput(digits ? String(parseAmountInput(digits)) : "");
-                    }}
-                    placeholder="0"
-                    ref={inputRef}
-                    value={actualText}
-                  />
-                </span>
-                <span className="shrink-0 text-[20px] font-semibold text-ledger-muted">
-                  {currencySuffix(wallet.currency)}
-                </span>
+          </div>
+
+          <div>
+            <FieldLabel htmlFor="reconcile-actual">
+              {t("Số dư thực tế", "Actual balance")}
+            </FieldLabel>
+            <label
+              className="flex h-16 cursor-text items-center gap-2 rounded-[12px] border border-ledger-line-strong bg-ledger-paper px-4 transition-colors focus-within:border-ledger-accent"
+              htmlFor="reconcile-actual"
+            >
+              <input
+                className="ledger-num h-full w-full min-w-0 bg-transparent text-[28px] font-semibold tracking-[-0.02em] text-ledger-ink outline-none placeholder:text-ledger-line-strong"
+                id="reconcile-actual"
+                inputMode="numeric"
+                onChange={(event) => {
+                  const digits = event.target.value.replace(/\D/g, "");
+                  setInput(digits ? String(parseAmountInput(digits)) : "");
+                }}
+                placeholder="0"
+                ref={inputRef}
+                value={actualText}
+              />
+              <span className="shrink-0 text-[20px] font-semibold text-ledger-muted">
+                {currencySuffix(wallet.currency)}
               </span>
             </label>
           </div>
@@ -788,8 +991,8 @@ const ReconcilePanel: React.FC<{
           ) : null}
 
           <div>
-            <FieldLabel htmlFor="reconcile-note">
-              {t("Ghi chú (không bắt buộc)", "Note (optional)")}
+            <FieldLabel hint={t("Không bắt buộc", "Optional")} htmlFor="reconcile-note">
+              {t("Ghi chú", "Note")}
             </FieldLabel>
             <TextInput
               id="reconcile-note"
@@ -906,14 +1109,32 @@ const WalletsPage: React.FC = () => {
 
   const totals = useMemo(() => {
     const byType: Record<WalletType, number> = { cash: 0, bank: 0, ewallet: 0 };
+    const countByType: Record<WalletType, number> = { cash: 0, bank: 0, ewallet: 0 };
     let total = 0;
     wallets.forEach((wallet) => {
       const balance = toAmount(wallet.balance);
-      byType[WALLET_TYPE_META[wallet.type] ? wallet.type : "cash"] += balance;
+      const type = WALLET_TYPE_META[wallet.type] ? wallet.type : "cash";
+      byType[type] += balance;
+      countByType[type] += 1;
       total += balance;
     });
-    return { byType, total };
+    return { byType, countByType, total };
   }, [wallets]);
+
+  // Shares are of the money actually held: a wallet below zero holds none,
+  // so it is left out rather than shrinking everyone else's slice.
+  const held = useMemo(
+    () => wallets.reduce((sum, wallet) => sum + Math.max(toAmount(wallet.balance), 0), 0),
+    [wallets],
+  );
+  const allocation = useMemo(() => {
+    const positive = WALLET_TYPES.map((type) => ({
+      type,
+      amount: Math.max(totals.byType[type], 0),
+    })).filter((part) => part.amount > 0);
+    const sum = positive.reduce((total, part) => total + part.amount, 0);
+    return positive.map((part) => ({ ...part, share: sum > 0 ? (part.amount / sum) * 100 : 0 }));
+  }, [totals]);
 
   const confirmDelete = async () => {
     if (!pendingDelete || deleting) {
@@ -1036,16 +1257,27 @@ const WalletsPage: React.FC = () => {
               )
             : null
         }
+        icon={WalletGlyph}
         label={t("Tổng số dư", "Total balance")}
-        stats={WALLET_TYPES.map((type) => ({
-          label: typeLabel(type),
-          value: (
-            <Money
-              amount={totals.byType[type]}
-              tone={totals.byType[type] < 0 ? "out" : "neutral"}
-            />
-          ),
-        }))}
+        stats={WALLET_TYPES.map((type) => {
+          const count = totals.countByType[type];
+          return {
+            label: typeLabel(type),
+            icon: WALLET_TYPE_META[type].icon,
+            tone: "neutral" as const,
+            value: (
+              <Money
+                amount={totals.byType[type]}
+                tone={totals.byType[type] < 0 ? "out" : count ? "neutral" : "muted"}
+              />
+            ),
+            hint: loading
+              ? undefined
+              : count
+                ? t(`${count} ví`, `${count} ${count === 1 ? "wallet" : "wallets"}`)
+                : t("Chưa có ví loại này", "None of this type"),
+          };
+        })}
         value={
           loading ? (
             <span className="text-ledger-line-strong">—</span>
@@ -1053,137 +1285,163 @@ const WalletsPage: React.FC = () => {
             <Money amount={totals.total} tone={totals.total < 0 ? "out" : "neutral"} />
           )
         }
-      />
+      >
+        {!loading && allocation.length >= 2 ? <AllocationBar parts={allocation} /> : null}
+      </HeroStrip>
 
-      <section aria-label={t("Ví đang dùng", "Wallets in use")} className="border-b border-ledger-line">
+      <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4 xl:mt-5 xl:space-y-5">
         {loading ? (
-          <div className="py-2">
-            <SkeletonRows rows={3} />
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:gap-5 2xl:grid-cols-3">
+            <WalletCardSkeleton />
+            <WalletCardSkeleton />
+            <WalletCardSkeleton />
           </div>
         ) : wallets.length ? (
-          wallets.map((wallet) => (
-            <WalletRow
-              key={wallet._id}
-              onAddIncome={(target) => openQuickAdd({ mode: "INCOME", walletId: target._id })}
-              onReconcile={(target) => setReconcileId(target._id)}
-              trailing={
-                <>
-                  <div className="hidden items-center gap-0.5 lg:flex">
-                    <IconAction
-                      icon={Scale}
-                      label={t("Cân đối ví", "Reconcile")}
-                      onClick={() => setReconcileId(wallet._id)}
-                    />
-                    <IconAction
-                      icon={ReceiptText}
-                      label={t("Xem giao dịch", "View transactions")}
-                      to={`/transactions?walletId=${wallet._id}`}
-                    />
-                    <IconAction
-                      icon={Pencil}
-                      label={t("Sửa ví", "Edit wallet")}
-                      onClick={() => setForm({ wallet })}
-                    />
-                    <IconAction
-                      danger
-                      icon={wallet.hasTransactions ? Archive : Trash2}
-                      label={removeLabel(wallet)}
-                      onClick={() => setPendingDelete(wallet)}
-                    />
-                  </div>
-                  {/* Four icons would squeeze the name to a few letters on a
-                      phone, so there they live in a sheet with their labels. */}
-                  <button
-                    aria-label={t(`Thao tác với ví ${wallet.name}`, `Actions for ${wallet.name}`)}
-                    className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ledger-muted hover:bg-ledger-canvas hover:text-ledger-ink lg:hidden"
-                    onClick={() => setActionsFor(wallet)}
-                    type="button"
-                  >
-                    <Ellipsis className="h-5 w-5" />
-                  </button>
-                </>
-              }
-              wallet={wallet}
-            />
-          ))
-        ) : (
-          <EmptyState
-            action={
-              <Button icon={Plus} onClick={() => setForm({ wallet: null })}>
-                {t("Tạo ví", "Create a wallet")}
-              </Button>
-            }
-            description={t(
-              "Mỗi khoản thu chi cần một ví để ghi vào: tiền mặt, tài khoản ngân hàng hay ví điện tử bạn đang dùng.",
-              "Every entry needs a wallet to go into: the cash, bank account or e-wallet you actually use.",
-            )}
-            icon={WalletCards}
-            title={t("Chưa có ví nào đang dùng", "No wallets in use")}
-          />
-        )}
-      </section>
-
-      {/* Outside the active list on purpose: archiving the last wallet leaves
-          that list empty, which is exactly when the way back matters most. */}
-      {!loading && archived.length ? (
-        <section className="py-5">
-          <button
-            aria-expanded={archivedOpen}
-            className="flex w-full items-start gap-2.5 text-left"
-            onClick={() => setArchivedOpen((open) => !open)}
-            type="button"
+          <section
+            aria-label={t("Ví đang dùng", "Wallets in use")}
+            className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:gap-5 2xl:grid-cols-3"
           >
-            <ChevronRight
-              className={cn(
-                "mt-0.5 h-4 w-4 shrink-0 text-ledger-muted transition-transform",
-                archivedOpen && "rotate-90",
-              )}
-            />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
-              <span className="flex items-center gap-2">
-                <span className="text-[15px] font-semibold text-ledger-ink">
-                  {t("Ví đã lưu trữ", "Archived wallets")}
-                </span>
-                <span className="ledger-num rounded-full bg-ledger-canvas px-2 py-0.5 text-[12px] text-ledger-ink-2">
-                  {archived.length}
-                </span>
-              </span>
-              <span className="text-[12.5px] text-ledger-muted">
-                {t(
-                  "Không tính vào tổng, không hiện khi ghi giao dịch",
-                  "Not counted in totals, not offered when recording",
-                )}
-              </span>
-            </span>
-          </button>
-
-          {archivedOpen ? (
-            <div className="mt-2">
-              {archived.map((wallet) => (
-                <WalletRow
-                  compact
-                  dimmed
+            {wallets.map((wallet) => {
+              const balance = toAmount(wallet.balance);
+              return (
+                <WalletCard
                   key={wallet._id}
-                  trailing={
-                    <Button
-                      disabled={restoringId !== null}
-                      icon={ArchiveRestore}
-                      onClick={() => void restore(wallet)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {restoringId === wallet._id
-                        ? t("Đang khôi phục...", "Restoring...")
-                        : t("Khôi phục", "Restore")}
-                    </Button>
-                  }
+                  onAddIncome={() => openQuickAdd({ mode: "INCOME", walletId: wallet._id })}
+                  onEdit={() => setForm({ wallet })}
+                  onMore={() => setActionsFor(wallet)}
+                  onReconcile={() => setReconcileId(wallet._id)}
+                  onRemove={() => setPendingDelete(wallet)}
+                  share={wallets.length >= 2 && balance > 0 && held > 0 ? (balance / held) * 100 : null}
                   wallet={wallet}
                 />
-              ))}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+              );
+            })}
+            {/* Fills the grid's last row when it has a gap, and only then:
+                on its own row it would be one more "Thêm ví" than needed. */}
+            <button
+              className={cn(
+                "hidden min-h-[200px] flex-col items-center justify-center gap-3 rounded-[18px] border-2 border-dashed border-ledger-line-strong p-6 text-center transition-colors hover:border-ledger-accent hover:bg-ledger-paper",
+                wallets.length % 2 === 1 && "md:flex",
+                wallets.length % 3 === 0 ? "2xl:hidden" : "2xl:flex",
+              )}
+              onClick={() => setForm({ wallet: null })}
+              type="button"
+            >
+              <IconBadge icon={Plus} size="md" />
+              <span className="text-[15px] font-semibold text-ledger-ink">
+                {t("Thêm ví", "New wallet")}
+              </span>
+              <span className="max-w-[260px] text-[13px] leading-snug text-ledger-muted">
+                {t(
+                  "Tiền mặt, tài khoản ngân hàng hay ví điện tử bạn đang dùng.",
+                  "Cash, a bank account or an e-wallet you use.",
+                )}
+              </span>
+            </button>
+          </section>
+        ) : (
+          <Card>
+            <EmptyState
+              action={
+                <Button icon={Plus} onClick={() => setForm({ wallet: null })}>
+                  {t("Tạo ví", "Create a wallet")}
+                </Button>
+              }
+              description={t(
+                "Mỗi khoản thu chi cần một ví để ghi vào: tiền mặt, tài khoản ngân hàng hay ví điện tử bạn đang dùng.",
+                "Every entry needs a wallet to go into: the cash, bank account or e-wallet you actually use.",
+              )}
+              icon={WalletCards}
+              title={t("Chưa có ví nào đang dùng", "No wallets in use")}
+            />
+          </Card>
+        )}
+
+        {/* Outside the active list on purpose: archiving the last wallet leaves
+            that list empty, which is exactly when the way back matters most. */}
+        {!loading && archived.length ? (
+          <Card>
+            <CardHeader
+              action={
+                <Button
+                  aria-controls="ledger-archived-wallets"
+                  aria-expanded={archivedOpen}
+                  aria-label={archivedOpen ? t("Thu gọn", "Hide") : t("Xem ví đã lưu trữ", "Show archived wallets")}
+                  className="max-sm:w-8 max-sm:px-0"
+                  onClick={() => setArchivedOpen((open) => !open)}
+                  size="sm"
+                  variant="outline"
+                >
+                  {/* A bare chevron on a phone, so the subtitle keeps its width. */}
+                  <span className="hidden sm:inline">
+                    {archivedOpen ? t("Thu gọn", "Hide") : t("Xem", "Show")}
+                  </span>
+                  <ChevronDown
+                    className={cn("h-4 w-4 transition-transform", archivedOpen && "rotate-180")}
+                  />
+                </Button>
+              }
+              className={archivedOpen ? undefined : "mb-0"}
+              icon={Archive}
+              meta={String(archived.length)}
+              subtitle={t(
+                "Không tính vào tổng, không hiện khi ghi giao dịch",
+                "Not counted in totals, not offered when recording",
+              )}
+              title={t("Ví đã lưu trữ", "Archived wallets")}
+              tone="neutral"
+            />
+
+            {archivedOpen ? (
+              <div
+                className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"
+                id="ledger-archived-wallets"
+              >
+                {archived.map((wallet) => {
+                  const subtitle = walletSubtitle(wallet, isVietnamese);
+                  return (
+                    <div
+                      className="flex flex-wrap items-center gap-x-3 gap-y-3 rounded-[14px] border border-ledger-line p-3.5"
+                      key={wallet._id}
+                    >
+                      <div className="flex min-w-0 flex-1 basis-[150px] items-center gap-3">
+                        {/* Greyed rather than faded: the name stays readable. */}
+                        <span className="opacity-70 grayscale">
+                          <WalletIcon size={38} wallet={wallet} />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="break-words text-[15px] font-medium leading-snug text-ledger-ink">
+                            {wallet.name}
+                          </p>
+                          <p className="text-[13px] leading-snug text-ledger-muted">
+                            {subtitle ? `${subtitle} · ` : ""}
+                            <Money
+                              amount={toAmount(wallet.balance)}
+                              currency={wallet.currency}
+                              tone={toAmount(wallet.balance) < 0 ? "out" : "muted"}
+                            />
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        disabled={restoringId !== null}
+                        icon={ArchiveRestore}
+                        onClick={() => void restore(wallet)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        {restoringId === wallet._id
+                          ? t("Đang khôi phục...", "Restoring...")
+                          : t("Khôi phục", "Restore")}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </Card>
+        ) : null}
+      </div>
 
       <WalletFormPanel
         onClose={() => setForm(null)}
@@ -1209,14 +1467,20 @@ const WalletsPage: React.FC = () => {
       >
         {actionsFor ? (
           <div>
-            <p className="mb-1 text-[13px] text-ledger-muted">
-              {typeLabel(actionsFor.type)} ·{" "}
-              <Money
-                amount={toAmount(actionsFor.balance)}
-                currency={actionsFor.currency}
-                tone={toAmount(actionsFor.balance) < 0 ? "out" : "muted"}
-              />
-            </p>
+            <div className="mb-1 flex items-center gap-3 rounded-[14px] bg-ledger-canvas p-3.5">
+              <WalletIcon size={40} wallet={actionsFor} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] text-ledger-ink-2">
+                  {walletSubtitle(actionsFor, isVietnamese) || t("Số dư", "Balance")}
+                </p>
+                <Money
+                  amount={toAmount(actionsFor.balance)}
+                  className="text-[17px] font-semibold"
+                  currency={actionsFor.currency}
+                  tone={toAmount(actionsFor.balance) < 0 ? "out" : "neutral"}
+                />
+              </div>
+            </div>
             <SheetAction
               icon={Pencil}
               label={t("Sửa ví", "Edit wallet")}

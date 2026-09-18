@@ -1,6 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ChartPie, Plus, ReceiptText } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowUpRight,
+  Bell,
+  ChartColumn,
+  ChartPie,
+  Minus,
+  PiggyBank,
+  Plus,
+  ReceiptText,
+  Target,
+  Wallet as WalletIcon,
+} from "lucide-react";
 import {
   budgetApi,
   configApi,
@@ -15,7 +28,6 @@ import { ChartLegend, IncomeExpenseBars } from "../components/BarChart";
 import { BudgetTrackRow, WalletRow } from "../components/finance";
 import {
   Button,
-  Eyebrow,
   HeroStrip,
   Money,
   PageHeader,
@@ -23,6 +35,7 @@ import {
   Section,
   SkeletonRows,
   TextLink,
+  Track,
 } from "../components/primitives";
 import { TimelineDayGroup } from "../components/timeline";
 import { useLedger } from "../LedgerContext";
@@ -31,7 +44,6 @@ import {
   daysLeftInMonth,
   formatMoney,
   longToday,
-  monthLabel,
   todayKey,
 } from "../lib/format";
 import { useT } from "../lib/i18n";
@@ -160,32 +172,45 @@ const DashboardPage: React.FC = () => {
             toAmount(right.currentAmount) / Math.max(toAmount(right.targetAmount), 1) -
             toAmount(left.currentAmount) / Math.max(toAmount(left.targetAmount), 1),
         )
-        .slice(0, 2),
+        .slice(0, 3),
     [data.goals],
   );
 
   const monthlyIncome = toAmount(data.stats?.monthlyIncome);
   const monthlyExpense = toAmount(data.stats?.monthlyExpense);
-  const hasBudget = toAmount(data.budget?.totalBudget) > 0;
+  const totalBudget = toAmount(data.budget?.totalBudget);
+  const totalSpent = toAmount(data.budget?.totalSpent);
+  const hasBudget = totalBudget > 0;
   const remaining = toAmount(data.budget?.totalRemaining);
   const daysLeft = daysLeftInMonth(timezoneOffsetMinutes);
   // Rounded down to the thousand: "263.000 ₫ a day" is a figure a person can
   // hold in their head; "263.846 ₫" only looks precise.
   const perDay = Math.floor(remaining / Math.max(daysLeft, 1) / 1000) * 1000;
+  const usedPercent = hasBudget ? (totalSpent / totalBudget) * 100 : 0;
   const name = currentUser?.displayName || currentUser?.username || "";
+
+  const history = (data.stats?.history || []).map((point) => ({
+    label: point.month.replace(/^Th/, isVietnamese ? "T" : "M"),
+    income: toAmount(point.income),
+    expense: toAmount(point.expense),
+  }));
+  // Last month in full, as context for this month so far. A percentage
+  // against a whole month would call the 18th of the month a "drop".
+  const lastMonth = history.length >= 2 ? history[history.length - 2] : null;
+  const previousMonth = month === 1 ? 12 : month - 1;
 
   // "Can I spend this?" is answered by what is left of this month's budgets.
   // Without budgets there is no plan to measure against, so the honest figure
   // is simply what came in minus what went out.
   const hero = hasBudget
     ? {
-        label: t("Còn có thể tiêu trong tháng", "Left to spend this month"),
+        label: t(`Còn có thể tiêu trong tháng ${month}`, "Left to spend this month"),
         value: <Money amount={remaining} tone={remaining < 0 ? "out" : "neutral"} />,
         caption:
           remaining > 0
             ? t(
-                `Còn ${daysLeft} ngày · khoảng ${formatMoney(perDay)} mỗi ngày`,
-                `${daysLeft} days left · about ${formatMoney(perDay)} a day`,
+                `Còn ${daysLeft} ngày, khoảng ${formatMoney(perDay)} mỗi ngày.`,
+                `${daysLeft} days left, about ${formatMoney(perDay)} a day.`,
               )
             : t(
                 `Đã tiêu quá tổng hạn mức ${formatMoney(Math.abs(remaining))}. Mọi khoản vẫn được ghi nhận.`,
@@ -193,51 +218,51 @@ const DashboardPage: React.FC = () => {
               ),
       }
     : {
-        label: t("Thu trừ chi tháng này", "In minus out this month"),
-        value: (
-          <Money amount={monthlyIncome - monthlyExpense} signed tone="auto" />
-        ),
+        label: t(`Thu trừ chi tháng ${month}`, "In minus out this month"),
+        value: <Money amount={monthlyIncome - monthlyExpense} signed tone="auto" />,
         caption: (
           <span>
             {t(
               "Đặt ngân sách để biết mỗi ngày còn tiêu được bao nhiêu. ",
               "Set a budget to see how much you can spend each day. ",
             )}
-            <TextLink to="/budgets">{t("Tạo ngân sách", "Create a budget")}</TextLink>
+            <TextLink to="/budgets?create=1">{t("Tạo ngân sách", "Create a budget")}</TextLink>
           </span>
         ),
       };
 
-  const history = (data.stats?.history || []).map((point) => ({
-    label: point.month.replace(/^Th/, isVietnamese ? "T" : "M"),
-    income: toAmount(point.income),
-    expense: toAmount(point.expense),
-  }));
-
   const reconcile = (wallet: Wallet) => navigate(`/wallets?reconcile=${wallet._id}`);
 
-  const walletsSection = (
+  const walletsCard = (
     <Section
-      action={<TextLink to="/wallets">{t("Tất cả", "All")}</TextLink>}
+      action={<TextLink to="/wallets">{t("Quản lý", "Manage")}</TextLink>}
+      icon={WalletIcon}
+      meta={data.wallets.length ? String(data.wallets.length) : undefined}
       title={t("Ví tiền", "Wallets")}
     >
       {loading ? (
         <SkeletonRows rows={3} />
       ) : data.wallets.length ? (
-        data.wallets.map((wallet) => (
-          <WalletRow
-            compact
-            key={wallet._id}
-            onAddIncome={(target) => openQuickAdd({ mode: "INCOME", walletId: target._id })}
-            onReconcile={reconcile}
-            wallet={wallet}
-          />
-        ))
+        <div className="-mt-3">
+          {data.wallets.map((wallet) => (
+            <WalletRow
+              compact
+              key={wallet._id}
+              onAddIncome={(target) => openQuickAdd({ mode: "INCOME", walletId: target._id })}
+              onReconcile={reconcile}
+              wallet={wallet}
+            />
+          ))}
+        </div>
       ) : (
-        <p className="text-[13.5px] text-ledger-ink-2">
-          {t("Chưa có ví nào.", "No wallets yet.")}{" "}
-          <TextLink to="/wallets">{t("Tạo ví", "Create one")}</TextLink>
-        </p>
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-[14px] text-ledger-ink-2">
+            {t("Chưa có ví nào. Tạo một ví để bắt đầu ghi chép.", "No wallets yet. Create one to start.")}
+          </p>
+          <Button icon={Plus} onClick={() => navigate("/wallets?create=1")} size="sm" variant="outline">
+            {t("Tạo ví", "Create a wallet")}
+          </Button>
+        </div>
       )}
     </Section>
   );
@@ -246,9 +271,17 @@ const DashboardPage: React.FC = () => {
     <div>
       <PageHeader
         actions={
-          <span className="rounded-full border border-ledger-line px-3 py-1.5 text-[13px] text-ledger-ink-2">
-            {monthLabel(month, year, isVietnamese)}
-          </span>
+          <div className="hidden items-center gap-2 sm:flex">
+            <Button icon={ArrowLeftRight} onClick={() => openQuickAdd({ mode: "TRANSFER" })} variant="outline">
+              {t("Chuyển ví", "Transfer")}
+            </Button>
+            <Button icon={Plus} onClick={() => openQuickAdd({ mode: "INCOME" })} variant="outline">
+              {t("Ghi thu", "Income")}
+            </Button>
+            <Button icon={Minus} onClick={() => openQuickAdd({ mode: "EXPENSE" })}>
+              {t("Ghi chi", "Expense")}
+            </Button>
+          </div>
         }
         subtitle={longToday(timezoneOffsetMinutes, isVietnamese)}
         title={
@@ -260,44 +293,79 @@ const DashboardPage: React.FC = () => {
 
       <HeroStrip
         caption={loading ? null : hero.caption}
+        icon={PiggyBank}
         label={hero.label}
         stats={[
           {
-            label: t("Tổng số dư", "Balance"),
-            value: <Money amount={data.totalBalance} tone={data.totalBalance < 0 ? "out" : "neutral"} />,
+            label: t("Tổng số dư", "Total balance"),
+            icon: WalletIcon,
+            tone: "accent",
+            value: (
+              <Money amount={data.totalBalance} tone={data.totalBalance < 0 ? "out" : "neutral"} />
+            ),
+            hint: data.wallets.length
+              ? t(`Trên ${data.wallets.length} ví đang dùng`, `Across ${data.wallets.length} wallets`)
+              : undefined,
           },
           {
-            label: t(`Thu tháng ${month}`, `In, ${monthLabel(month, year, false)}`),
+            label: t(`Thu tháng ${month}`, "Income this month"),
+            icon: ArrowDownLeft,
+            tone: "in",
             value: <Money amount={monthlyIncome} signed tone="in" />,
+            hint: lastMonth
+              ? t(`Tháng ${previousMonth}: ${formatMoney(lastMonth.income)}`, `Last month: ${formatMoney(lastMonth.income)}`)
+              : undefined,
           },
           {
-            label: t(`Chi tháng ${month}`, `Out, ${monthLabel(month, year, false)}`),
+            label: t(`Chi tháng ${month}`, "Spent this month"),
+            icon: ArrowUpRight,
+            tone: "out",
             value: <Money amount={monthlyExpense} />,
+            hint: lastMonth
+              ? t(`Tháng ${previousMonth}: ${formatMoney(lastMonth.expense)}`, `Last month: ${formatMoney(lastMonth.expense)}`)
+              : undefined,
           },
         ]}
         value={loading ? <span className="text-ledger-line-strong">—</span> : hero.value}
-      />
+      >
+        {!loading && hasBudget ? (
+          <div>
+            <Track percent={usedPercent} />
+            <div className="mt-2 flex items-center justify-between gap-3 text-[12.5px] text-ledger-muted">
+              <span className="ledger-num">
+                {t(
+                  `Đã dùng ${Math.round(usedPercent)}% · ${formatMoney(totalSpent)} / ${formatMoney(totalBudget)}`,
+                  `${Math.round(usedPercent)}% used · ${formatMoney(totalSpent)} / ${formatMoney(totalBudget)}`,
+                )}
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </HeroStrip>
 
-      <div className="grid gap-x-10 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0">
+      <div className="mt-3 grid gap-3 sm:mt-4 sm:gap-4 xl:mt-5 xl:grid-cols-12 xl:gap-5">
+        <div className="min-w-0 space-y-3 sm:space-y-4 xl:col-span-8 xl:space-y-5">
           <Section
-            action={<TextLink to="/budgets">{t("Quản lý", "Manage")}</TextLink>}
-            meta={
-              data.budget?.items?.length
-                ? t(`${data.budget.items.length} nhóm`, `${data.budget.items.length} groups`)
-                : undefined
-            }
-            title={t(`Ngân sách tháng ${month}`, `Budgets, ${monthLabel(month, year, false)}`)}
+            action={<TextLink to="/budgets">{t("Xem tất cả", "See all")}</TextLink>}
+            icon={ChartPie}
+            meta={data.budget?.items?.length ? String(data.budget.items.length) : undefined}
+            subtitle={t(
+              "Nhóm sắp chạm hạn mức hiện trước",
+              "Closest to their limit first",
+            )}
+            title={t(`Ngân sách tháng ${month}`, "Budgets this month")}
           >
             {loading ? (
               <SkeletonRows rows={3} />
             ) : budgetItems.length ? (
-              budgetItems.map((budget) => (
-                <BudgetTrackRow budget={budget} key={budget._id} showIcon={false} />
-              ))
+              <div className="grid gap-x-10 gap-y-6 md:grid-cols-2">
+                {budgetItems.map((budget) => (
+                  <BudgetTrackRow budget={budget} key={budget._id} showScope={false} tile />
+                ))}
+              </div>
             ) : (
-              <div className="flex flex-col items-start gap-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[13.5px] text-ledger-ink-2">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[14px] text-ledger-ink-2">
                   {t(
                     "Chưa có ngân sách nào cho tháng này. Ngân sách chỉ để theo dõi, không bao giờ chặn bạn chi.",
                     "No budgets for this month yet. Budgets only track, they never stop you spending.",
@@ -310,13 +378,15 @@ const DashboardPage: React.FC = () => {
             )}
           </Section>
 
-          {/* On a phone the wallets come right after the budgets: a negative
-              wallet is the next thing worth seeing, not something to scroll
-              past a chart for. The desktop copy lives in the side pane. */}
-          <div className="lg:hidden">{walletsSection}</div>
+          {/* On a phone and a narrow laptop the wallets come right after the
+              budgets: a negative wallet is the next thing worth seeing. On a
+              wide screen they live in the side column. */}
+          <div className="xl:hidden">{walletsCard}</div>
 
           <Section
             action={<TextLink to="/transactions">{t("Xem tất cả", "See all")}</TextLink>}
+            icon={ReceiptText}
+            subtitle={t("Bấm vào một dòng để sửa hoặc xoá", "Click a row to edit or delete it")}
             title={t("Giao dịch gần đây", "Recent activity")}
           >
             {loading ? (
@@ -330,8 +400,8 @@ const DashboardPage: React.FC = () => {
                 />
               ))
             ) : (
-              <div className="flex flex-col items-start gap-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[13.5px] text-ledger-ink-2">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[14px] text-ledger-ink-2">
                   {t("Chưa có giao dịch nào.", "Nothing recorded yet.")}
                 </p>
                 <Button icon={Plus} onClick={() => openQuickAdd()} size="sm">
@@ -340,20 +410,25 @@ const DashboardPage: React.FC = () => {
               </div>
             )}
           </Section>
+        </div>
+
+        <div className="min-w-0 space-y-3 sm:space-y-4 xl:col-span-4 xl:space-y-5">
+          <div className="hidden xl:block">{walletsCard}</div>
 
           {history.length ? (
-            <Section action={<ChartLegend />} bare title={t("Thu chi 6 tháng", "Last 6 months")}>
+            <Section
+              action={<ChartLegend />}
+              icon={ChartColumn}
+              title={t("Thu chi 6 tháng", "Last 6 months")}
+            >
               <IncomeExpenseBars data={history} />
             </Section>
           ) : null}
-        </div>
-
-        <aside className="min-w-0 lg:border-l lg:border-ledger-line lg:pl-8">
-          <div className="hidden lg:block">{walletsSection}</div>
 
           <Section
-            action={<TextLink to="/goals">{t("Tất cả", "All")}</TextLink>}
-            title={t("Mục tiêu", "Goals")}
+            action={<TextLink to="/goals">{t("Xem tất cả", "See all")}</TextLink>}
+            icon={Target}
+            title={t("Mục tiêu tiết kiệm", "Savings goals")}
           >
             {loading ? (
               <SkeletonRows rows={2} />
@@ -364,69 +439,74 @@ const DashboardPage: React.FC = () => {
                   const saved = toAmount(goal.currentAmount);
                   const percent = target > 0 ? (saved / target) * 100 : 0;
                   return (
-                    <div className="flex items-center gap-3 py-3 first:pt-0" key={goal._id}>
-                      <Ring percent={percent} size={46} />
+                    <div className="flex items-center gap-3.5 py-3.5 first:pt-0 last:pb-0" key={goal._id}>
+                      <Ring percent={percent} size={48} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[14.5px] font-medium text-ledger-ink">
+                        <p className="truncate text-[15px] font-semibold text-ledger-ink">
                           {goal.title}
                         </p>
-                        <p className="ledger-num text-[12.5px] text-ledger-muted">
-                          {formatMoney(saved)} / {formatMoney(target)}
-                        </p>
-                        <p className="mt-0.5 text-[12.5px] text-ledger-ink-2">
-                          {t(
-                            `Còn thiếu ${formatMoney(Math.max(target - saved, 0))}`,
-                            `${formatMoney(Math.max(target - saved, 0))} to go`,
-                          )}{" "}
-                          · <TextLink to={`/goals?contribute=${goal._id}`}>{t("Nạp thêm", "Add")}</TextLink>
+                        {/* Two nowrap halves, so a narrow column wraps between
+                            the figures instead of running under the button. */}
+                        <p className="mt-0.5 text-[13px] text-ledger-muted">
+                          <span className="ledger-num">{formatMoney(saved)}</span>{" "}
+                          <span className="ledger-num">/ {formatMoney(target)}</span>
                         </p>
                       </div>
+                      <Button
+                        onClick={() => navigate(`/goals?contribute=${goal._id}`)}
+                        size="sm"
+                        variant="soft"
+                      >
+                        {t("Nạp thêm", "Add")}
+                      </Button>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-[13.5px] text-ledger-ink-2">
-                {t("Chưa có mục tiêu đang chạy.", "No active goals.")}{" "}
-                <TextLink to="/goals">{t("Đặt mục tiêu", "Set one")}</TextLink>
-              </p>
+              <div className="flex flex-col items-start gap-3">
+                <p className="text-[14px] text-ledger-ink-2">
+                  {t("Chưa có mục tiêu đang chạy.", "No active goals.")}
+                </p>
+                <Button icon={Target} onClick={() => navigate("/goals")} size="sm" variant="outline">
+                  {t("Đặt mục tiêu", "Set a goal")}
+                </Button>
+              </div>
             )}
           </Section>
 
           {data.reminder ? (
-            <Section bare title={t("Nhắc ghi chép", "Reminders")}>
-              <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ledger-canvas text-ledger-ink-2">
-                  <Bell className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] text-ledger-ink">
-                    {data.reminder.enabled && data.reminder.times.length
-                      ? data.reminder.times.join(" · ")
-                      : t("Đang tắt", "Off")}
-                  </p>
-                  <Eyebrow className="normal-case tracking-normal">
-                    {data.reminder.enabled
-                      ? t("Thông báo lên điện thoại mỗi ngày", "A daily notification on your phone")
-                      : t("Bật để không quên ghi chép", "Turn on so you do not forget")}
-                  </Eyebrow>
-                </div>
-                <TextLink to="/settings?tab=reminders">{t("Sửa", "Edit")}</TextLink>
+            <Section
+              action={<TextLink to="/settings?tab=reminders">{t("Sửa", "Edit")}</TextLink>}
+              icon={Bell}
+              subtitle={
+                data.reminder.enabled
+                  ? t("Thông báo lên điện thoại mỗi ngày", "A daily notification on your phone")
+                  : t("Bật để không quên ghi chép", "Turn on so you do not forget")
+              }
+              title={t("Nhắc ghi chép", "Reminders")}
+              tone="neutral"
+            >
+              <div className="flex flex-wrap gap-2">
+                {data.reminder.enabled && data.reminder.times.length ? (
+                  data.reminder.times.map((time) => (
+                    <span
+                      className="ledger-num rounded-[10px] bg-ledger-canvas px-3 py-1.5 text-[14px] font-semibold text-ledger-ink"
+                      key={time}
+                    >
+                      {time}
+                    </span>
+                  ))
+                ) : (
+                  <span className="rounded-[10px] bg-ledger-canvas px-3 py-1.5 text-[14px] text-ledger-ink-2">
+                    {t("Đang tắt", "Off")}
+                  </span>
+                )}
               </div>
             </Section>
           ) : null}
-        </aside>
-      </div>
-
-      {!loading && !data.transactions.length && !data.wallets.length ? (
-        <div className="mt-6 flex items-center gap-3 rounded-[14px] bg-ledger-canvas p-4 text-[13.5px] text-ledger-ink-2">
-          <ReceiptText className="h-5 w-5 shrink-0" />
-          {t(
-            "Bắt đầu bằng cách tạo một ví, rồi ghi khoản chi đầu tiên.",
-            "Start by creating a wallet, then record your first expense.",
-          )}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 };

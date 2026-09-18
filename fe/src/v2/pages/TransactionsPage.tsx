@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  ArrowDownLeft,
   ArrowLeftRight,
   ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -10,9 +13,14 @@ import {
   ReceiptText,
   Search,
   SearchX,
+  Shapes,
+  TrendingDown,
+  TrendingUp,
   TriangleAlert,
+  Wallet as WalletGlyph,
   X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "lib/utils";
 import { getMonthRangeIso, transactionApi, walletApi } from "services/api";
 import { useLocale } from "contexts/LocaleContext";
@@ -20,15 +28,19 @@ import { useToast } from "contexts/ToastContext";
 import { ConfirmDialog } from "../components/overlays";
 import {
   Button,
-  Chip,
+  Card,
+  CardHeader,
   EmptyState,
+  IconBadge,
   Money,
   Notice,
   PageHeader,
+  Segmented,
   SkeletonRows,
   TextLink,
+  type Tone,
 } from "../components/primitives";
-import { TimelineDayGroup } from "../components/timeline";
+import { TimelineColumnsHeader, TimelineDayGroup } from "../components/timeline";
 import { useLedger } from "../LedgerContext";
 import {
   EXPENSE_CATEGORIES,
@@ -105,28 +117,32 @@ const foldedRowCount = (response: unknown, kind: Kind) => {
 };
 
 /**
- * A native <select> dressed as a filter pill. The real control sits on top,
- * invisible, so the phone still opens its own picker and the pill is only as
- * wide as the current choice rather than the longest option.
+ * A native <select> dressed as a dropdown button. The real control sits on
+ * top, invisible, so the phone still opens its own picker and the button is
+ * only as wide as the current choice rather than the longest option. It is
+ * outlined like an input, not rounded like a chip, so it reads as "pick one
+ * from a list" next to the type switch.
  */
 const FilterSelect: React.FC<{
   label: string;
   value: string;
   display: string;
+  icon: LucideIcon;
   onChange: (value: string) => void;
   children: React.ReactNode;
-}> = ({ label, value, display, onChange, children }) => (
+}> = ({ label, value, display, icon: Icon, onChange, children }) => (
   <label
     className={cn(
-      "relative inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border pl-3.5 pr-3 text-[13px] font-medium transition-colors",
+      "relative inline-flex h-11 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-[12px] border pl-3 pr-2.5 text-[13.5px] font-medium transition-colors",
       "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ledger-accent",
       value
         ? "border-ledger-accent bg-ledger-accent-wash text-ledger-accent"
-        : "border-ledger-line bg-ledger-paper text-ledger-ink-2 hover:border-ledger-line-strong hover:text-ledger-ink",
+        : "border-ledger-line-strong bg-ledger-paper text-ledger-ink hover:bg-ledger-hover",
     )}
   >
-    <span className="max-w-[180px] truncate">{display}</span>
-    <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" />
+    <Icon className={cn("h-4 w-4 shrink-0", !value && "text-ledger-muted")} />
+    <span className="max-w-[200px] truncate">{display}</span>
+    <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
     <select
       aria-label={label}
       className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 [color-scheme:light] dark:[color-scheme:dark]"
@@ -145,6 +161,29 @@ const SelectOption: React.FC<{ value: string; children: React.ReactNode }> = ({
   <option className="bg-ledger-paper text-ledger-ink" value={value}>
     {children}
   </option>
+);
+
+/**
+ * One of the month's figures as its own card, laid out like the Dashboard's
+ * stat tiles so the two pages read the same way.
+ */
+const StatTile: React.FC<{
+  label: string;
+  icon: LucideIcon;
+  tone: Tone;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+}> = ({ label, icon, tone, value, hint }) => (
+  <Card className="hidden min-w-0 flex-col justify-center sm:flex">
+    <div className="flex min-w-0 items-center gap-2.5">
+      <IconBadge icon={icon} tone={tone} />
+      <p className="truncate text-[13.5px] font-medium text-ledger-ink-2">{label}</p>
+    </div>
+    <div className="mt-3 text-[20px] font-semibold leading-tight tracking-[-0.02em] 2xl:text-[22px]">
+      {value}
+    </div>
+    {hint ? <p className="mt-1 text-[12.5px] leading-snug text-ledger-muted">{hint}</p> : null}
+  </Card>
 );
 
 const TransactionsPage: React.FC = () => {
@@ -616,28 +655,82 @@ const TransactionsPage: React.FC = () => {
     (item) => item.key === category,
   );
 
-  const summaryLine =
-    kind === "transfer" ? (
-      <span className="text-[12.5px] text-ledger-muted">
-        {t("Chuyển ví không tính vào thu chi", "Transfers are not income or spending")}
-      </span>
-    ) : summary ? (
-      <span className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ledger-ink-2">
-        {kind !== "expense" ? (
-          <span>
-            {t("Thu", "In")}{" "}
-            <Money amount={summary.income} className="font-semibold" tone="in" />
-          </span>
-        ) : null}
-        {kind === "all" ? <span className="text-ledger-muted">·</span> : null}
-        {kind !== "income" ? (
-          <span>
-            {t("Chi", "Out")}{" "}
-            <Money amount={summary.expense} className="font-semibold" tone="out" />
-          </span>
-        ) : null}
-      </span>
-    ) : null;
+  /* ------------------------------------------------------------ Summary */
+
+  // The server's figures cover the whole filtered month, not only the rows
+  // loaded so far. Transfers and scheduled rows are never part of them.
+  const figuresReady = !loading && !error && summary !== null;
+  const narrowed = Boolean(category) || Boolean(walletId) || Boolean(note);
+  const income = summary?.income ?? 0;
+  const expense = summary?.expense ?? 0;
+  const net = income - expense;
+  const placeholder = <span className="text-ledger-line-strong">—</span>;
+  const filterHint = t("Theo bộ lọc đang chọn", "For the current filters");
+  const transferNote = t("Chuyển ví không tính vào thu chi", "Transfers are not income or spending");
+  const pickAll = t("Chọn “Tất cả” để xem", "Pick “All” to see it");
+
+  const figures: Array<{
+    key: string;
+    label: string;
+    short: string;
+    icon: LucideIcon;
+    tone: Tone;
+    applies: boolean;
+    value: React.ReactNode;
+    hint: string;
+  }> = [
+    {
+      key: "income",
+      label: t(`Thu ${monthName}`, `Income in ${monthName}`),
+      short: t("Thu", "Income"),
+      icon: ArrowDownLeft,
+      tone: "in",
+      applies: kind === "all" || kind === "income",
+      value: <Money amount={income} signed tone="in" />,
+      // A tile that does not apply to the current kind says why, and no two
+      // tiles repeat the same sentence.
+      hint:
+        kind === "transfer"
+          ? transferNote
+          : kind === "expense"
+            ? t("Đang xem riêng khoản chi", "Showing spending only")
+            : narrowed
+              ? filterHint
+              : t("Không tính chuyển ví", "Transfers not included"),
+    },
+    {
+      key: "expense",
+      label: t(`Chi ${monthName}`, `Spent in ${monthName}`),
+      short: t("Chi", "Spent"),
+      icon: ArrowUpRight,
+      tone: "out",
+      applies: kind === "all" || kind === "expense",
+      value: <Money amount={expense} />,
+      hint:
+        kind === "transfer"
+          ? t("Đang xem riêng chuyển ví", "Showing transfers only")
+          : kind === "income"
+            ? t("Đang xem riêng khoản thu", "Showing income only")
+            : narrowed
+              ? filterHint
+              : t("Chưa tính khoản đã lên lịch", "Scheduled items not included"),
+    },
+    {
+      key: "net",
+      label: t(`Chênh lệch ${monthName}`, `Net for ${monthName}`),
+      short: t("Chênh lệch", "Net"),
+      icon: kind === "all" && net < 0 ? TrendingDown : TrendingUp,
+      tone: net < 0 ? "out" : "accent",
+      applies: kind === "all",
+      value: <Money amount={net} signed tone="auto" />,
+      hint:
+        kind !== "all"
+          ? pickAll
+          : narrowed
+            ? filterHint
+            : t("Thu trừ chi", "Income minus spending"),
+    },
+  ];
 
   /* ------------------------------------------------------------- Render */
 
@@ -648,17 +741,32 @@ const TransactionsPage: React.FC = () => {
     { value: "transfer", label: t("Chuyển ví", "Transfers") },
   ];
 
+  const listHeading: Record<Kind, { title: string; icon: LucideIcon; tone: Tone }> = {
+    all: { title: t("Tất cả giao dịch", "All transactions"), icon: ReceiptText, tone: "accent" },
+    expense: { title: t("Khoản chi", "Spending"), icon: ArrowUpRight, tone: "out" },
+    income: { title: t("Khoản thu", "Income"), icon: ArrowDownLeft, tone: "in" },
+    transfer: { title: t("Chuyển ví", "Transfers"), icon: ArrowLeftRight, tone: "neutral" },
+  };
+
   const retry = () => {
     setError(null);
     setLoading(true);
     setReloadKey((key) => key + 1);
   };
 
+  // "Ghi giao dịch" starts from what the list is showing: a list of income
+  // opens an income, a list filtered to one wallet pays from that wallet.
+  const addFromList = () =>
+    openQuickAdd({
+      mode: kind === "income" ? "INCOME" : kind === "transfer" ? "TRANSFER" : "EXPENSE",
+      walletId: activeWallets.some((wallet) => wallet._id === walletId) ? walletId : undefined,
+    });
+
   // Without this an unreachable server would read as "no transactions".
   const errorNotice = error ? (
     <Notice
       action={<TextLink onClick={retry}>{t("Thử lại", "Retry")}</TextLink>}
-      className="mt-5"
+      className="mb-4"
       detail={error}
       icon={TriangleAlert}
       tone="rose"
@@ -721,19 +829,24 @@ const TransactionsPage: React.FC = () => {
   } else {
     body = (
       <>
-        <div className="[&>*+*]:mt-3">
+        {/* On a wide screen the rows become a table: category, wallet and
+            amount each get a column under these titles. */}
+        <TimelineColumnsHeader />
+        <div className="[&>*+*]:mt-4">
           {days.map((day) => (
             <TimelineDayGroup
+              columns
               day={day}
               key={day.dayKey}
               onDelete={requestDelete}
               onEdit={(entry) => openQuickAdd({ editing: entry.source })}
+              sticky
             />
           ))}
         </div>
         {hasMore ? (
-          <div className="flex flex-col items-center gap-2 border-t border-ledger-line pt-6">
-            <Button disabled={loadingMore} onClick={loadMore} variant="outline">
+          <div className="mt-5 flex flex-col items-center gap-2 border-t border-ledger-line pt-5">
+            <Button disabled={loadingMore} icon={ChevronDown} onClick={loadMore} variant="outline">
               {loadingMore ? t("Đang tải…", "Loading…") : t("Xem thêm", "Show more")}
             </Button>
             <p className="ledger-num text-[12.5px] text-ledger-muted">
@@ -745,16 +858,109 @@ const TransactionsPage: React.FC = () => {
     );
   }
 
+  const monthTitle = isVietnamese
+    ? monthLabel(period.month, period.year, true)
+    : englishMonth(period, "long", true);
+  // Previous / next month. On a phone they sit beside the month at thumb
+  // size; in a tile they sit on the label row, 32px like the icon badge, so
+  // the month name keeps the tile's full width and lines up with the figures
+  // in the tiles next to it.
+  const monthSteps = (size: "sm" | "lg") => {
+    const classes = cn(
+      "flex items-center justify-center border border-ledger-line-strong bg-ledger-paper text-ledger-ink-2 transition-colors hover:bg-ledger-hover hover:text-ledger-ink",
+      size === "lg" ? "h-10 w-10 rounded-[10px]" : "h-8 w-8 rounded-[9px]",
+    );
+    const icon = size === "lg" ? "h-[18px] w-[18px]" : "h-4 w-4";
+    return (
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          aria-label={t("Tháng trước", "Previous month")}
+          className={classes}
+          onClick={() => setPeriod((current) => shiftMonth(current, -1))}
+          type="button"
+        >
+          <ChevronLeft className={icon} />
+        </button>
+        <button
+          aria-label={t("Tháng sau", "Next month")}
+          className={classes}
+          onClick={() => setPeriod((current) => shiftMonth(current, 1))}
+          type="button"
+        >
+          <ChevronRight className={icon} />
+        </button>
+      </div>
+    );
+  };
+
+  // The month is the page's main switch, so it gets a card of its own at the
+  // head of the figures it controls. On a phone the figure tiles are hidden
+  // and the same numbers fold into this card as rows.
+  const monthCard = (
+    <Card className="flex min-w-0 flex-col justify-center">
+      <div className="hidden min-w-0 items-center gap-2.5 sm:flex">
+        <IconBadge icon={CalendarDays} />
+        <p className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-ledger-ink-2">
+          {t("Đang xem", "Viewing")}
+        </p>
+        {monthSteps("sm")}
+      </div>
+      <div className="flex items-center justify-between gap-3 sm:mt-3">
+        <div className="min-w-0">
+          <p className="ledger-num text-[20px] font-semibold leading-tight tracking-[-0.02em] text-ledger-ink 2xl:text-[22px]">
+            {monthTitle}
+          </p>
+          <p className="mt-1 text-[12.5px] text-ledger-muted">
+            {isCurrentMonth ? (
+              t("Tháng hiện tại", "The current month")
+            ) : (
+              <TextLink className="text-[12.5px]" onClick={() => setPeriod(today)}>
+                {t("Về tháng này", "Back to this month")}
+              </TextLink>
+            )}
+          </p>
+        </div>
+        <div className="sm:hidden">{monthSteps("lg")}</div>
+      </div>
+      <div className="mt-4 border-t border-ledger-line pt-1 sm:hidden">
+        {kind === "transfer" ? (
+          <p className="pt-2.5 text-[13px] text-ledger-ink-2">{transferNote}</p>
+        ) : (
+          <dl className="divide-y divide-ledger-line">
+            {figures
+              .filter((figure) => figure.applies)
+              .map((figure) => (
+                <div
+                  className="flex items-center justify-between gap-3 py-2.5 last:pb-0"
+                  key={figure.key}
+                >
+                  <dt className="text-[13.5px] text-ledger-ink-2">{figure.short}</dt>
+                  <dd className="text-[15px] font-semibold">
+                    {figuresReady ? figure.value : placeholder}
+                  </dd>
+                </div>
+              ))}
+          </dl>
+        )}
+        {narrowed && kind !== "transfer" ? (
+          <p className="mt-2 text-[12.5px] text-ledger-muted">{filterHint}</p>
+        ) : null}
+      </div>
+    </Card>
+  );
+
+  const heading = listHeading[kind];
+
   return (
     <div>
       <PageHeader
         actions={
           <>
-            <div className="relative min-w-0 flex-1 sm:w-[260px] sm:flex-none">
+            <div className="relative min-w-0 flex-1 sm:w-[240px] sm:flex-none xl:w-[300px]">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ledger-muted" />
               <input
                 aria-label={t("Tìm trong ghi chú", "Search notes")}
-                className="h-10 w-full rounded-[10px] border border-ledger-line bg-ledger-paper pl-9 pr-9 text-[14px] text-ledger-ink outline-none transition-colors placeholder:text-ledger-muted focus:border-ledger-accent"
+                className="h-10 w-full rounded-[10px] border border-ledger-line-strong bg-ledger-paper pl-9 pr-9 text-[14px] text-ledger-ink outline-none transition-colors placeholder:text-ledger-muted focus:border-ledger-accent"
                 enterKeyHint="search"
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={t("Tìm trong ghi chú", "Search notes")}
@@ -782,120 +988,139 @@ const TransactionsPage: React.FC = () => {
             >
               {t("Chuyển ví", "Transfer")}
             </Button>
+            {/* A phone has the + in the tab bar for this. */}
+            <Button className="hidden sm:inline-flex" icon={Plus} onClick={addFromList}>
+              {t("Ghi giao dịch", "New entry")}
+            </Button>
           </>
         }
         subtitle={subtitle}
         title={t("Giao dịch", "Transactions")}
       />
 
-      {/* One row of filters. It scrolls sideways on a phone, and the month's
-          totals drop to their own line there instead of scrolling out of
-          sight at the end of it. */}
-      <div className="flex flex-col gap-3 border-b border-ledger-line py-3.5 lg:flex-row lg:items-center lg:gap-6">
-        <div className="ledger-scroll-x -mx-1 flex min-w-0 items-center gap-2 px-1 lg:flex-1 lg:flex-wrap">
-          {kinds.map((option) => (
-            <Chip
-              key={option.value}
-              onClick={() => chooseKind(option.value)}
-              selected={kind === option.value}
-            >
-              {option.label}
-            </Chip>
+      {/* Up to a laptop-sized screen the month and its figures run across the
+          top. On a very wide screen they move into a side column that stays
+          in view while the ledger scrolls, so the table is not stretched so
+          wide that a name sits a whole screen away from its category. */}
+      <div className="grid gap-3 sm:gap-4 xl:gap-5 min-[1700px]:grid-cols-12 min-[1700px]:items-start">
+        <section className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4 xl:gap-5 min-[1700px]:sticky min-[1700px]:top-6 min-[1700px]:order-2 min-[1700px]:col-span-3 min-[1700px]:grid-cols-1">
+          {monthCard}
+          {figures.map((figure) => (
+            <StatTile
+              hint={figure.hint}
+              icon={figure.icon}
+              key={figure.key}
+              label={figure.label}
+              tone={figure.applies ? figure.tone : "neutral"}
+              value={figure.applies && figuresReady ? figure.value : placeholder}
+            />
           ))}
+        </section>
 
-          <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-ledger-line" />
-
-          <div className="inline-flex h-9 shrink-0 items-center rounded-full border border-ledger-line bg-ledger-paper">
-            <button
-              aria-label={t("Tháng trước", "Previous month")}
-              className="flex h-full w-9 items-center justify-center rounded-l-full text-ledger-ink-2 hover:bg-ledger-canvas hover:text-ledger-ink"
-              onClick={() => setPeriod((current) => shiftMonth(current, -1))}
-              type="button"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="ledger-num min-w-[96px] px-1 text-center text-[13px] font-medium text-ledger-ink">
-              {isVietnamese
-                ? monthLabel(period.month, period.year, true)
-                : englishMonth(period, "short", true)}
-            </span>
-            <button
-              aria-label={t("Tháng sau", "Next month")}
-              className="flex h-full w-9 items-center justify-center rounded-r-full text-ledger-ink-2 hover:bg-ledger-canvas hover:text-ledger-ink"
-              onClick={() => setPeriod((current) => shiftMonth(current, 1))}
-              type="button"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          <FilterSelect
-            display={walletId ? selectedWalletName : t("Mọi ví", "All wallets")}
-            label={t("Lọc theo ví", "Filter by wallet")}
-            onChange={setWalletId}
-            value={walletId}
-          >
-            <SelectOption value="">{t("Mọi ví", "All wallets")}</SelectOption>
-            {activeWallets.map((wallet) => (
-              <SelectOption key={wallet._id} value={wallet._id}>
-                {wallet.name}
-              </SelectOption>
-            ))}
-            {archivedWallets.length ? (
-              <optgroup label={t("Đã lưu trữ", "Archived")}>
-                {archivedWallets.map((wallet) => (
+        <div className="min-w-0 space-y-3 sm:space-y-4 xl:space-y-5 min-[1700px]:col-span-9">
+          {/* What to show: the kind as a switch, then the narrowing dropdowns. */}
+          <Card className="flex flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:items-center lg:gap-4" flush>
+            <Segmented
+              // Four options share a phone's width; tighter padding keeps
+              // "Chuyển ví" on one line.
+              className="w-full shrink-0 lg:w-[400px] [&>button]:whitespace-nowrap [&>button]:px-1.5 sm:[&>button]:px-3"
+              onChange={chooseKind}
+              options={kinds}
+              value={kind}
+            />
+            {/* These wrap rather than scroll: "Xoá bộ lọc" must never be the
+                thing hidden past the edge of a phone. */}
+            <div className="flex min-w-0 flex-wrap items-center gap-2 lg:flex-1">
+              <FilterSelect
+                display={walletId ? selectedWalletName : t("Mọi ví", "All wallets")}
+                icon={WalletGlyph}
+                label={t("Lọc theo ví", "Filter by wallet")}
+                onChange={setWalletId}
+                value={walletId}
+              >
+                <SelectOption value="">{t("Mọi ví", "All wallets")}</SelectOption>
+                {activeWallets.map((wallet) => (
                   <SelectOption key={wallet._id} value={wallet._id}>
                     {wallet.name}
                   </SelectOption>
                 ))}
-              </optgroup>
-            ) : null}
-            {walletId && !wallets.some((wallet) => wallet._id === walletId) ? (
-              <SelectOption value={walletId}>{selectedWalletName}</SelectOption>
-            ) : null}
-          </FilterSelect>
+                {archivedWallets.length ? (
+                  <optgroup label={t("Đã lưu trữ", "Archived")}>
+                    {archivedWallets.map((wallet) => (
+                      <SelectOption key={wallet._id} value={wallet._id}>
+                        {wallet.name}
+                      </SelectOption>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {walletId && !wallets.some((wallet) => wallet._id === walletId) ? (
+                  <SelectOption value={walletId}>{selectedWalletName}</SelectOption>
+                ) : null}
+              </FilterSelect>
 
-          {/* A transfer has no category of its own to narrow by. */}
-          {kind !== "transfer" ? (
-            <FilterSelect
-              display={category ? categoryLabel(category) : t("Mọi danh mục", "All categories")}
-              label={t("Lọc theo danh mục", "Filter by category")}
-              onChange={setCategory}
-              value={category}
-            >
-              <SelectOption value="">{t("Mọi danh mục", "All categories")}</SelectOption>
-              {kind !== "income" ? (
-                <optgroup label={t("Khoản chi", "Spending")}>
-                  {EXPENSE_CATEGORIES.map((item) => (
-                    <SelectOption key={item.key} value={item.key}>
-                      {isVietnamese ? item.vi : item.en}
-                    </SelectOption>
-                  ))}
-                </optgroup>
+              {/* A transfer has no category of its own to narrow by. */}
+              {kind !== "transfer" ? (
+                <FilterSelect
+                  display={category ? categoryLabel(category) : t("Mọi danh mục", "All categories")}
+                  icon={Shapes}
+                  label={t("Lọc theo danh mục", "Filter by category")}
+                  onChange={setCategory}
+                  value={category}
+                >
+                  <SelectOption value="">{t("Mọi danh mục", "All categories")}</SelectOption>
+                  {kind !== "income" ? (
+                    <optgroup label={t("Khoản chi", "Spending")}>
+                      {EXPENSE_CATEGORIES.map((item) => (
+                        <SelectOption key={item.key} value={item.key}>
+                          {isVietnamese ? item.vi : item.en}
+                        </SelectOption>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                  {kind !== "expense" ? (
+                    <optgroup label={t("Khoản thu", "Income")}>
+                      {INCOME_CATEGORIES.map((item) => (
+                        <SelectOption key={item.key} value={item.key}>
+                          {isVietnamese ? item.vi : item.en}
+                        </SelectOption>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                  {category && !knownCategory ? (
+                    <SelectOption value={category}>{categoryLabel(category)}</SelectOption>
+                  ) : null}
+                </FilterSelect>
               ) : null}
-              {kind !== "expense" ? (
-                <optgroup label={t("Khoản thu", "Income")}>
-                  {INCOME_CATEGORIES.map((item) => (
-                    <SelectOption key={item.key} value={item.key}>
-                      {isVietnamese ? item.vi : item.en}
-                    </SelectOption>
-                  ))}
-                </optgroup>
+
+              {hasFilters ? (
+                <button
+                  className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-[12px] px-3 text-[13.5px] font-medium text-ledger-ink-2 transition-colors hover:bg-ledger-canvas hover:text-ledger-ink lg:ml-auto"
+                  onClick={clearFilters}
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                  {t("Xoá bộ lọc", "Clear filters")}
+                </button>
               ) : null}
-              {category && !knownCategory ? (
-                <SelectOption value={category}>{categoryLabel(category)}</SelectOption>
-              ) : null}
-            </FilterSelect>
-          ) : null}
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader
+              icon={heading.icon}
+              subtitle={
+                days.length && !loading
+                  ? t("Bấm vào một dòng để sửa hoặc xoá", "Click a row to edit or delete it")
+                  : undefined
+              }
+              title={heading.title}
+              tone={heading.tone}
+            />
+            {errorNotice}
+            {body}
+          </Card>
         </div>
-
-        {!loading && !error ? <div className="shrink-0">{summaryLine}</div> : null}
       </div>
-
-      <section className="pb-2">
-        {errorNotice}
-        {body}
-      </section>
 
       <ConfirmDialog
         busy={deleting}
@@ -917,13 +1142,18 @@ const TransactionsPage: React.FC = () => {
       >
         {effects.length ? (
           <div>
-            <dl className="divide-y divide-ledger-line border-y border-ledger-line">
+            <p className="mb-2 text-[13px] font-medium text-ledger-ink-2">
+              {t("Số dư ví sau khi xoá", "Wallet balance afterwards")}
+            </p>
+            <dl className="divide-y divide-ledger-line rounded-[12px] border border-ledger-line bg-ledger-canvas px-3.5">
               {effects.map((effect) => (
                 <div
-                  className="flex items-center justify-between gap-3 py-2.5 text-[13.5px]"
+                  // A phone puts the figures under the name on every row, so
+                  // two wallets never end up laid out two different ways.
+                  className="flex flex-col gap-1 py-2.5 text-[13.5px] sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                   key={effect.id}
                 >
-                  <dt className="min-w-0 truncate text-ledger-ink-2">{effect.name}</dt>
+                  <dt className="min-w-0 truncate font-medium text-ledger-ink">{effect.name}</dt>
                   <dd className="flex shrink-0 items-center gap-1.5">
                     {effect.balance !== null ? (
                       <>
@@ -963,3 +1193,4 @@ const TransactionsPage: React.FC = () => {
 };
 
 export default TransactionsPage;
+

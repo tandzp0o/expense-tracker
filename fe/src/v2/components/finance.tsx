@@ -131,9 +131,13 @@ export const WalletRow: React.FC<{
 export const BudgetTrackRow: React.FC<{
   budget: BudgetItem;
   showIcon?: boolean;
+  /** Show "Mọi ví" for budgets that are not tied to a wallet. */
+  showScope?: boolean;
   trailing?: React.ReactNode;
   footnote?: React.ReactNode;
-}> = ({ budget, showIcon = true, trailing, footnote }) => {
+  /** No divider: for budgets laid out as tiles in a grid. */
+  tile?: boolean;
+}> = ({ budget, showIcon = true, showScope = true, trailing, footnote, tile }) => {
   const t = useT();
   const { isVietnamese } = useLocale();
   const categoryMeta = getCategoryMeta(budget.category);
@@ -147,39 +151,62 @@ export const BudgetTrackRow: React.FC<{
   const spent = toAmount(budget.spent);
   const percent = limit > 0 ? (spent / limit) * 100 : spent > 0 ? 101 : 0;
   const over = spent - limit;
+  const usedUp = over === 0 && limit > 0;
+  const scope = budget.walletId
+    ? budget.walletName || t("Một ví", "One wallet")
+    : showScope
+      ? t("Mọi ví", "All wallets")
+      : "";
 
   return (
-    <div className="border-b border-ledger-line py-4 last:border-b-0">
+    <div
+      className={cn(
+        "min-w-0",
+        tile ? "py-1" : "border-b border-ledger-line py-4 first:pt-0 last:border-b-0 last:pb-0",
+      )}
+    >
+      {/* Name and share on top, the track, then the figures under it: each
+          line has the full width, so nothing truncates on a phone. */}
       <div className="flex items-center gap-3">
-        {showIcon ? <CategoryIcon meta={meta} size={38} /> : null}
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <p className="truncate text-[14.5px] font-medium text-ledger-ink">
-              {isVietnamese ? meta.vi : meta.en}
-            </p>
-            <span className="rounded-full bg-ledger-canvas px-2 py-0.5 text-[11.5px] text-ledger-ink-2">
-              {budget.walletId
-                ? budget.walletName || t("Một ví", "One wallet")
-                : t("Mọi ví", "All wallets")}
-            </span>
-          </div>
-          <p className="ledger-num mt-0.5 text-[12.5px] text-ledger-muted">
-            {formatMoney(spent)} / {formatMoney(limit)}
+        {showIcon ? <CategoryIcon meta={meta} size={36} /> : null}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <p className="truncate text-[15px] font-semibold text-ledger-ink">
+            {isVietnamese ? meta.vi : meta.en}
           </p>
+          {scope ? (
+            <span className="min-w-0 max-w-[45%] truncate rounded-full bg-ledger-canvas px-2 py-0.5 text-[11.5px] font-medium text-ledger-ink-2">
+              {scope}
+            </span>
+          ) : null}
         </div>
         <span
           className={cn(
-            "ledger-num shrink-0 text-right text-[13px] font-semibold",
-            over > 0 ? "text-ledger-out" : "text-ledger-ink-2",
+            "ledger-num shrink-0 text-[13.5px] font-semibold",
+            over > 0 ? "text-ledger-out" : percent >= 85 ? "text-ledger-spend" : "text-ledger-ink-2",
           )}
         >
-          {over > 0
-            ? t(`Vượt ${formatMoney(over)}`, `${formatMoney(over)} over`)
-            : t(`Còn ${formatMoney(-over)}`, `${formatMoney(-over)} left`)}
+          {Math.round(percent)}%
         </span>
         {trailing}
       </div>
       <Track className="mt-3" percent={percent} />
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <span className="ledger-num text-[13px] text-ledger-muted">
+          {formatMoney(spent)} / {formatMoney(limit)}
+        </span>
+        <span
+          className={cn(
+            "ledger-num text-[13.5px] font-semibold",
+            over > 0 ? "text-ledger-out" : usedUp ? "text-ledger-spend" : "text-ledger-ink",
+          )}
+        >
+          {over > 0
+            ? t(`Vượt ${formatMoney(over)}`, `${formatMoney(over)} over`)
+            : usedUp
+              ? t("Đã dùng hết", "All used")
+              : t(`Còn ${formatMoney(-over)}`, `${formatMoney(-over)} left`)}
+        </span>
+      </div>
       {footnote}
     </div>
   );

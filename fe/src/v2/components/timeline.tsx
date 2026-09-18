@@ -3,7 +3,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { cn } from "lib/utils";
 import { useLocale } from "contexts/LocaleContext";
 import type { TimelineDay, TimelineEntry } from "../lib/timeline";
-import { CategoryIcon, Eyebrow, Money } from "./primitives";
+import { CategoryIcon, Money } from "./primitives";
 
 const StatusPill: React.FC<{ status: TimelineEntry["status"] }> = ({ status }) => {
   const { isVietnamese } = useLocale();
@@ -26,17 +26,27 @@ const StatusPill: React.FC<{ status: TimelineEntry["status"] }> = ({ status }) =
           : "Cancelled";
 
   return (
-    <span className="shrink-0 rounded-full bg-ledger-spend-wash px-2 py-0.5 text-[11px] font-semibold text-ledger-spend">
+    <span className="shrink-0 rounded-full bg-ledger-spend-wash px-2 py-0.5 text-[11.5px] font-semibold text-ledger-spend">
       {label}
     </span>
   );
 };
 
+/**
+ * One transaction. Clicking the row opens its actions underneath, on a phone
+ * and with a mouse alike: icons that only appear on hover either eat the title
+ * on a small screen or leave a hole beside every amount on a large one.
+ *
+ * With `columns`, a wide screen shows category and wallet as their own
+ * columns, so a long list reads like a ledger instead of a column of names
+ * with amounts floating far to the right.
+ */
 export const TimelineRow: React.FC<{
   entry: TimelineEntry;
   onEdit?: (entry: TimelineEntry) => void;
   onDelete?: (entry: TimelineEntry) => void;
-}> = ({ entry, onEdit, onDelete }) => {
+  columns?: boolean;
+}> = ({ entry, onEdit, onDelete, columns }) => {
   const { isVietnamese } = useLocale();
   const [open, setOpen] = React.useState(false);
   const tone =
@@ -50,19 +60,40 @@ export const TimelineRow: React.FC<{
 
   const body = (
     <>
-      <CategoryIcon meta={entry.meta} />
+      <CategoryIcon meta={entry.meta} size={40} />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <p className="truncate text-[14.5px] font-medium text-ledger-ink">
-            {entry.title}
-          </p>
-          <StatusPill status={entry.status} />
+          <p className="truncate text-[15px] font-medium text-ledger-ink">{entry.title}</p>
+          <span className="hidden sm:contents">
+            <StatusPill status={entry.status} />
+          </span>
         </div>
-        <p className="truncate text-[12.5px] text-ledger-muted">{entry.subtitle}</p>
+        {/* On a phone the status moves to the second line, so it never cuts
+            the title short. */}
+        <div className={cn("flex min-w-0 items-center gap-2", columns && "xl:hidden")}>
+          <span className="contents sm:hidden">
+            <StatusPill status={entry.status} />
+          </span>
+          <p className="truncate text-[13px] text-ledger-muted">{entry.subtitle}</p>
+        </div>
       </div>
+      {columns ? (
+        <>
+          <span className="hidden w-[180px] shrink-0 truncate text-[13.5px] text-ledger-ink-2 xl:block">
+            {entry.categoryLabel}
+          </span>
+          <span className="hidden w-[220px] shrink-0 truncate text-[13.5px] text-ledger-ink-2 xl:block">
+            {entry.walletLabel}
+          </span>
+        </>
+      ) : null}
       <Money
         amount={entry.amount}
-        className={cn("shrink-0 text-[14.5px] font-semibold", planned && "opacity-60")}
+        className={cn(
+          "shrink-0 text-right text-[15px] font-semibold",
+          columns && "xl:w-[150px]",
+          planned && "opacity-60",
+        )}
         signed={entry.kind === "income" || entry.kind === "expense"}
         tone={tone}
       />
@@ -70,52 +101,27 @@ export const TimelineRow: React.FC<{
   );
 
   return (
-    <div className="group border-b border-ledger-line last:border-b-0">
-      <div className="flex min-h-[64px] items-center gap-3 py-3">
-        {/* On a phone the icons would eat the title, so the row itself opens
-            its actions; with a mouse they appear on hover instead. */}
-        {hasActions ? (
-          <button
-            aria-expanded={open}
-            className="flex min-w-0 flex-1 items-center gap-3 text-left lg:cursor-default"
-            onClick={() => setOpen((value) => !value)}
-            type="button"
-          >
-            {body}
-          </button>
-        ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-3">{body}</div>
-        )}
-        {hasActions ? (
-          <div className="hidden w-[72px] shrink-0 items-center justify-end lg:flex lg:opacity-0 lg:transition-opacity lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
-            {canEdit ? (
-              <button
-                aria-label={editLabel}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-ledger-muted hover:bg-ledger-canvas hover:text-ledger-ink"
-                onClick={() => onEdit?.(entry)}
-                type="button"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-            ) : null}
-            {canDelete ? (
-              <button
-                aria-label={deleteLabel}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-ledger-muted hover:bg-ledger-out-wash hover:text-ledger-out"
-                onClick={() => onDelete?.(entry)}
-                type="button"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+    <div className="border-b border-ledger-line last:border-b-0">
+      {hasActions ? (
+        <button
+          aria-expanded={open}
+          className={cn(
+            "-mx-2 flex w-[calc(100%+16px)] min-w-0 items-center gap-3 rounded-[12px] px-2 py-3 text-left transition-colors hover:bg-ledger-hover",
+            open && "bg-ledger-hover",
+          )}
+          onClick={() => setOpen((value) => !value)}
+          type="button"
+        >
+          {body}
+        </button>
+      ) : (
+        <div className="flex min-w-0 items-center gap-3 py-3">{body}</div>
+      )}
       {hasActions && open ? (
-        <div className="-mt-1 flex flex-wrap gap-2 pb-3 pl-[48px] lg:hidden">
+        <div className="flex flex-wrap items-center gap-2 pb-3 pl-[52px] pt-1">
           {canEdit ? (
             <button
-              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-ledger-line-strong px-3.5 text-[13px] font-semibold text-ledger-ink"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-ledger-line-strong bg-ledger-paper px-3.5 text-[13px] font-semibold text-ledger-ink hover:bg-ledger-hover"
               onClick={() => {
                 setOpen(false);
                 onEdit?.(entry);
@@ -128,7 +134,7 @@ export const TimelineRow: React.FC<{
           ) : null}
           {canDelete ? (
             <button
-              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-ledger-line-strong px-3.5 text-[13px] font-semibold text-ledger-out"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-ledger-line-strong bg-ledger-paper px-3.5 text-[13px] font-semibold text-ledger-out hover:bg-ledger-out-wash"
               onClick={() => {
                 setOpen(false);
                 onDelete?.(entry);
@@ -140,8 +146,10 @@ export const TimelineRow: React.FC<{
             </button>
           ) : null}
           {!canEdit ? (
-            <p className="self-center text-[12px] text-ledger-muted">
-              {isVietnamese ? "Dòng này không sửa được, chỉ xoá." : "This row can only be deleted."}
+            <p className="text-[12.5px] text-ledger-muted">
+              {isVietnamese
+                ? "Loại giao dịch này không sửa trực tiếp được. Xoá rồi ghi lại nếu cần."
+                : "This kind of entry cannot be edited. Delete it and record it again if needed."}
             </p>
           ) : null}
         </div>
@@ -150,20 +158,60 @@ export const TimelineRow: React.FC<{
   );
 };
 
+/** Column titles for the wide layout; hidden below xl. */
+export const TimelineColumnsHeader: React.FC = () => {
+  const { isVietnamese } = useLocale();
+  const label = "text-[12px] font-semibold uppercase tracking-[0.06em] text-ledger-muted";
+
+  return (
+    <div className="mb-2 hidden items-center gap-3 border-b border-ledger-line pb-2.5 xl:flex">
+      <span className={cn(label, "flex-1 pl-[52px]")}>
+        {isVietnamese ? "Giao dịch" : "Transaction"}
+      </span>
+      <span className={cn(label, "w-[180px]")}>{isVietnamese ? "Danh mục" : "Category"}</span>
+      <span className={cn(label, "w-[220px]")}>{isVietnamese ? "Ví" : "Wallet"}</span>
+      <span className={cn(label, "w-[150px] text-right")}>
+        {isVietnamese ? "Số tiền" : "Amount"}
+      </span>
+    </div>
+  );
+};
+
+/**
+ * A day of transactions: a tinted heading with the day's net, then its rows.
+ * The heading is a filled bar rather than tiny caps on a hairline, so days
+ * separate clearly when scanning a long list.
+ */
 export const TimelineDayGroup: React.FC<{
   day: TimelineDay;
   onEdit?: (entry: TimelineEntry) => void;
   onDelete?: (entry: TimelineEntry) => void;
-}> = ({ day, onEdit, onDelete }) => (
-  <div>
-    <div className="sticky top-0 z-[1] flex items-center justify-between border-b border-ledger-line bg-ledger-paper py-2.5">
-      <Eyebrow>{day.label}</Eyebrow>
+  columns?: boolean;
+  /** Keep the day heading in view while its rows scroll (long lists only). */
+  sticky?: boolean;
+}> = ({ day, onEdit, onDelete, columns, sticky }) => (
+  <div className="mt-3 first:mt-0">
+    <div
+      className={cn(
+        // Same inset as the rows (-mx-2 px-2), so the day total lines up with
+        // the amounts under it.
+        "-mx-2 flex items-center justify-between gap-3 rounded-[10px] bg-ledger-canvas px-2 py-2",
+        sticky && "sticky top-0 z-[1]",
+      )}
+    >
+      <span className="text-[13px] font-semibold text-ledger-ink-2">{day.label}</span>
       {day.net !== 0 ? (
-        <Money amount={day.net} className="text-[12.5px] font-semibold" signed tone="auto" />
+        <Money amount={day.net} className="text-[13px] font-semibold" signed tone="auto" />
       ) : null}
     </div>
     {day.entries.map((entry) => (
-      <TimelineRow entry={entry} key={entry.id} onDelete={onDelete} onEdit={onEdit} />
+      <TimelineRow
+        columns={columns}
+        entry={entry}
+        key={entry.id}
+        onDelete={onDelete}
+        onEdit={onEdit}
+      />
     ))}
   </div>
 );
